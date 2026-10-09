@@ -48,7 +48,7 @@ def preview_report(state_dir, log_dir, payload):
     result={'schema_version':1,'report_id':report_id,'type':kind,'state':'draft','destination':DESTINATION,
             'title':values['title'],'body':body,'labels':['bug' if kind=='bug' else 'enhancement','from-app'],
             'files':files,'delivery_available':False,
-            'disclosure':'Public GitHub issue. Prose and the listed diagnostic files would be shared. The private alias key is excluded. Nothing has been sent.'}
+            'disclosure':'Please don’t send any confidential information. Public GitHub issue. Prose and the listed diagnostic files would be shared. The private alias key is excluded. Nothing has been sent.'}
     fd=os.open(case/'draft.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'w') as target:json.dump(result,target,indent=2)
     return result
