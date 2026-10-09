@@ -13,7 +13,7 @@ import subprocess
 import shutil
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json, cloud_status, archive_manifest, content_manifest, utc_now
+from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json, cloud_status, archive_manifest, content_manifest, utc_now, tree_entries, verify_current
 
 
 class HubTests(unittest.TestCase):
@@ -156,6 +156,83 @@ class HubTests(unittest.TestCase):
         self.hub.backup()
         self.assertNotEqual(self.hub.index[key]["archive"], previous)
         self.assertFalse(self.hub.status["repos"][0]["needs_backup"])
+
+    def test_timestamp_only_changes_match_hashes_and_do_not_replace_backup(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        previous = self.hub.index[key]["archive"]
+        for path in [self.repo / "work.txt", self.repo / "ignored"]:
+            s = path.stat()
+            os.utime(path, ns=(s.st_atime_ns, s.st_mtime_ns + 1_000_000_000))
+        self.hub.scan(deep=False)
+        self.assertEqual(self.hub.status["repos"][0]["verification"]["state"], "checking")
+        self.hub.scan(force=True)
+        row = self.hub.status["repos"][0]
+        self.assertEqual(row["verification"]["state"], "matched")
+        self.assertFalse(row["needs_backup"])
+        self.assertNotEqual(row["signature"], self.hub.index[key]["signature"])
+        self.hub.scan(deep=False)
+        self.assertFalse(self.hub.status["repos"][0]["needs_backup"])
+        self.hub.backup()
+        self.assertEqual(self.hub.index[key]["archive"], previous)
+
+    def test_hash_differences_distinguish_finder_git_and_repo_files(self):
+        finder = self.repo / ".DS_Store"
+        finder.write_bytes(b"old")
+        self.hub.backup()
+        current = self.hub.index[workspace_id("Example")]
+        finder.write_bytes(b"new")
+        (self.repo / ".git/.DS_Store").write_bytes(b"finder in git")
+        self.hub.scan(force=True)
+        row = self.hub.status["repos"][0]
+        self.assertTrue(row["needs_backup"])
+        self.assertEqual(row["verification"]["changes"]["counts"],
+                         {"finder_metadata": 2, "git_data": 0, "repo_files": 0})
+        (self.repo / ".git/marker").write_text("new history")
+        os.chmod(self.repo / "work.txt", 0o700)
+        (self.repo / "ignored/cache.txt").unlink()
+        (self.repo / "new.txt").write_text("untracked")
+        result = verify_current(self.repo, current)
+        self.assertEqual(result["changes"]["counts"],
+                         {"finder_metadata": 2, "git_data": 1, "repo_files": 3})
+        self.assertIn({"path": "ignored/cache.txt", "category": "repo_files", "change": "removed"}, result["changes"]["examples"])
+        for i in range(12):
+            (self.repo / ".git" / f"extra-{i}").write_text("git data")
+        result = verify_current(self.repo, current)
+        self.assertEqual(result["changes"]["counts"]["git_data"], 13)
+        self.assertEqual(len(result["changes"]["examples"]), 8)
+        self.assertTrue(any(item["category"] == "repo_files" for item in result["changes"]["examples"]))
+        self.hub.backup()
+        self.assertEqual(archive_manifest(self.hub.index[workspace_id("Example")]["archive"], "Example"), content_manifest(self.repo))
+
+    def test_verification_for_another_source_tree_cannot_clear_pending_status(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        (self.repo / "work.txt").write_text("real edit")
+        receipt = {**self.hub.verifications[key], "signature": "another-tree"}
+        with patch("repohub.verify_current", return_value=receipt):
+            self.hub.scan(force=True)
+        row = self.hub.status["repos"][0]
+        self.assertEqual(row["verification"]["state"], "checking")
+        self.assertTrue(row["needs_backup"])
+
+    def test_git_monitoring_does_not_refresh_index_or_change_source(self):
+        shutil.rmtree(self.repo / ".git")
+        def git(*args):
+            subprocess.run(["git", "-C", str(self.repo), *args], check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        git("init", "-b", "main")
+        git("add", ".")
+        git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Fixture")
+        path = self.repo / "work.txt"
+        s = path.stat()
+        os.utime(path, ns=(s.st_atime_ns, s.st_mtime_ns + 1_000_000_000))
+        before = tree_entries(self.repo)
+        contents = content_manifest(self.repo)
+        git_info(self.repo)
+        git_info(self.repo)
+        self.assertEqual(tree_entries(self.repo), before)
+        self.assertEqual(content_manifest(self.repo), contents)
 
     def test_corrupted_archive_detected_and_repaired(self):
         self.hub.backup()

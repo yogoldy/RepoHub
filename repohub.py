@@ -160,19 +160,51 @@ def archive_stamp(path):
     return [s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns]
 
 
+def summarize_changes(source, saved):
+    """Describe hash/path/mode differences without calling background writes user edits."""
+    counts = {"finder_metadata": 0, "git_data": 0, "repo_files": 0}
+    samples = {category: [] for category in counts}
+    for relative in sorted(source.keys() | saved.keys()):
+        if source.get(relative) == saved.get(relative):
+            continue
+        path = Path(relative)
+        category = ("finder_metadata" if path.name == ".DS_Store" or path.name.startswith("._")
+                    else "git_data" if ".git" in path.parts else "repo_files")
+        counts[category] += 1
+        if len(samples[category]) < 8:
+            samples[category].append({"path": relative, "category": category,
+                                     "change": "added" if relative not in saved else "removed" if relative not in source else "modified"})
+    # Include representatives of each category so Git internals cannot hide repo files.
+    examples = [item for group in samples.values() for item in group[:2]]
+    extras = [item for group in samples.values() for item in group[2:]]
+    examples.extend(extras[:8 - len(examples)])
+    return {"counts": counts, "examples": examples}
+
+
 def verify_current(root, current):
     entries = tree_entries(root)
-    source_digest = content_signature(content_manifest(root, entries))
+    source = content_manifest(root, entries)
+    source_digest = content_signature(source)
     stamp = archive_stamp(current["archive"])
     if sha256(current["archive"]) != current["sha256"]:
         raise RuntimeError("Backup archive checksum failed; replacement required")
-    stored_digest = current.get("content_signature") or content_signature(archive_manifest(current["archive"], Path(root).name))
+    saved = None
+    stored_digest = current.get("content_signature")
+    if not stored_digest:
+        saved = archive_manifest(current["archive"], Path(root).name)
+        stored_digest = content_signature(saved)
+    changes = {}
+    if source_digest != stored_digest:
+        if saved is None:
+            saved = archive_manifest(current["archive"], Path(root).name)
+        changes = summarize_changes(source, saved)
     if entries != tree_entries(root) or stamp != archive_stamp(current["archive"]):
         raise RuntimeError("Files changed while verifying; retry later")
     return {"state": "matched" if source_digest == stored_digest else "different",
             "checked_at": utc_now(), "signature": fingerprint(entries),
             "archive": current["archive"], "archive_stamp": stamp,
-            "content_signature": source_digest, "archive_content_signature": stored_digest}
+            "content_signature": source_digest, "archive_content_signature": stored_digest,
+            "changes": changes}
 
 
 def cloud_status(raw):
@@ -359,11 +391,15 @@ class Hub:
                             cached = verify_current(root, current)
                             with self.lock:
                                 self.verifications[key] = cached
-                            valid = True
+                            valid = cached.get("signature") == row.get("signature")
                     except Exception as e:
                         cached = {"state": "error", "checked_at": utc_now(), "error": str(e)}
                         valid = True
                 row["verification"] = cached if valid else {"state": "checking"}
+                if row["verification"]["state"] == "matched":
+                    # Timestamps/sizes of directories are hints, not content differences.
+                    # This cached receipt is bound to the current tree and archive above.
+                    row["needs_backup"] = False
                 if row["verification"]["state"] in {"different", "error"}:
                     row["needs_backup"] = True
                 row["cloud"] = self.cloud_for(key, current)
@@ -582,7 +618,7 @@ class Hub:
                     with self.lock:
                         previous = self.index.get(key)
                     verified = None
-                    if previous and previous["signature"] == signature and Path(previous["archive"]).is_file():
+                    if previous and Path(previous["archive"]).is_file():
                         try:
                             verified = verify_current(root, previous)
                         except (OSError, RuntimeError, tarfile.TarError):

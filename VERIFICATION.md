@@ -78,3 +78,16 @@ Spacing-only follow-up adds 14-point gaps between explanatory paragraphs, extra 
 Preview measurements show about 18 points after the folder demonstration row and 14 points between following paragraphs. Expanded spacing and full-dashboard Show me were observed; the illustration entered the demonstration state and the explanation remained visible. JavaScript syntax and 28 status policy checks pass. Existing 52 Python and 35 native bridge checks are unchanged by this CSS-only commit.
 
 Final installed verification: subsequent native UI activation completed successfully. Show me enlarged and shook the actual BlankSlate folder button, without opening Finder; clicking Open Excel development in Finder then opened the exact local `/Users/leogoldberg/Desktop/repos/Excel development` folder. This supersedes the earlier interrupted Finder-activation check. Both disclosure panels and the spaced explanation render in the installed app. No independent cloud computer/download/restore environment was configured.
+
+
+## Backup change detection — 2026-10-09
+
+At Leo's request, main was fast-forwarded from `22fa051` to `cb01813`, bringing in the completed settings/health and menu-bar commits. The follow-up fix uses the separately authorized `codex/backup-change-detection` branch.
+
+Read-only comparisons found seven flagged repos differed only in Finder `.DS_Store` data; RepoHub also had actual source and Git changes from the merge. The latest non-Git file timestamp was not evidence of which file differed from the backup.
+
+- Change reporting compares full source manifests against the checksum-verified archive and separates Finder metadata, Git data and other repo files. Advanced shows up to eight representative changed paths, including each changed category. All files remain in archives, including Finder data, ignored files and Git history.
+- Matching content hashes clear metadata-only pending status. A backup request verifies the existing archive even when timestamps differ, so timestamp-only changes do not create another archive. Cached verification must match the currently scanned source signature; a receipt for another tree remains Checking. Pending hash checks no longer claim New edits.
+- Fifty-six Python tests pass, including archive/persistence/security checks and regressions for file/directory timestamps, mixed Finder/Git/source differences, limited representative examples, permission/deletion/addition changes, mismatched source receipts and read-only Git monitoring. Thirty-four JavaScript status checks pass; main/menu JS syntax and git diff whitespace checks pass. Native code and packaging are unchanged, so no native rebuild was needed.
+- Installed helper and web assets were updated, with the previous runtime preserved at `releases/change-detection-base-cb01813/runtime`. Saved default and per-repo settings hashes remained unchanged. The installed menu page displays Finder metadata changed and explains that repo files still match; Advanced shows the actual `.DS_Store` differences. Finder/Git differences still require backup and cannot produce a green full-match check.
+- The fix is intentionally not merged into main. No independent cloud download/restore audit or deliberately induced personal backup failure was performed. No manual backup was forced just to clear these states.

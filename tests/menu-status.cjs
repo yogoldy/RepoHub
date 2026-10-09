@@ -23,4 +23,15 @@ for(const percent of [null,NaN,Infinity,-1,101,'50',true]){const value=check({..
 for(const percent of [0,55.4,100]){const value=check({...good,cloud:{state:'uploading',percent}},'uploading');assert.equal(value.percent,percent);}
 check({...good,cloud:{state:'pending',percent:100}},'pending');
 check({...good,needs_backup:true,cloud:{state:'uploading',percent:42}},'changed');
+function changed(counts,archive='/current'){
+  return {...good,needs_backup:true,verification:{state:'different',archive,changes:{counts}}};
+}
+assert.equal(check(changed({finder_metadata:2,git_data:0,repo_files:0}),'changed').label,'Finder metadata changed');
+assert.match(view(changed({finder_metadata:2,git_data:0,repo_files:0})).detail,/repo files still match/);
+assert.equal(check(changed({finder_metadata:0,git_data:1,repo_files:0}),'changed').label,'Git data changed');
+assert.equal(check(changed({finder_metadata:1,git_data:1,repo_files:0}),'changed').label,'Finder / Git data changed');
+assert.equal(check(changed({finder_metadata:1,git_data:1,repo_files:2}),'changed').label,'Files changed');
+assert.doesNotMatch(view(changed({finder_metadata:1,git_data:1,repo_files:2})).detail,/repo files still match/);
+assert.equal(check(changed({finder_metadata:1,git_data:0,repo_files:0},'/old'),'changed').label,'Backup needs updating');
+assert.equal(check({...good,needs_backup:true,verification:{state:'checking'}},'verifying').label,'Checking for changes');
 console.log(count+' menu status checks passed');
