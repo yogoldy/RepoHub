@@ -7,6 +7,17 @@ async function api(path,payload){const controller=new AbortController(),timer=se
 function nativeAction(action,repoId){const bridge=window.webkit?.messageHandlers?.repoHub;if(!bridge){$('#notice').textContent='This control is available from the Mac menu bar.';return false;}bridge.postMessage(repoId?{action,repo_id:repoId}:{action});return true;}
 function view(repo){return RepoStatus.view(repo,menuState?.backup);}
 $('#status-legend').innerHTML=RepoStatus.legend();
+let folderDemoTimer=null;
+$('#show-folder').onclick=()=>{
+  const card=[...$('#cards').querySelectorAll('.repo-card')].find(b=>b.dataset.repoId===selectedId);
+  const folder=card?.parentElement.querySelector('.open-repo');if(!folder)return;
+  clearTimeout(folderDemoTimer);for(const node of document.querySelectorAll('.demonstrating'))node.classList.remove('demonstrating');
+  folder.scrollIntoView({behavior:motion(),block:'nearest',inline:'nearest'});
+  void folder.offsetWidth;folder.classList.add('demonstrating');
+  const name=menuState?.repos.find(r=>r.id===selectedId)?.name||'the selected repo';
+  $('#folder-demo-status').textContent='Folder button highlighted for '+name+'. Click that button to open the repo in Finder.';
+  folderDemoTimer=setTimeout(()=>folder.classList.remove('demonstrating'),1400);
+};
 $('#things-toggle').onclick=()=>{const open=$('#things-panel').hidden;$('#things-panel').hidden=!open;$('#things-toggle').setAttribute('aria-expanded',String(open));};
 window.addEventListener('repoHubFinderError',e=>{$('#notice').textContent=e.detail;});
 $('#status-key-toggle').onclick=()=>{const open=$('#status-legend').hidden;$('#status-legend').hidden=!open;$('#status-key-toggle').setAttribute('aria-expanded',String(open));};
