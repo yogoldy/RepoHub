@@ -29,10 +29,20 @@ def status_at(now):
 class PolicyTests(unittest.TestCase):
     def setUp(self):
         self.settings = default_settings()
+        self.settings['battery']['after_edits'] = True  # Exercise opt-in quiet-period scheduling.
         self.scheduler = BackupScheduler(0)
         self.rows = [{'id': 'one', 'signature': 'a', 'needs_backup': True},
                      {'id': 'two', 'signature': 'b', 'needs_backup': True}]
         self.scheduler.observe(self.rows, 0)
+
+    def test_battery_default_is_no_after_edits_and_manual_only_is_supported(self):
+        defaults = default_settings()
+        self.assertFalse(defaults['battery']['after_edits'])
+        self.assertIsNone(self.scheduler.plan(defaults, 'battery', self.rows, 301))
+        defaults['battery'].update(frequency_minutes=0, after_edits=False)
+        self.assertEqual(validate_settings(defaults), defaults)
+        self.assertIsNone(self.scheduler.plan(defaults, 'battery', self.rows, 99999))
+        self.assertEqual(self.scheduler.plan(defaults, 'adapter', self.rows, 3600)['reason'], 'scheduled')
 
     def test_edit_timer_is_per_repo_and_restarts_for_more_edits(self):
         self.rows[0]['signature'] = 'new'
@@ -42,7 +52,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIsNone(self.scheduler.plan(self.settings, 'battery', self.rows, 299))
         self.assertEqual(self.scheduler.plan(self.settings, 'battery', self.rows, 551)['keys'], ['one', 'two'])
 
-    def test_after_edits_default_is_battery_only_and_unknown_pauses(self):
+    def test_after_edits_can_be_battery_only_and_unknown_pauses(self):
         self.assertIsNone(self.scheduler.plan(self.settings, 'adapter', self.rows, 301))
         self.assertIsNone(self.scheduler.plan(self.settings, 'unknown', self.rows, 4000))
         self.assertEqual(self.scheduler.plan(self.settings, 'battery', self.rows, 301)['reason'], 'after_edits')

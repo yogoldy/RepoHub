@@ -7,7 +7,7 @@ EDIT_DELAYS = (2, 5, 10, 15, 30)
 
 
 def default_settings():
-    return {"battery": {"frequency_minutes": 60, "after_edits": True, "edit_delay_minutes": 5},
+    return {"battery": {"frequency_minutes": 60, "after_edits": False, "edit_delay_minutes": 5},
             "adapter": {"frequency_minutes": 60, "after_edits": False, "edit_delay_minutes": 5}}
 
 
