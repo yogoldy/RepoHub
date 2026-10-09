@@ -55,7 +55,7 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 **Remaining exposure:** Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided.
 
-**Hosted-test lesson:** CI exposed Git background maintenance removing `objects/maintenance.lock` between inventory and hashing in a restore fixture. The fixture now disables automatic maintenance/GC before committing. Production concurrent-write rejection remains intact; an idle synthetic fixture must not silently depend on the runner’s Git defaults.
+**Hosted-test lesson:** CI exposed Git background maintenance removing `objects/maintenance.lock` between inventory and hashing in a restore fixture. All committing unit-test fixtures now disable automatic maintenance/GC before committing; the same background writer also changed a read-only monitoring fixture. Production concurrent-write rejection remains intact; an idle synthetic fixture must not silently depend on the runner’s Git defaults.
 
 ### GR03 — Finder-only hints cannot cause broad replacements
 
