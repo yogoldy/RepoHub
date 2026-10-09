@@ -649,7 +649,9 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/views/"):
                 return self.serve_view(path)
             routes = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css",
-                      "/view-client.js": "view-client.js", "/notes.html": "notes.html"}
+                      "/view-client.js": "view-client.js", "/notes.html": "notes.html",
+                      "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
+                      "/repo-status.js": "repo-status.js"}
             if path not in routes:
                 return self.send({"error": "Not found"}, 404)
             target = WEB / routes[path]

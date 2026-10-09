@@ -1,11 +1,11 @@
 # Repo Hub
 
-A simple local Mac app showing whether the latest iCloud-folder backups match the repos on Leo's Desktop. One status page, an optional Advanced toggle, and a menu-bar item. The scoped JSON helper remains available as a foundation for future tools.
+A simple local Mac app showing whether the latest iCloud-folder backups match the repos on Leo's Desktop. A horizontal menu-bar panel, expandable repo details, and an optional full status page with Advanced details. The scoped JSON helper remains available as a foundation for future tools.
 
 ## Pieces
 
 - A Python standard-library helper serves only `127.0.0.1:8767`, scans the configured repos every 30 seconds, and backs them up on a configurable schedule while the Mac is awake.
-- A native Swift / WKWebView menu-bar app (macOS 13 or later, built for this Mac) opens the HTML dashboard. Closing its window leaves the helper running. Quitting the menu-bar app does not stop backups.
+- A native Swift / WKWebView menu-bar app (macOS 13 or later, built for this Mac) opens a transient card panel directly under its menu-bar icon. Clicking outside dismisses it; reopening preserves the selected repo and scroll position. Quitting the menu-bar app does not stop backups.
 - Each workspace has persistent JSON files in `~/Library/Application Support/RepoHub/data/workspaces/`. The hub stores its current repo status as `status.json` and backup metadata as `backups.json` beside the data folder.
 - Independent login LaunchAgents start the helper and menu-bar app. macOS suspends work during sleep; it resumes when the Mac wakes. KeepAlive restarts the helper after an unexpected exit.
 
@@ -63,3 +63,15 @@ Settings live in `data/settings.json`, which is included in saved helper-data ba
 Green requires fresh observations as well as verified hashes and macOS upload acknowledgement. Default freshness limits are two minutes for repo scans, 45 seconds for upload probes, and 17 minutes for hash checks (15-minute interval plus two-minute grace). Failed/unreachable helper requests clear the dashboard's green marks and disable Back up now until it reconnects. A 20-second browser watchdog catches a hanging request. Stale acknowledgement cannot prune previous archives or trigger completion notifications.
 
 The menu's Backup notifications switch covers completion and problem notices. Persistent copy/upload errors and stale checks wait two minutes before a problem notice. Pending uploads with no observed percentage change for 30 minutes and copies on the same repo for 30 minutes also surface an issue. Moving percentage observations reset the upload wait, including progress accompanied by error 4355. Missing percentage is not proof the transfer stopped: the notice says it has not shown progress. Problem episodes are persisted, reset only after observed recovery, grouped, and deduplicated in native preferences with a 30-minute notification cooldown. Notification display continues to depend on macOS permission and Focus.
+
+## Menu-bar repo cards
+
+The menu-bar icon opens a themed NSPopover with three repo cards visible at once. Horizontal trackpad scrolling, previous/next arrows, and Left/Right/Home/End keyboard navigation reach every repo. Clicking a card expands its backup status below the rail: last archive saved, last hash check, archive size, and observed upload progress when available. Selection and card DOM identity survive five-second updates. New repos appear automatically; removal of the selected repo safely selects another. No Git details appear in this compact panel.
+
+A green card requires fresh checks, no new edits or copy errors, and matching verification/upload observations for the exact current archive. Stale data, source changes, missing archive identities, and 100% pending progress cannot become Backed up. Local archive creation uses indeterminate progress; the app does not invent a copying percentage. A saved copy uploading while newer edits exist remains New edits.
+
+Back up now, Repository Backups, Backup notifications, and the settings gear use the same card theme. Settings open inside the popover and save to the same revision-safe settings API; no full app window is needed. There is no Open Repo Hub menu button. A small Quit control stops only the menu-bar app. The original full dashboard remains available at the helper root for development/Advanced inspection.
+
+The native bridge accepts only openBackups, toggleNotifications, and quit from this popover's exact top-level http://127.0.0.1:8767/menu.html document. Other origins, ports, paths, subframes, extra fields and arbitrary path/command requests are rejected. HTML views never receive this bridge. Backups and settings still go through authenticated loopback POST endpoints, obtaining the current process token for each write so a helper restart does not strand the panel with an old token. Browser-only previews disable the three native controls.
+
+Menu checks: `node tests/menu-status.cjs`; compile `native/MenuBridge.swift` with `tests/menu_bridge_checks.swift` and run the executable. Existing Python security/backup and Swift notification-readiness checks still apply. This branch starts from 9f442b8 and changes only the menu-bar presentation and its fixed adapter; cloud restore verification remains a separate future pass.

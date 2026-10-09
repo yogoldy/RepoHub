@@ -34,3 +34,14 @@ Implemented on a separate worktree/branch, `codex/backup-settings-health`, from 
 - No independent iCloud redownload or restore audit was performed in this branch. Notification policy is exercised synthetically; sustained real upload failures and prolonged copy stalls were not deliberately induced on personal backups.
 
 Installed branch observations: the native app opens the top-right gear panel, detects power-adapter operation, and saves the requested defaults: hourly on both sources; after-edits enabled only on battery with a five-minute delay. Existing notification permission remains Allowed. The prior stable app/runtime/configuration is retained locally at `~/Library/Application Support/RepoHub/releases/stable-22fa051`. Upgrade changed only Repo Hub runtime/app files and restarted its own login jobs; no cloud Desktop migration, source-repo edits, account changes or merge into main occurred.
+
+
+## Horizontal menu-bar branch — 2026-10-09
+
+Branch `codex/menu-bar-repo-cards` starts exactly from `9f442b8`, in its own worktree. Main and the settings/health branch are left unchanged.
+
+- Forty-three Python tests pass, including a new fixed-route/CSP menu-asset check plus the previous backup/power/settings/security checks. Twenty-eight JavaScript status checks pass, covering exact archive identity, fresh observations, changed sources, copy failures, active copying, invalid percentages and refusing green at 100% pending progress. Sixteen Swift bridge checks pass for the fixed actions and rejecting other origins/ports/paths, subframes and arbitrary payloads; the fifteen existing Swift notification checks pass.
+- Native app compiles for arm64 macOS 13. Menu JavaScript syntax passes. Isolated synthetic preview shows three cards, expandable observed progress, horizontal paging and keyboard navigation to the last of eleven repos; selection/scroll position persist through five-second refreshes. Browser console contains no errors. Synthetic examples are explicitly separate from real personal backups.
+- No cloud computer, iCloud login, independent download or restore audit is configured in this pass, as requested. Full Git-history restore verification remains separate.
+
+Installed menu observations: the native popover opens with three cards and correct real repo details; horizontal paging preserves selection across refreshes. Notification controls were toggled Off and restored On, the inline settings dialog saved unchanged defaults, and Repository Backups opened the correct iCloud folder in Finder. Startup retry targets the menu page, and the native popover receives keyboard focus. The earlier settings app/runtime/configuration is retained at `~/Library/Application Support/RepoHub/releases/settings-9f442b8`. Quit was not exercised; cloud restore verification remains deferred.

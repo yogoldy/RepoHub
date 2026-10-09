@@ -112,7 +112,7 @@ def main():
     run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/CloudStatus.swift"), "-o", str(cloud_binary),
         "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0")
     shutil.copy2(cloud_binary, runtime / "cloud-status")
-    run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), str(SOURCE / "native/BackupReadiness.swift"), str(SOURCE / "native/ProblemAlerts.swift"), "-o", str(app_binary),
+    run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), str(SOURCE / "native/BackupReadiness.swift"), str(SOURCE / "native/ProblemAlerts.swift"), str(SOURCE / "native/MenuBridge.swift"), "-o", str(app_binary),
         "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0",
         "-framework", "AppKit", "-framework", "WebKit", "-framework", "UserNotifications")
     (APP / "Contents/MacOS").mkdir(parents=True, exist_ok=True)

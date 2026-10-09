@@ -192,6 +192,17 @@ class SettingsHTTPTests(unittest.TestCase):
         with urllib.request.urlopen(req) as response:
             return json.load(response)
 
+    def test_menu_assets_are_fixed_routes_with_safe_csp(self):
+        for path, kind in [('/menu.html','text/html'),('/menu.css','text/css'),('/menu.js','javascript'),('/repo-status.js','javascript')]:
+            with urllib.request.urlopen(self.origin+path) as response:
+                self.assertIn(kind,response.headers['Content-Type'])
+                self.assertIn("script-src 'self'",response.headers['Content-Security-Policy'])
+                self.assertGreater(len(response.read()),0)
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(self.origin+'/menu/../../repohub.py')
+        self.assertEqual(caught.exception.code,404)
+        caught.exception.close()
+
     def test_settings_persist_with_revision_and_reject_stale_writes(self):
         current = self.request()
         settings = current['settings']
