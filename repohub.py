@@ -83,6 +83,113 @@ def sha256(path):
     return h.hexdigest()
 
 
+def content_manifest(root, entries=None):
+    """Hash every regular file; do not reuse digests based on size or timestamps."""
+    root = Path(root)
+    entries = tree_entries(root) if entries is None else entries
+    result = {}
+    for relative, mode, size, _, link in entries:
+        item = {"mode": stat.S_IMODE(mode)}
+        if stat.S_ISREG(mode):
+            h = hashlib.sha256()
+            fd = os.open(root / relative, os.O_RDONLY | os.O_NOFOLLOW)
+            with os.fdopen(fd, "rb") as f:
+                before = os.fstat(f.fileno())
+                if not stat.S_ISREG(before.st_mode):
+                    raise RuntimeError("File type changed during verification")
+                for block in iter(lambda: f.read(8 * 1024 * 1024), b""):
+                    h.update(block)
+                after = os.fstat(f.fileno())
+                if (before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                    raise RuntimeError("File changed during content verification")
+            item.update(kind="file", size=before.st_size, sha256=h.hexdigest())
+        elif stat.S_ISDIR(mode):
+            item.update(kind="directory")
+        else:
+            item.update(kind="symlink", target=link)
+        result[relative] = item
+    if entries != tree_entries(root):
+        raise RuntimeError("Repo changed during content verification; retry later")
+    return result
+
+
+def archive_manifest(path, root_name):
+    """Read all stored file bytes without extracting; validate paths and link records."""
+    result = {}
+    prefix = root_name + "/"
+    with tarfile.open(path, "r|gz") as archive:
+        for member in archive:
+            if member.name == root_name and member.isdir():
+                continue
+            if not member.name.startswith(prefix):
+                raise RuntimeError("Unexpected archive root")
+            relative = member.name[len(prefix):]
+            if not relative or ".." in Path(relative).parts or relative in result:
+                raise RuntimeError("Unsafe or duplicate archive entry")
+            item = {"mode": member.mode}
+            if member.isfile():
+                h = hashlib.sha256()
+                with archive.extractfile(member) as f:
+                    for block in iter(lambda: f.read(8 * 1024 * 1024), b""):
+                        h.update(block)
+                item.update(kind="file", size=member.size, sha256=h.hexdigest())
+            elif member.islnk():
+                target = result.get(member.linkname[len(prefix):]) if member.linkname.startswith(prefix) else None
+                if not target or target["kind"] != "file":
+                    raise RuntimeError("Invalid archive hardlink")
+                item.update(kind="file", size=target["size"], sha256=target["sha256"])
+            elif member.isdir():
+                item.update(kind="directory")
+            elif member.issym():
+                item.update(kind="symlink", target=member.linkname)
+            else:
+                raise RuntimeError("Unsupported archive entry")
+            result[relative] = item
+    return result
+
+
+def content_signature(manifest):
+    return hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def archive_stamp(path):
+    s = Path(path).stat()
+    return [s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns]
+
+
+def verify_current(root, current):
+    entries = tree_entries(root)
+    source_digest = content_signature(content_manifest(root, entries))
+    stamp = archive_stamp(current["archive"])
+    if sha256(current["archive"]) != current["sha256"]:
+        raise RuntimeError("Backup archive checksum failed; replacement required")
+    stored_digest = current.get("content_signature") or content_signature(archive_manifest(current["archive"], Path(root).name))
+    if entries != tree_entries(root) or stamp != archive_stamp(current["archive"]):
+        raise RuntimeError("Files changed while verifying; retry later")
+    return {"state": "matched" if source_digest == stored_digest else "different",
+            "checked_at": utc_now(), "signature": fingerprint(entries),
+            "archive": current["archive"], "archive_stamp": stamp,
+            "content_signature": source_digest, "archive_content_signature": stored_digest}
+
+
+def cloud_status(raw):
+    if raw.get("error") or raw.get("conflicts") is True:
+        reason = ("connection" if raw.get("error_domain") == "NSCocoaErrorDomain" and raw.get("error_code") == 4355
+                  else "storage" if raw.get("error_domain") == "NSCocoaErrorDomain" and raw.get("error_code") == 4354
+                  else "conflict" if raw.get("conflicts") is True else "other")
+        return {"state": "error", "detail": raw.get("error") or "iCloud has unresolved conflicts",
+                "reason": reason, "error_code": raw.get("error_code")}
+    if raw.get("ubiquitous") is not True:
+        return {"state": "unknown", "detail": "macOS did not identify this as an iCloud item"}
+    if raw.get("uploading") is True:
+        return {"state": "uploading"}
+    if raw.get("uploaded") is True:
+        return {"state": "uploaded", "detail": "Upload confirmed by macOS"}
+    if raw.get("uploaded") is False:
+        return {"state": "pending"}
+    return {"state": "unknown", "detail": "macOS did not return upload completion"}
+
+
 def git_info(root):
     def run(*args):
         result = subprocess.run(["/usr/bin/git", "-C", str(root), *args], capture_output=True,
@@ -110,11 +217,12 @@ def git_info(root):
 
 
 def snapshot(root, destination, staging, expected=None, after_archive=None):
-    """Produce a full archive; publish only if metadata stayed stable and the checksum verifies."""
+    """Verify source bytes, stored archive contents, and destination checksum before publication."""
     root, destination, staging = map(Path, (root, destination, staging))
     before = tree_entries(root)
     if expected is not None and fingerprint(before) != expected:
         raise RuntimeError("Repo changed before the backup started; retry later")
+    contents = content_manifest(root, before)
     staging.mkdir(parents=True, exist_ok=True)
     temporary = staging / (secrets.token_hex(12) + ".tar.gz")
     published = None
@@ -127,6 +235,8 @@ def snapshot(root, destination, staging, expected=None, after_archive=None):
             after_archive()
         if before != tree_entries(root):
             raise RuntimeError("Repo changed during the backup; no snapshot was published")
+        if archive_manifest(temporary, root.name) != contents or content_manifest(root) != contents:
+            raise RuntimeError("Repo content changed during the backup; no snapshot was published")
         digest = sha256(temporary)
         destination.mkdir(parents=True, exist_ok=True)
         filename = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S.%fZ") + ".tar.gz"
@@ -135,7 +245,8 @@ def snapshot(root, destination, staging, expected=None, after_archive=None):
         if sha256(published) != digest:
             raise RuntimeError("Snapshot checksum verification failed")
         return {"completed_at": utc_now(), "archive": str(published), "sha256": digest,
-                "signature": fingerprint(before), "archive_bytes": published.stat().st_size,
+                "signature": fingerprint(before), "content_signature": content_signature(contents),
+                "archive_bytes": published.stat().st_size,
                 "source_files": sum(stat.S_ISREG(e[1]) for e in before),
                 "source_bytes": sum(e[2] for e in before if stat.S_ISREG(e[1]))}
     except BaseException:
@@ -162,19 +273,21 @@ class Hub:
         self.scan_lock = threading.Lock()
         self.backup_lock = threading.Lock()
         self.csrf = secrets.token_urlsafe(32)
+        self.verifications = {}
+        self.cloud_states = {}
         self.index = load_json(self.state_dir / "backups.json", {})
         self.data_dir = self.state_dir / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.views = load_json(self.data_dir / "views.json", [])
         self.status = {"scanned_at": None, "repos": [], "backup": {"running": False},
                        "repos_root": str(self.root), "backup_root": str(self.backups)}
-        self.scan()
+        self.scan(deep=False)
 
     def repositories(self):
         return {workspace_id(p.name): p for p in sorted(self.root.iterdir(), key=lambda p: p.name.lower())
                 if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")}
 
-    def scan(self):
+    def scan(self, deep=True, force=False):
         if not self.scan_lock.acquire(blocking=False):
             return
         try:
@@ -198,14 +311,42 @@ class Hub:
                     row["error"] = str(e)
                 with self.lock:
                     row["last_backup"] = self.index.get(key)
+                    cached = self.verifications.get(key, {})
                     row["needs_backup"] = (not row.get("last_backup")
                                            or row.get("signature") != row["last_backup"].get("signature")
                                            or not Path(row["last_backup"]["archive"]).is_file())
+                current = row["last_backup"]
+                valid = False
+                if current and not row.get("error"):
+                    try:
+                        age = time.time() - datetime.fromisoformat(cached.get("checked_at", "1970-01-01T00:00:00+00:00")).timestamp()
+                        valid = (cached.get("archive") == current["archive"]
+                                 and cached.get("signature") == row.get("signature")
+                                 and cached.get("archive_stamp") == archive_stamp(current["archive"])
+                                 and age < self.config.get("verification_seconds", 900))
+                        if deep and (force or not valid):
+                            with self.lock:
+                                self.status["verifying"] = root.name
+                                self.persist_status()
+                            cached = verify_current(root, current)
+                            with self.lock:
+                                self.verifications[key] = cached
+                            valid = True
+                    except Exception as e:
+                        cached = {"state": "error", "checked_at": utc_now(), "error": str(e)}
+                        valid = True
+                row["verification"] = cached if valid else {"state": "checking"}
+                if row["verification"]["state"] in {"different", "error"}:
+                    row["needs_backup"] = True
+                row["cloud"] = self.cloud_for(key, current)
                 rows.append(row)
             with self.lock:
                 self.status.update({"scanned_at": utc_now(), "repos": rows})
+                self.status["verifying"] = None
                 self.persist_status()
         finally:
+            with self.lock:
+                self.status["verifying"] = None
             self.scan_lock.release()
 
     def persist_status(self):
@@ -217,10 +358,60 @@ class Hub:
             result["views"] = self.views
             return result
 
+    def cloud_for(self, key, current):
+        observed = self.cloud_states.get(key, {})
+        if not current or observed.get("archive") != current["archive"]:
+            return {"state": "unknown"}
+        return observed
+
+    def refresh_cloud(self):
+        with self.lock:
+            copies = {key: dict(value) for key, value in self.index.items()}
+        requests = [{"id": key, "path": value["archive"]} for key, value in copies.items()
+                    if Path(value["archive"]).parent == self.backups / key]
+        helper = self.config.get("cloud_helper", str(Path(__file__).parent / "cloud-status"))
+        try:
+            result = subprocess.run([helper], input=json.dumps(requests), text=True,
+                                    capture_output=True, timeout=15, check=True)
+            raw = json.loads(result.stdout)
+            if not isinstance(raw, dict):
+                raise ValueError("Invalid upload-status response")
+        except Exception as e:
+            raw = {r["id"]: {"error": None, "probe_error": str(e)} for r in requests}
+        checked = utc_now()
+        observed = {}
+        for request in requests:
+            item = raw.get(request["id"], {})
+            if not isinstance(item, dict):
+                item = {"probe_error": "Invalid upload-status item"}
+            state = cloud_status(item)
+            if item.get("probe_error"):
+                state = {"state": "unknown", "detail": "Upload-status helper unavailable"}
+            observed[request["id"]] = {**state, "archive": request["path"], "checked_at": checked}
+        with self.lock:
+            self.cloud_states = observed
+            for row in self.status["repos"]:
+                row["cloud"] = self.cloud_for(row["id"], row.get("last_backup"))
+            self.status["data_cloud"] = self.cloud_for("repohub-data", self.index.get("repohub-data"))
+            self.persist_status()
+        if self.backup_lock.acquire(blocking=False):
+            try:
+                for key, current in copies.items():
+                    if self.cloud_for(key, current).get("state") == "uploaded":
+                        try:
+                            self.retain_current(key, current)
+                        except Exception as e:
+                            print("Retention cleanup deferred:", key, str(e), flush=True)
+            finally:
+                self.backup_lock.release()
+
     def retain_current(self, key, current):
         """Remove only managed superseded archives after verifying the retained copy."""
         if self.retention != "latest":
             return
+        with self.lock:
+            if self.index.get(key, {}).get("archive") != current["archive"]:
+                raise ValueError("Refusing cleanup using a superseded upload observation")
         destination = self.backups / key
         retained = Path(current["archive"])
         if (destination.is_symlink() or destination.resolve().parent != self.backups
@@ -231,6 +422,9 @@ class Hub:
                     and ARCHIVE_NAME.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
         if not obsolete:
             return
+        if (self.config.get("require_upload_before_prune", False)
+                and self.cloud_for(key, current).get("state") != "uploaded"):
+            return  # Keep the previously uploaded copy until its replacement reaches iCloud.
         if sha256(retained) != current["sha256"]:
             raise RuntimeError("Current archive failed verification; older backups were kept")
         for path in obsolete:
@@ -256,7 +450,17 @@ class Hub:
                     signature = fingerprint(entries)
                     with self.lock:
                         previous = self.index.get(key)
+                    verified = None
                     if previous and previous["signature"] == signature and Path(previous["archive"]).is_file():
+                        try:
+                            verified = verify_current(root, previous)
+                        except (OSError, RuntimeError, tarfile.TarError):
+                            pass  # Replace a corrupt copy from the intact source; do not prune first.
+                    if verified and verified["state"] == "matched":
+                        with self.lock:
+                            self.verifications[key] = verified
+                            previous["content_signature"] = verified["archive_content_signature"]
+                            atomic_json(self.state_dir / "backups.json", self.index)
                         # Finish an interrupted publication/cleanup without making another copy.
                         atomic_json(self.backups / "index.json", self.index)
                         self.retain_current(key, previous)
@@ -269,6 +473,9 @@ class Hub:
                         atomic_json(self.backups / "index.json", self.index)
                         if key == "repohub-data":
                             self.status["data_backup"] = result
+                        self.verifications[key] = {"state": "matched", "checked_at": utc_now(),
+                                                   "signature": result["signature"], "archive": result["archive"],
+                                                   "archive_stamp": archive_stamp(result["archive"])}
                     self.retain_current(key, result)
                 except Exception as e:
                     failures.append({"repo": root.name, "error": str(e)})
@@ -409,7 +616,7 @@ class Handler(BaseHTTPRequestHandler):
                 threading.Thread(target=self.hub.backup, daemon=True).start()
                 return self.send({"accepted": True}, 202)
             if path == "/api/scan":
-                threading.Thread(target=self.hub.scan, daemon=True).start()
+                threading.Thread(target=self.hub.scan, kwargs={"force": True}, daemon=True).start()
                 return self.send({"accepted": True}, 202)
             if path == "/api/views":
                 return self.send(self.hub.register_view(payload["repo_id"], payload["path"], payload.get("title", "")), 201)
@@ -452,7 +659,7 @@ def main():
         while True:
             time.sleep(config.get("scan_seconds", 30))
             try:
-                hub.scan()
+                hub.scan(deep=not hub.public_status()["backup"].get("running"))
             except Exception as e:
                 print("Scan failed:", e, flush=True)
     def backups():
@@ -461,6 +668,14 @@ def main():
             time.sleep(config.get("backup_seconds", 3600))
     threading.Thread(target=scans, daemon=True).start()
     threading.Thread(target=backups, daemon=True).start()
+    def cloud_checks():
+        while True:
+            try:
+                hub.refresh_cloud()
+            except Exception as e:
+                print("Upload-status check failed:", e, flush=True)
+            time.sleep(config.get("cloud_seconds", 30))
+    threading.Thread(target=cloud_checks, daemon=True).start()
     server.serve_forever()
 
 

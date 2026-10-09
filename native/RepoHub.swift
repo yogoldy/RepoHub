@@ -8,6 +8,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var summaryItem: NSMenuItem!
     var detailItem: NSMenuItem!
     var backupItem: NSMenuItem!
+    var cloudItem: NSMenuItem!
     var polling: Timer?
     let address = URL(string: "http://127.0.0.1:8767/")!
 
@@ -24,6 +25,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         detailItem.isEnabled = false
         menu.addItem(summaryItem)
         menu.addItem(detailItem)
+        cloudItem = NSMenuItem(title: "iCloud status: checking", action: nil, keyEquivalent: "")
+        cloudItem.isEnabled = false
+        menu.addItem(cloudItem)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Open Repo Hub", action: #selector(showHub), keyEquivalent: "h").target = self
         backupItem = menu.addItem(withTitle: "Back up now", action: #selector(backupNow), keyEquivalent: "")
@@ -47,6 +51,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 guard error == nil, let status = status else {
                     self.summaryItem.title = "Backup helper unavailable"
                     self.detailItem.title = "Open the hub to check its connection"
+                    self.cloudItem.title = "iCloud status: unavailable"
                     self.statusItem.button?.title = " !"
                     self.statusItem.button?.toolTip = "Repo Hub: helper unavailable"
                     self.backupItem.isEnabled = false
@@ -57,18 +62,25 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 let running = backup["running"] as? Bool ?? false
                 let pending = repos.filter { $0["needs_backup"] as? Bool ?? true }.count
                 let errors = backup["errors"] as? [[String: Any]] ?? []
+                let verified = repos.filter { ($0["verification"] as? [String: Any])?["state"] as? String == "matched" }.count
+                let verificationErrors = repos.filter { ($0["verification"] as? [String: Any])?["state"] as? String == "error" }.count
+                let uploaded = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "uploaded" }.count
+                let cloudErrors = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "error" }.count
+                let dataError = (status["data_cloud"] as? [String: Any])?["state"] as? String == "error"
+                self.cloudItem.title = "iCloud: \(uploaded)/\(repos.count) uploads confirmed" + (cloudErrors > 0 ? " · \(cloudErrors) error(s)" : "") + (dataError ? " · saved data error" : "")
                 let count = repos.filter { $0["last_backup"] is [String: Any] }.count
                 self.summaryItem.title = running ? "Backing up: \(backup["current_repo"] as? String ?? "repos")" :
                     !errors.isEmpty ? "\(errors.count) backup issue(s) — check hub" :
-                    pending > 0 ? "\(pending) repo(s) changed since backup" : "All \(repos.count) repos have current snapshots"
+                    verificationErrors > 0 ? "\(verificationErrors) verification issue(s) — check hub" :
+                    pending > 0 ? "\(pending) repo(s) changed since backup" : verified < repos.count ? "Verifying contents: \(verified)/\(repos.count) checked" : "All \(repos.count) repo contents match"
                 let parser = ISO8601DateFormatter()
                 parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let newest = repos.compactMap { ($0["last_backup"] as? [String: Any])?["completed_at"] as? String }
                     .compactMap { parser.date(from: $0) }.max()
                 let last = newest.map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) }
                 self.detailItem.title = "\(count)/\(repos.count) backed up" + (last.map { " · Latest \($0)" } ?? "")
-                self.statusItem.button?.title = running ? " ↻" : !errors.isEmpty ? " !" : pending > 0 ? " \(pending)" : ""
-                self.statusItem.button?.toolTip = "Repo Hub: " + self.summaryItem.title
+                self.statusItem.button?.title = running ? " ↻" : (!errors.isEmpty || verificationErrors > 0 || cloudErrors > 0 || dataError) ? " !" : pending > 0 ? " \(pending)" : uploaded < repos.count ? " ↑" : ""
+                self.statusItem.button?.toolTip = "Repo Hub: " + self.summaryItem.title + " · " + self.cloudItem.title
                 self.backupItem.isEnabled = !running
             }
         }.resume()

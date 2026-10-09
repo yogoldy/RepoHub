@@ -13,7 +13,7 @@ import subprocess
 import shutil
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json
+from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json, cloud_status, archive_manifest, content_manifest
 
 
 class HubTests(unittest.TestCase):
@@ -132,15 +132,94 @@ class HubTests(unittest.TestCase):
         unknown = current.parent / "manual-backup.tar.gz"
         unknown.write_text("unmanaged")
         current.write_bytes(b"corrupt")
-        self.hub.backup()
+        with self.assertRaisesRegex(RuntimeError, "verification"):
+            self.hub.retain_current(key, self.hub.index[key])
         self.assertTrue(older.is_file())
         self.assertTrue(unknown.is_file())
-        self.assertTrue(self.hub.status["backup"]["errors"])
         shutil.copy2(older, current)
         self.hub.backup()
         self.assertFalse(older.exists())
         self.assertTrue(unknown.is_file())
         self.assertFalse(self.hub.status["backup"]["errors"])
+
+    def test_same_size_same_mtime_edit_is_detected_and_replaced(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        previous = self.hub.index[key]["archive"]
+        path = self.repo / "work.txt"
+        s = path.stat()
+        path.write_bytes(b"x" * s.st_size)
+        os.utime(path, ns=(s.st_atime_ns, s.st_mtime_ns))
+        self.hub.scan(force=True)
+        self.assertEqual(self.hub.status["repos"][0]["verification"]["state"], "different")
+        self.assertTrue(self.hub.status["repos"][0]["needs_backup"])
+        self.hub.backup()
+        self.assertNotEqual(self.hub.index[key]["archive"], previous)
+        self.assertFalse(self.hub.status["repos"][0]["needs_backup"])
+
+    def test_corrupted_archive_detected_and_repaired(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        Path(self.hub.index[key]["archive"]).write_bytes(b"corrupt")
+        self.hub.scan(force=True)
+        self.assertEqual(self.hub.status["repos"][0]["verification"]["state"], "error")
+        self.hub.backup()
+        self.assertFalse(self.hub.status["backup"]["errors"])
+        self.assertEqual(self.hub.status["repos"][0]["verification"]["state"], "matched")
+
+    def test_metadata_preserving_change_during_snapshot_is_rejected(self):
+        path = self.repo / "work.txt"
+        s = path.stat()
+        def change():
+            path.write_bytes(b"x" * s.st_size)
+            os.utime(path, ns=(s.st_atime_ns, s.st_mtime_ns))
+        with self.assertRaisesRegex(RuntimeError, "content changed"):
+            snapshot(self.repo, self.backups, self.base / "stage", after_archive=change)
+        self.assertFalse(list(self.backups.glob("*.tar.gz")))
+
+    def test_archive_content_verification_includes_hardlinks_and_empty_directories(self):
+        os.link(self.repo / "work.txt", self.repo / "hardlink.txt")
+        (self.repo / "empty").mkdir()
+        result = snapshot(self.repo, self.backups, self.base / "stage")
+        self.assertEqual(archive_manifest(result["archive"], "Example"), content_manifest(self.repo))
+
+    def test_upload_unknown_false_conflict_and_error_never_confirm_success(self):
+        for raw in [{}, {"ubiquitous": True}, {"ubiquitous": False, "uploaded": True}]:
+            self.assertEqual(cloud_status(raw)["state"], "unknown")
+        self.assertEqual(cloud_status({"ubiquitous": True, "uploaded": False})["state"], "pending")
+        self.assertEqual(cloud_status({"ubiquitous": True, "uploaded": True, "uploading": True})["state"], "uploading")
+        self.assertEqual(cloud_status({"ubiquitous": True, "uploaded": True, "error": "failed"})["state"], "error")
+        self.assertEqual(cloud_status({"uploaded": True, "conflicts": True})["state"], "error")
+        self.assertEqual(cloud_status({"ubiquitous": True, "uploaded": True, "uploading": False})["state"], "uploaded")
+        self.assertEqual(cloud_status({"error": "unreachable", "error_domain": "NSCocoaErrorDomain", "error_code": 4355})["reason"], "connection")
+
+    def test_old_copy_kept_until_replacement_upload_is_confirmed(self):
+        self.hub.config["require_upload_before_prune"] = True
+        self.hub.backup()
+        key = workspace_id("Example")
+        old = self.hub.index[key]["archive"]
+        old_record = self.hub.index[key].copy()
+        (self.repo / "work.txt").write_text("new work")
+        self.hub.backup()
+        current = self.hub.index[key]
+        self.assertTrue(Path(old).exists())
+        self.hub.cloud_states[key] = {"archive": old, "state": "uploaded"}
+        self.hub.retain_current(key, current)
+        self.assertTrue(Path(old).exists())
+        with self.assertRaisesRegex(ValueError, "superseded"):
+            self.hub.retain_current(key, old_record)
+        self.hub.cloud_states[key] = {"archive": current["archive"], "state": "uploaded"}
+        self.hub.retain_current(key, current)
+        self.assertFalse(Path(old).exists())
+
+    def test_failed_cloud_probe_revokes_previous_confirmation(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        archive = self.hub.index[key]["archive"]
+        self.hub.cloud_states[key] = {"archive": archive, "state": "uploaded"}
+        with patch("repohub.subprocess.run", side_effect=OSError("helper unavailable")):
+            self.hub.refresh_cloud()
+        self.assertEqual(self.hub.status["repos"][0]["cloud"]["state"], "unknown")
 
     def test_cleanup_refuses_external_archive_and_symlink_directory(self):
         self.hub.backup()
