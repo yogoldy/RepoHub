@@ -22,7 +22,7 @@ def summarize(events):
         first = first or event.get('utc'); last = event.get('utc')
         if kind in {'schedule_decision', 'backup_deferred', 'backup_interrupted', 'backup_started', 'backup_paused', 'backup_failed', 'backup_finished',
                     'repo_backup_started', 'archive_stage', 'archive_verified', 'archive_repair_needed', 'archive_reused', 'repo_backup_finished',
-                    'repo_backup_failed', 'upload_observed', 'upload_stale', 'retention_decision', 'retention_verified',
+                    'repo_backup_failed', 'verification_deferred', 'upload_observed', 'upload_stale', 'retention_decision', 'retention_verified',
                     'retention_failed', 'prune_started', 'prune_finished'}:
             lifecycle.append(event)
             lifecycle = lifecycle[-200:]

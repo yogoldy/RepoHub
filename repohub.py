@@ -709,7 +709,21 @@ class Hub:
                         try:
                             observe("existing_verification")
                             verified = verify_current(root, previous)
-                        except (OSError, RuntimeError, tarfile.TarError) as error:
+                        except OSError as error:
+                            # A cloud placeholder/read failure is not evidence of corruption.
+                            # Keep the current backup and let the normal retry policy try again.
+                            try:
+                                flags = Path(previous["archive"]).stat().st_flags
+                                dataless = bool(flags & getattr(stat, "SF_DATALESS", 0x40000000))
+                            except (OSError, AttributeError):
+                                dataless = None
+                            self.lifecycle.emit("verification_deferred", key=key, run_id=run_id,
+                                                previous_archive_ref=diagnostic_ref(previous["archive"]),
+                                                stage="existing_verification", reason="verification_io_unavailable",
+                                                mode="posix", error_code=error.errno, error_type=type(error).__name__,
+                                                archive_dataless=dataless, result="deferred")
+                            raise
+                        except (RuntimeError, tarfile.TarError) as error:
                             self.lifecycle.emit("archive_repair_needed", key=key, run_id=run_id,
                                                 previous_archive_ref=diagnostic_ref(previous["archive"]), error_type=type(error).__name__)
                             pass  # Replace a corrupt copy from the intact source; do not prune first.

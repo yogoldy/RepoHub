@@ -1,4 +1,6 @@
 import copy
+import errno
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -113,6 +115,44 @@ class ScopedBackupTests(unittest.TestCase):
         self.hub.backup(keys=[workspace_id('FinderOnly')])
         self.assertNotEqual(self.archive('FinderOnly'),old)
         self.assertEqual(sha256(self.archive('FinderOnly')),self.hub.index[workspace_id('FinderOnly')]['sha256'])
+
+    def test_unavailable_archive_is_reported_without_replacement_and_recovery_reuses_it(self):
+        from repohub import verify_current
+        root=self.repos['Unchanged'].resolve();key=workspace_id('Unchanged');original=self.archive('Unchanged')
+        def unavailable(current_root, current):
+            if current_root==root:raise OSError(errno.ETIMEDOUT, 'private fixture error, never log prose')
+            return verify_current(current_root,current)
+        with patch('repohub.verify_current',side_effect=unavailable):
+            self.hub.backup(keys=[key],reason='scheduled')
+        self.assertEqual(self.archive('Unchanged'),original)
+        self.assertEqual(self.hub.index[key],self.original[key])
+        self.assertEqual(len(list(self.hub.backups.rglob('*.tar.gz'))),len(self.original))
+        self.assertTrue(self.hub.status['backup']['errors'])
+        records=[json.loads(line) for f in (self.base/'state/diagnostics').glob('*.jsonl') for line in f.read_text().splitlines()]
+        events=[r for r in records if r['event']=='verification_deferred']
+        self.assertEqual(len(events),1)
+        self.assertEqual(events[0]['error_code'],errno.ETIMEDOUT)
+        self.assertEqual(events[0]['result'],'deferred')
+        self.assertNotIn('private fixture error',json.dumps(records))
+        self.hub.backup(keys=[key],reason='scheduled')
+        self.assertEqual(self.archive('Unchanged'),original)
+        self.assertFalse(self.hub.status['backup']['errors'])
+
+    def test_read_failure_defers_changed_repo_until_verification_can_recover(self):
+        from repohub import verify_current
+        root=self.repos['Changed'].resolve();key=workspace_id('Changed');original=self.archive('Changed')
+        (root/'work').write_text('a real edit while the old backup is unavailable')
+        def unavailable(current_root,current):
+            if current_root==root:raise PermissionError(errno.EACCES,'fixture unavailable')
+            return verify_current(current_root,current)
+        with patch('repohub.verify_current',side_effect=unavailable):
+            self.hub.backup(keys=[key],reason='after_edits')
+        self.assertEqual(self.archive('Changed'),original)
+        self.assertTrue(next(r for r in self.hub.status['repos'] if r['name']=='Changed')['needs_backup'])
+        self.hub.backup(keys=[key],reason='after_edits')
+        self.assertNotEqual(self.archive('Changed'),original)
+        self.assertEqual(archive_manifest(self.archive('Changed'),'Changed'),content_manifest(root))
+        self.assertFalse(self.hub.status['backup']['errors'])
 
     def test_finder_write_does_not_reset_meaningful_edit_hint(self):
         self.hub.scan(force=True)
