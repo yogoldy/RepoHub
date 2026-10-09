@@ -54,6 +54,25 @@ class RestoreAuditTests(unittest.TestCase):
         self.assertTrue(all(json.loads(line).get('stage') for line in logs.splitlines()))
         self.assertEqual((self.base/'verify/events.jsonl').stat().st_mode&0o777,0o600)
 
+    @unittest.skipUnless(hasattr(os, 'lchmod') or os.chmod in os.supports_follow_symlinks,
+                         'Platform cannot set symlink permissions')
+    def test_symlink_mode_survives_different_receiver_umask_without_changing_target(self):
+        os.chmod(self.root/'link', 0o700, follow_symlinks=False)
+        self.archive=Path(snapshot(self.root,self.base/'mode-archives',self.base/'mode-stage')['archive'])
+        cap=self.base/'mode-capture'
+        self.assertEqual(audit.main(['capture','--source',str(self.root),'--archive-sha256',audit.digest(self.archive),
+                                    '--out',str(cap)]),0)
+        self.expected=cap/'expected.json'
+        previous=os.umask(0o022)
+        try:
+            self.assertEqual(self.verify('mode-verify'),0)
+        finally:
+            os.umask(previous)
+        restored=self.base/'mode-verify/restored'
+        self.assertEqual(restored.joinpath('link').lstat().st_mode & 0o777,0o700)
+        self.assertEqual(restored.joinpath('script.sh').stat().st_mode & 0o777,0o755)
+        self.assertEqual(audit.manifest(restored),audit.manifest(self.root))
+
     def test_corrupt_archive_and_wrong_manifest_identity_fail_before_extraction(self):
         self.archive.write_bytes(b'corrupt')
         self.assertEqual(self.verify(),1)

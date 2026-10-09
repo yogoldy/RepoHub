@@ -250,7 +250,18 @@ def extract_checked(archive, baseline, destination, evidence):
                 shutil.copyfileobj(source,target,1024*1024)
                 os.fchmod(target.fileno(),expected[relative]['mode'])
         for relative,item in expected.items():
-            if item['kind']=='symlink':os.symlink(item['target'],destination/relative)
+            if item['kind']=='symlink':
+                link=destination/relative
+                os.symlink(item['target'],link)
+                # Symlink modes can depend on the receiving Mac's umask. Change
+                # the link itself, never its target, and fail closed if unsupported.
+                if stat.S_IMODE(link.lstat().st_mode)!=item['mode']:
+                    if hasattr(os,'lchmod'):
+                        os.lchmod(link,item['mode'])
+                    elif os.chmod in os.supports_follow_symlinks:
+                        os.chmod(link,item['mode'],follow_symlinks=False)
+                    else:
+                        raise AuditError('symlink_mode_restore_unsupported')
         for relative in sorted(directories,key=lambda r:len(PurePosixPath(r).parts),reverse=True):
             os.chmod(destination/relative,expected[relative]['mode'])
         evidence.emit('extraction_finished',entries=len(members),bytes=total)
