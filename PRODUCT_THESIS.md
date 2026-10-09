@@ -95,7 +95,7 @@ Folder-based destinations come first. **Do not implement cloud account linking i
 
 ## Completion and commit discipline
 
-1. Pick one unchecked atomic item, next **1D: sanitized diagnostic export** after the installed lifecycle capture.
+1. Pick one unchecked atomic item, next **5C pilot: controlled receive-and-restore audit** per Leo’s priority; sanitized diagnostic export follows.
 2. Implement it on the authorized work branch, with proportionate checks against synthetic data and a live UI check when behavior changes.
 3. Commit the implementation separately from the next item. Add its SHA and evidence to this checklist; a plan or screenshot alone does not mark a backend feature complete.
 4. Preserve stable main until the completed tier is reviewed for merging. Do not enable cloud/AI accounts, telemetry or scheduled maintainer agents as a side effect.
@@ -118,3 +118,6 @@ Installed dogfooding recorded seven Finder-only repo alerts with zero project-fi
 **Tier 1C — Backup lifecycle and icon decisions (2026-10-09):** schedule decisions disclose the effective frequency/edit delay and power source, quiet-period and retry waits. Selected decisions share a run ID with archive creation, hash verification, transfer and publication stages. Reuse, repair, per-repo errors, run completion and restart interruptions are recorded. New archive indexes persist the creating run ID, so macOS upload observations, stale receipts, upload-gated retention and individual prune operations can refer to the exact archive and run across restarts. Unchanged scheduling/upload/retention observations are throttled to a per-minute heartbeat. Existing archives without a run ID retain their archive reference; prior unlogged events are not reconstructed.
 
 Menu/app presentation receipts now link to those run/archive identities. Backend evidence includes freshness, change classification, copy state and verification/upload archive identities. A diagnostic-only comparison explains the rendered icon and flags disagreement with backend inputs separately from disagreement between views; neither a UI receipt nor an icon is upload proof. This does not change status or scheduling policy. The local summary includes the latest 200 lifecycle events and bounded input disagreements. Shareable export/reporting dialogs and independent cloud restores remain separate work.
+
+
+**5C pilot preparation — Controlled receive-and-restore audit:** `restore_audit.py` and [the cloud handoff](docs/CLOUD_RESTORE_HANDOFF.md) prepare a private offline test. The receiving cloud agent does not need iCloud access. Expected file/Git facts are independently captured from the matching live source, not derived from the test archive. Verification checks supplied identities, safe extraction, every manifest entry, Git integrity/history and input immutability, with stage logs and explicit unsupported cases. This prepares the experiment; Tier 5C stays unchecked until actual private iCloud-downloaded inputs are independently restored. Direct authenticated cloud retrieval and application execution remain outside this pilot.

@@ -133,3 +133,8 @@ Lifecycle diagnostics record scheduling/power decisions, quiet-period/retry wait
 GitHub hosts the app source at https://github.com/yogoldy/RepoHub. Environment values, credential/signing files, runtime state, raw diagnostic logs and backup/restore archives are excluded through `.gitignore`. Example environment files may be tracked only with placeholders. Ignore rules do not remove already tracked files or secrets from history, so review staged changes before pushing.
 
 Keep restore inputs outside the repository, or in the ignored `restore-inputs/` directory. Never commit personal backup archives to make them available to a cloud task. Any future transfer to a cloud test environment is separate from publishing source and needs an explicitly chosen private transfer route. Git ignore rules do not change RepoHub backup coverage: ignored files, including local environment files, remain part of full backups.
+
+
+## Controlled cloud restore pilot
+
+See [docs/CLOUD_RESTORE_HANDOFF.md](docs/CLOUD_RESTORE_HANDOFF.md) for the pinned-input, privately provisioned receive-and-restore experiment. `restore_audit.py` independently captures source expectations and verifies the supplied archive in a fresh output directory, including Git checks and structured logs. No iCloud credentials or restored-code execution are needed. Actual archives/baselines remain private; successful synthetic tests are not proof of a personal cloud restore.
