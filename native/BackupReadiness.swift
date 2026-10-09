@@ -11,6 +11,7 @@ enum BackupReadiness {
     static func pendingNotifications(_ repos: [[String: Any]], seen: Set<String>) -> [ReadyBackup] {
         repos.compactMap { repo in
             guard repo["needs_backup"] as? Bool == false, repo["error"] == nil,
+                  (repo["health"] as? [String: Any])?["fresh"] as? Bool == true,
                   let backup = repo["last_backup"] as? [String: Any],
                   let archive = backup["archive"] as? String, let hash = backup["sha256"] as? String,
                   let verification = repo["verification"] as? [String: Any],

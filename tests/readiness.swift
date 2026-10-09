@@ -3,7 +3,7 @@ import Foundation
 @main struct ReadinessTests {
     static func main() {
         let archive = "/backups/current.tar.gz"
-        let good: [String: Any] = ["name":"Example", "needs_backup":false,
+        let good: [String: Any] = ["name":"Example", "needs_backup":false, "health":["fresh":true],
             "last_backup":["archive":archive, "sha256":"abc"],
             "verification":["state":"matched", "archive":archive],
             "cloud":["state":"uploaded", "archive":archive]]
@@ -21,6 +21,16 @@ import Foundation
         precondition(BackupReadiness.pendingNotifications([changed], seen: []).isEmpty)
         changed = good; changed["verification"] = ["state":"matched", "archive":"/backups/old.tar.gz"]
         precondition(BackupReadiness.pendingNotifications([changed], seen: []).isEmpty)
-        print("8 notification-readiness checks passed")
+        changed = good; changed["health"] = ["fresh":false]
+        precondition(BackupReadiness.pendingNotifications([changed], seen: []).isEmpty)
+        changed = good; changed.removeValue(forKey: "health")
+        precondition(BackupReadiness.pendingNotifications([changed], seen: []).isEmpty)
+        let problem: [String: Any] = ["id":"repo:upload:1", "name":"Example", "detail":"Upload stalled"]
+        precondition(ProblemAlerts.pending([problem], seen: [], lastNotice: 0, now: 2000).count == 1)
+        precondition(ProblemAlerts.pending([problem], seen: ["repo:upload:1"], lastNotice: 0, now: 2000).isEmpty)
+        precondition(ProblemAlerts.pending([problem], seen: [], lastNotice: 1900, now: 2000).isEmpty)
+        precondition(ProblemAlerts.pending([], seen: [], lastNotice: 0, now: 2000).isEmpty)
+        precondition(ProblemAlerts.pending([["id":"bad"]], seen: [], lastNotice: 0, now: 2000).isEmpty)
+        print("15 notification-readiness/problem checks passed")
     }
 }

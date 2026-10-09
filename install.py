@@ -92,14 +92,19 @@ def main():
 
     runtime = STATE / "runtime"
     runtime.mkdir(exist_ok=True)
-    shutil.copy2(SOURCE / "repohub.py", runtime / "repohub.py")
+    for name in ("repohub.py", "backup_policy.py", "status_health.py"):
+        shutil.copy2(SOURCE / name, runtime / name)
     shutil.copytree(SOURCE / "web", runtime / "web", dirs_exist_ok=True)
     config = {"repos_root": str(HOME_DIR / "Desktop/repos"),
               "backup_root": str(backup_root / "Snapshots"), "state_dir": str(STATE),
               "port": 8767, "scan_seconds": 30, "backup_seconds": 3600, "retention": "latest",
               "verification_seconds": 900, "cloud_seconds": 5, "require_upload_before_prune": True,
               "cloud_helper": str(runtime / "cloud-status")}
-    (STATE / "config.json").write_text(json.dumps(config, indent=2) + "\n")
+    config_path = STATE / "config.json"
+    if config_path.exists():
+        config.update(json.loads(config_path.read_text()))
+        config["cloud_helper"] = str(runtime / "cloud-status")
+    config_path.write_text(json.dumps(config, indent=2) + "\n")
     os.chmod(STATE / "config.json", 0o600)
 
     app_binary = Path("/private/tmp/repohub-native-build")
@@ -107,7 +112,7 @@ def main():
     run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/CloudStatus.swift"), "-o", str(cloud_binary),
         "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0")
     shutil.copy2(cloud_binary, runtime / "cloud-status")
-    run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), str(SOURCE / "native/BackupReadiness.swift"), "-o", str(app_binary),
+    run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), str(SOURCE / "native/BackupReadiness.swift"), str(SOURCE / "native/ProblemAlerts.swift"), "-o", str(app_binary),
         "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0",
         "-framework", "AppKit", "-framework", "WebKit", "-framework", "UserNotifications")
     (APP / "Contents/MacOS").mkdir(parents=True, exist_ok=True)

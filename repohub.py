@@ -20,6 +20,8 @@ import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
+from backup_policy import BackupScheduler, default_settings, validate_settings, power_source
+from status_health import annotate_health, ProblemTracker, age
 
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
@@ -288,6 +290,16 @@ class Hub:
         self.index = load_json(self.state_dir / "backups.json", {})
         self.data_dir = self.state_dir / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.settings_path = self.data_dir / "settings.json"
+        self.settings = validate_settings(load_json(self.settings_path, default_settings()))
+        if not self.settings_path.exists():
+            atomic_json(self.settings_path, self.settings)
+        saved_clock = load_json(self.state_dir / "schedule-clock.json", {})
+        previous_times = [datetime.fromisoformat(item["completed_at"]).timestamp() for item in self.index.values()]
+        self.last_periodic_at = saved_clock.get("last_periodic_at", max(previous_times, default=0))
+        self.scheduler = BackupScheduler(time.monotonic() - max(0, time.time() - self.last_periodic_at))
+        self.problem_tracker = ProblemTracker(load_json(self.state_dir / "problem-episodes.json", {}))
+        self.power = "unknown"
         self.views = load_json(self.data_dir / "views.json", [])
         self.status = {"scanned_at": None, "repos": [], "backup": {"running": False},
                        "repos_root": str(self.root), "backup_root": str(self.backups)}
@@ -351,6 +363,7 @@ class Hub:
                 row["cloud"] = self.cloud_for(key, current)
                 rows.append(row)
             with self.lock:
+                self.scheduler.observe(rows, time.monotonic())
                 self.status.update({"scanned_at": utc_now(), "repos": rows})
                 self.status["verifying"] = None
                 self.persist_status()
@@ -367,12 +380,57 @@ class Hub:
             result = json.loads(json.dumps(self.status))
             result["views"] = self.views
             result["notifications"] = load_json(self.state_dir / "notifications.json", {"permission": "unknown"})
+            result["settings"] = self.settings
+            result["power_source"] = self.power
+            result["observed_at"] = utc_now()
+            annotate_health(result, self.config, time.time())
+            before = json.dumps(self.problem_tracker.episodes, sort_keys=True)
+            result["problems"] = self.problem_tracker.update(result, time.time())
+            if before != json.dumps(self.problem_tracker.episodes, sort_keys=True):
+                atomic_json(self.state_dir / "problem-episodes.json", self.problem_tracker.episodes)
             return result
+
+    def settings_status(self):
+        with self.lock:
+            return {"settings": json.loads(json.dumps(self.settings)),
+                    "revision": sha256(self.settings_path), "power_source": self.power}
+
+    def save_settings(self, payload):
+        value = validate_settings(payload.get("settings"))
+        with self.lock:
+            if payload.get("revision") != sha256(self.settings_path):
+                raise FileExistsError("Settings changed. Reopen settings before saving.")
+            atomic_json(self.settings_path, value)
+            self.settings = value
+            return self.settings_status()
+
+    def automatic_tick(self):
+        source = power_source()
+        with self.lock:
+            self.power = source
+            rows = json.loads(json.dumps(self.status["repos"]))
+            # Wall-clock cadence survives sleep/restarts; edit quiet periods use monotonic time.
+            self.scheduler.last_periodic = time.monotonic() - max(0, time.time() - self.last_periodic_at)
+            plan = self.scheduler.plan(self.settings, source, rows, time.monotonic())
+            policy = self.settings.get(source)
+            self.status["schedule"] = {"paused": source == "unknown" or not policy or
+                                       (not policy["frequency_minutes"] and not policy["after_edits"])}
+        if plan and self.backup(keys=plan["keys"], reason=plan["reason"], expected_power=source):
+            with self.lock:
+                self.scheduler.completed(plan, rows, time.monotonic())
+                if plan["reason"] == "scheduled":
+                    self.record_periodic_clock()
+
+    def record_periodic_clock(self):
+        self.last_periodic_at = time.time()
+        atomic_json(self.state_dir / "schedule-clock.json", {"last_periodic_at": self.last_periodic_at})
 
     def cloud_for(self, key, current):
         observed = self.cloud_states.get(key, {})
         if not current or observed.get("archive") != current["archive"]:
             return {"state": "unknown"}
+        if age(observed.get("checked_at"), time.time()) > max(45, self.config.get("cloud_seconds", 5) * 6):
+            return {"state": "unknown", "detail": "Upload status is outdated", "archive": current["archive"]}
         return observed
 
     def refresh_cloud(self):
@@ -443,18 +501,25 @@ class Hub:
         for path in obsolete:
             path.unlink()
 
-    def backup(self):
+    def backup(self, keys=None, reason="manual", expected_power=None):
+        if expected_power is not None and power_source() != expected_power:
+            return False
         if not self.backup_lock.acquire(blocking=False):
             return False
         failures = []
         try:
             with self.lock:
-                self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None}
+                self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "reason": reason}
                 self.persist_status()
             if not self.backups.parent.is_dir():
                 raise RuntimeError("iCloud Repository Backups folder is unavailable")
-            backup_sources = {**self.repositories(), "repohub-data": self.data_dir}
+            repositories = self.repositories()
+            backup_sources = {key: root for key, root in repositories.items() if keys is None or key in keys}
+            backup_sources["repohub-data"] = self.data_dir
             for key, root in backup_sources.items():
+                if expected_power is not None and power_source() != expected_power:
+                    break  # Finish an in-flight archive, then respect the new power source.
+
                 with self.lock:
                     self.status["backup"]["current_repo"] = root.name
                     self.persist_status()
@@ -503,6 +568,10 @@ class Hub:
         finally:
             self.backup_lock.release()
             self.scan()
+            if reason == "manual":
+                with self.lock:
+                    self.scheduler.manual_completed(time.monotonic())
+                    self.record_periodic_clock()
         return True
 
     def data_path(self, key, name):
@@ -562,6 +631,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send({"error": "Invalid host"}, 403)
         path = unquote(urlparse(self.path).path)
         try:
+            if path == "/api/settings":
+                return self.send(self.hub.settings_status())
             if path == "/api/status":
                 return self.send(self.hub.public_status())
             if path == "/api/session":
@@ -624,7 +695,14 @@ class Handler(BaseHTTPRequestHandler):
             if size > 2 * 1024 * 1024:
                 return self.send({"error": "JSON is too large"}, 413)
             payload = json.loads(self.rfile.read(size) or b"{}")
+            if not isinstance(payload, dict):
+                raise ValueError("Request must be an object")
             path = unquote(urlparse(self.path).path)
+            if path == "/api/settings":
+                try:
+                    return self.send(self.hub.save_settings(payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
             if path == "/api/backup":
                 threading.Thread(target=self.hub.backup, daemon=True).start()
                 return self.send({"accepted": True}, 202)
@@ -677,8 +755,11 @@ def main():
                 print("Scan failed:", e, flush=True)
     def backups():
         while True:
-            hub.backup()
-            time.sleep(config.get("backup_seconds", 3600))
+            try:
+                hub.automatic_tick()
+            except Exception as e:
+                print("Backup scheduler failed:", e, flush=True)
+            time.sleep(15)
     threading.Thread(target=scans, daemon=True).start()
     threading.Thread(target=backups, daemon=True).start()
     def cloud_checks():

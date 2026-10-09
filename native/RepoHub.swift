@@ -12,6 +12,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var cloudItem: NSMenuItem!
     var notificationItem: NSMenuItem!
     var notificationInFlight = false
+    var unavailableSince: Date?
     var notificationsEnabled: Bool { UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true }
     var polling: Timer?
     let address = URL(string: "http://127.0.0.1:8767/")!
@@ -38,7 +39,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         backupItem.target = self
         backupItem.isEnabled = false
         menu.addItem(withTitle: "Open Repository Backups", action: #selector(openBackups), keyEquivalent: "").target = self
-        notificationItem = menu.addItem(withTitle: "Notify when backups are ready", action: #selector(toggleNotifications), keyEquivalent: "")
+        notificationItem = menu.addItem(withTitle: "Backup notifications", action: #selector(toggleNotifications), keyEquivalent: "")
         notificationItem.target = self
         notificationItem.state = notificationsEnabled ? .on : .off
         menu.addItem(.separator())
@@ -53,8 +54,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func pollStatus() {
         updateNotificationStatus()
-        let url = address.appendingPathComponent("api/status")
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+        var statusRequest = URLRequest(url: address.appendingPathComponent("api/status"))
+        statusRequest.timeoutInterval = 8
+        URLSession.shared.dataTask(with: statusRequest) { [weak self] data, _, error in
             guard let self = self else { return }
             let status = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             DispatchQueue.main.async {
@@ -65,16 +67,22 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                     self.statusItem.button?.title = " !"
                     self.statusItem.button?.toolTip = "Repo Hub: helper unavailable"
                     self.backupItem.isEnabled = false
+                    if self.unavailableSince == nil { self.unavailableSince = Date() }
+                    if let since = self.unavailableSince, Date().timeIntervalSince(since) >= 120 {
+                        self.notifyProblems([["id":"helper:" + String(since.timeIntervalSince1970), "name":"Repo Hub", "detail":"The backup helper has been unavailable for two minutes."]])
+                    }
                     return
                 }
+                self.unavailableSince = nil
                 let repos = status["repos"] as? [[String: Any]] ?? []
                 let backup = status["backup"] as? [String: Any] ?? [:]
                 let running = backup["running"] as? Bool ?? false
+                let stale = repos.filter { ($0["health"] as? [String: Any])?["fresh"] as? Bool != true }.count
                 let pending = repos.filter { $0["needs_backup"] as? Bool ?? true }.count
                 let errors = backup["errors"] as? [[String: Any]] ?? []
-                let verified = repos.filter { ($0["verification"] as? [String: Any])?["state"] as? String == "matched" }.count
+                let verified = repos.filter { ($0["verification"] as? [String: Any])?["state"] as? String == "matched" && ($0["health"] as? [String: Any])?["fresh"] as? Bool == true }.count
                 let verificationErrors = repos.filter { ($0["verification"] as? [String: Any])?["state"] as? String == "error" }.count
-                let uploaded = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "uploaded" }.count
+                let uploaded = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "uploaded" && ($0["health"] as? [String: Any])?["fresh"] as? Bool == true }.count
                 let cloudErrors = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "error" }.count
                 let uploading = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "uploading" }
                 let dataError = (status["data_cloud"] as? [String: Any])?["state"] as? String == "error"
@@ -88,7 +96,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                     self.cloudItem.title += " · \(active["name"] as? String ?? "Repo")\(percent) uploading"
                 }
                 let count = repos.filter { $0["last_backup"] is [String: Any] }.count
-                self.summaryItem.title = running ? "Backing up: \(backup["current_repo"] as? String ?? "repos")" :
+                self.summaryItem.title = stale > 0 ? "Status outdated: \(stale) repo(s) need fresh checks" : running ? "Backing up: \(backup["current_repo"] as? String ?? "repos")" :
                     !errors.isEmpty ? "\(errors.count) backup issue(s) — check hub" :
                     verificationErrors > 0 ? "\(verificationErrors) verification issue(s) — check hub" :
                     pending > 0 ? "\(pending) repo(s) changed since backup" : verified < repos.count ? "Verifying hashes: \(verified)/\(repos.count) checked" : "All \(repos.count) repo hashes verified"
@@ -98,9 +106,10 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                     .compactMap { parser.date(from: $0) }.max()
                 let last = newest.map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) }
                 self.detailItem.title = "\(count)/\(repos.count) backed up" + (last.map { " · Latest \($0)" } ?? "")
-                self.statusItem.button?.title = running ? " ↻" : (!errors.isEmpty || verificationErrors > 0 || cloudErrors > 0 || dataError) ? " !" : pending > 0 ? " \(pending)" : uploaded < repos.count ? " ↑" : ""
+                self.statusItem.button?.title = running ? " ↻" : (stale > 0 || !errors.isEmpty || verificationErrors > 0 || cloudErrors > 0 || dataError) ? " !" : pending > 0 ? " \(pending)" : uploaded < repos.count ? " ↑" : ""
                 self.statusItem.button?.toolTip = "Repo Hub: " + self.summaryItem.title + " · " + self.cloudItem.title
                 self.backupItem.isEnabled = !running
+                self.notifyProblems(status["problems"] as? [[String: Any]] ?? [])
                 self.notifyReadyBackups(repos)
             }
         }.resume()
@@ -127,7 +136,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 let path = FileManager.default.homeDirectoryForCurrentUser
                     .appendingPathComponent("Library/Application Support/RepoHub/notifications.json")
                 if let data = try? JSONSerialization.data(withJSONObject: status) { try? data.write(to: path, options: .atomic) }
-                self.notificationItem.title = "Notify when backups are ready" + (permission == "denied" ? " (macOS permission needed)" : "")
+                self.notificationItem.title = "Backup notifications" + (permission == "denied" ? " (macOS permission needed)" : "")
             }
         }
     }
@@ -161,6 +170,38 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                         if error == nil {
                             UserDefaults.standard.set(Array(seen.union(ready.map { $0.key })), forKey: "notifiedBackups")
                         } else { print("Completion notification failed:", error!.localizedDescription) }
+                    }
+                }
+            }
+        }
+    }
+
+    func notifyProblems(_ problems: [[String: Any]]) {
+        guard notificationsEnabled, !notificationInFlight else { return }
+        let defaults = UserDefaults.standard
+        let seen = Set(defaults.stringArray(forKey: "notifiedProblems") ?? [])
+        let ready = ProblemAlerts.pending(problems, seen: seen,
+            lastNotice: defaults.double(forKey: "lastProblemNotice"), now: Date().timeIntervalSince1970)
+        guard !ready.isEmpty else { return }
+        notificationInFlight = true
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+                    self.notificationInFlight = false
+                    return
+                }
+                let content = UNMutableNotificationContent()
+                content.title = "Repo Hub needs attention"
+                content.body = ready.prefix(3).map { "\($0["name"] as? String ?? "Repo"): \($0["detail"] as? String ?? "Check backups")" }.joined(separator: "\n")
+                content.sound = .default
+                let request = UNNotificationRequest(identifier: "repohub-problem-" + UUID().uuidString, content: content, trigger: nil)
+                UNUserNotificationCenter.current().add(request) { error in
+                    DispatchQueue.main.async {
+                        self.notificationInFlight = false
+                        if error == nil {
+                            defaults.set(Array(seen.union(ready.compactMap { $0["id"] as? String })), forKey: "notifiedProblems")
+                            defaults.set(Date().timeIntervalSince1970, forKey: "lastProblemNotice")
+                        } else { print("Problem notification failed:", error!.localizedDescription) }
                     }
                 }
             }

@@ -13,7 +13,7 @@ import subprocess
 import shutil
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json, cloud_status, archive_manifest, content_manifest
+from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json, cloud_status, archive_manifest, content_manifest, utc_now
 
 
 class HubTests(unittest.TestCase):
@@ -203,12 +203,12 @@ class HubTests(unittest.TestCase):
         self.hub.backup()
         current = self.hub.index[key]
         self.assertTrue(Path(old).exists())
-        self.hub.cloud_states[key] = {"archive": old, "state": "uploaded"}
+        self.hub.cloud_states[key] = {"archive": old, "state": "uploaded", "checked_at": utc_now()}
         self.hub.retain_current(key, current)
         self.assertTrue(Path(old).exists())
         with self.assertRaisesRegex(ValueError, "superseded"):
             self.hub.retain_current(key, old_record)
-        self.hub.cloud_states[key] = {"archive": current["archive"], "state": "uploaded"}
+        self.hub.cloud_states[key] = {"archive": current["archive"], "state": "uploaded", "checked_at": utc_now()}
         self.hub.retain_current(key, current)
         self.assertFalse(Path(old).exists())
 
@@ -230,7 +230,7 @@ class HubTests(unittest.TestCase):
         (self.repo / "work.txt").write_text("new work")
         self.hub.backup()
         current = self.hub.index[key]
-        self.hub.cloud_states[key] = {**state, "archive": current["archive"]}
+        self.hub.cloud_states[key] = {**state, "archive": current["archive"], "checked_at": utc_now()}
         self.hub.retain_current(key, current)
         self.assertTrue(Path(old).exists())
 
@@ -250,7 +250,7 @@ class HubTests(unittest.TestCase):
         self.hub.backup()
         key = workspace_id("Example")
         archive = self.hub.index[key]["archive"]
-        self.hub.cloud_states[key] = {"archive": archive, "state": "uploaded"}
+        self.hub.cloud_states[key] = {"archive": archive, "state": "uploaded", "checked_at": utc_now()}
         with patch("repohub.subprocess.run", side_effect=OSError("helper unavailable")):
             self.hub.refresh_cloud()
         self.assertEqual(self.hub.status["repos"][0]["cloud"]["state"], "unknown")
