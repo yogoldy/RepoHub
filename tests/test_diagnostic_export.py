@@ -59,3 +59,51 @@ class ExportTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.export()
         with self.assertRaises(ValueError): self.export(hours=169)
         with self.assertRaises(ValueError): self.export(max_events=0)
+
+    def test_no_wall_clock_raw_sizes_hashes_or_free_text(self):
+        self.log.emit('repo_checked',repo_ref='actual-name',bytes=123456789,files=777,duration_ms=1234.5,verification_checked_at=(self.now-timedelta(seconds=12)).isoformat(),error_type='email@example.test',reason='repo_files_differ',source_signature='deadbeef',percent=33.3)
+        case=self.export()
+        shared=''.join(p.read_text() for p in (case/'share').iterdir())
+        row=json.loads((case/'share/events.jsonl').read_text().splitlines()[0])
+        self.assertEqual(row['elapsed_seconds'],0)
+        self.assertEqual(row['duration_seconds'],1)
+        self.assertEqual(row['verification_age_seconds'],12)
+        self.assertEqual(row['percent'],35)
+        for field in ['utc','verification_checked_at','bytes','files','duration_ms','error_type']:
+            self.assertNotIn(field,row)
+        for secret in [self.now.isoformat(),'email@example.test','actual-name','deadbeef','123456789']:
+            self.assertNotIn(secret,shared)
+        self.assertNotIn('start',json.loads((case/'share/schema.json').read_text())['window'])
+    def test_enums_are_field_specific_and_not_a_global_word_list(self):
+        self.log.emit('repo_checked',mode='repo_files_differ',reason='app',state='ArchiveCreation',surface='token',display_label='a personal message',needs_backup='true',error_code=123456789)
+        row=json.loads((self.export()/'share/events.jsonl').read_text().splitlines()[0])
+        for field in ['mode','reason','state','surface','display_label','needs_backup','error_code']:
+            self.assertNotIn(field,row)
+    def test_unknown_events_and_unknown_nested_fields_fail_closed(self):
+        self.log.emit('unreviewed_new_event',reason='contents_match')
+        self.log.emit('repo_checked',samples=[{'path_ref':'private-file','category':'repo_files','change':'added','known_file':'private-filename'}],counts={'repo_files':90000})
+        case=self.export();rows=[json.loads(line) for line in (case/'share/events.jsonl').read_text().splitlines()]
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['counts']['repo_files'],1000)
+        self.assertNotIn('known_file',rows[0]['samples'][0])
+        self.assertEqual(json.loads((case/'share/schema.json').read_text())['window']['unsupported_events'],1)
+    def test_adversarial_types_and_huge_numbers_do_not_escape_or_crash(self):
+        self.log.emit('repo_checked')
+        path=next(self.logs.iterdir())
+        with path.open('a') as target:
+            target.write(json.dumps({'schema_version':1,'session_id':'private-session','utc':self.now.isoformat(),'event':'verification_deferred','repo_ref':123456789,'error_code':True,'percent':10**400,'duration_ms':10**400,'gap_seconds':10**400,'after_edits':'private','reason':['secret'],'counts':{'git_data':True},'samples':[{'path_ref':1234,'known_file':{'secret':'private'}}]})+'\n')
+        rows=[json.loads(line) for line in (self.export()/'share/events.jsonl').read_text().splitlines()]
+        for key in ['repo_ref','error_code','percent','duration_seconds','gap_seconds','after_edits','reason']:
+            self.assertNotIn(key,rows[1])
+        self.assertEqual(rows[1]['counts'],{})
+    def test_namespaces_are_fresh_and_relative_order_preserved(self):
+        self.log.emit('backup_started',run_id='private-run')
+        self.log.clock=lambda:(self.now+timedelta(seconds=30)).timestamp()
+        self.log.emit('backup_finished',run_id='private-run',result='complete')
+        self.now+=timedelta(seconds=31)
+        a,b=self.export(),self.export()
+        rows_a=[json.loads(line) for line in (a/'share/events.jsonl').read_text().splitlines()]
+        rows_b=[json.loads(line) for line in (b/'share/events.jsonl').read_text().splitlines()]
+        self.assertEqual([r['elapsed_seconds'] for r in rows_a],[0,30])
+        self.assertEqual(rows_a[0]['run_id'],rows_a[1]['run_id'])
+        self.assertNotEqual(rows_a[0]['run_id'],rows_b[0]['run_id'])
