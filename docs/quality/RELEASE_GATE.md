@@ -39,7 +39,7 @@ The existing Air pilot demonstrates particular supported paths. It does not clos
 
 [The workflow](../../.github/workflows/golden-rules.yml) runs the macOS gate on main/work-branch pushes, pull requests and manual dispatch. It uses synthetic inputs only, read-only repository permission and no persisted checkout credentials. The checkout action is pinned to a verified commit; see its [official documentation](https://github.com/actions/checkout).
 
-CI runs automatically but repository branch protection has not been changed. A maintainer can still bypass a check unless a required status/ruleset is separately configured. Do not promote or deploy a version with a failed/missing gate receipt. Do not enable `pull_request_target` or upload private diagnostic receipts as part of this workflow.
+GitHub protects `main`: changes require a pull request and the `automated-contract` check from GitHub Actions (app ID 15368), with the branch up to date before merging. Protection applies to administrators too; force pushes and branch deletion are disabled. No extra approving review is required for this single-maintainer workflow. Repository administrators can change protection settings, so this is an enforced merge policy, not an immutable security boundary. Do not promote or deploy a version with a failed/missing gate receipt. Do not enable `pull_request_target` or upload private diagnostic receipts as part of this workflow.
 
 ## Maintaining the contract
 

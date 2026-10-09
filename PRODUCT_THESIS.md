@@ -138,6 +138,6 @@ Menu/app presentation receipts now link to those run/archive identities. Backend
 
 - [x] Document known failure modes, their diagnostic trails, required responses, narrow fixes and remaining exposure in [the quality register](docs/quality/FAILURE_MODES.md). Concrete private incident records remain local.
 - [x] Add an executable domain release gate linking each rule to tests that must actually execute and pass; validate runtime/HTML packaging, JavaScript behavior/syntax and native builds/checks. Receipts identify source revision/fingerprint, dirty state and pending manual evidence.
-- [x] Wire the synthetic macOS gate into GitHub push/PR checks and agent release instructions. Branch protection itself remains unchanged.
+- [x] Wire the synthetic macOS gate into GitHub push/PR checks and agent release instructions. Main requires pull requests and an up-to-date passing GitHub Actions `automated-contract` check, including for administrators.
 
 [Gate usage and limits](docs/quality/RELEASE_GATE.md) distinguish an automated pass from live deployment/provider/hardware acceptance. Application behavior and the installed release are unchanged by this quality-tooling work.

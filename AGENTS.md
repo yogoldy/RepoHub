@@ -13,3 +13,5 @@
 - Before promoting or deploying an application version, run `python3 tools/release_gate.py --require-clean` on its clean committed macOS source and inspect its JSON receipt. Missing/skipped referenced regressions, failed builds or dirty/mutated source cannot be accepted as release evidence.
 - Use `docs/quality/FAILURE_MODES.md` and `docs/quality/golden-rules.json` when diagnosing regressions. A new failure needs a small controlled counterexample, appropriate diagnostic assertions, a narrow fix and an updated rule/gap. Keep private case data outside Git.
 - An automated pass does not approve a deployment: perform the changed-boundary live checks described in `docs/quality/RELEASE_GATE.md`, and explicitly record any unchecked hardware/provider/UI conditions. Do not silently replace missing evidence with an old release’s receipt.
+
+- GitHub `main` promotion must use a pull request with the required up-to-date `automated-contract` check from GitHub Actions. Do not bypass or disable protection to merge a failing version; no additional approving review is required.
