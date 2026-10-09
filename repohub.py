@@ -22,6 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
 from backup_policy import BackupScheduler, default_settings, validate_settings, power_source
 from status_health import annotate_health, ProblemTracker, age
+from diagnostics import DiagnosticLog
 
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
@@ -313,6 +314,8 @@ class Hub:
         if self.root == self.backups or self.root in self.backups.parents or self.root in self.state_dir.parents:
             raise ValueError("Backups and app state must be outside the source repos")
         self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.diagnostics = DiagnosticLog(self.state_dir / "diagnostics")
+        self.diagnostics.emit("helper_started", build_id=sha256(Path(__file__))[:16])
         self.lock = threading.RLock()
         self.scan_lock = threading.Lock()
         self.backup_lock = threading.Lock()
@@ -428,6 +431,7 @@ class Hub:
                 row["backup_settings"] = self.repo_settings.get(row["id"], self.settings)
             result["power_source"] = self.power
             result["observed_at"] = utc_now()
+            result["diagnostics"] = self.diagnostics.status()
             annotate_health(result, self.config, time.time())
             before = json.dumps(self.problem_tracker.episodes, sort_keys=True)
             result["problems"] = self.problem_tracker.update(result, time.time())
@@ -478,6 +482,9 @@ class Hub:
             return self.repo_settings_status(key)
 
     def automatic_tick(self):
+        self.diagnostics.heartbeat(repo_count=len(self.status["repos"]),
+                                   scan_running=self.scan_lock.locked(),
+                                   backup_running=self.backup_lock.locked())
         source = power_source()
         with self.lock:
             self.power = source
@@ -850,12 +857,14 @@ def main():
             try:
                 hub.scan(deep=not hub.public_status()["backup"].get("running"))
             except Exception as e:
+                hub.diagnostics.emit("runtime_error", stage="scan", error_type=type(e).__name__)
                 print("Scan failed:", e, flush=True)
     def backups():
         while True:
             try:
                 hub.automatic_tick()
             except Exception as e:
+                hub.diagnostics.emit("runtime_error", stage="scheduler", error_type=type(e).__name__)
                 print("Backup scheduler failed:", e, flush=True)
             time.sleep(15)
     threading.Thread(target=scans, daemon=True).start()
@@ -866,6 +875,7 @@ def main():
             try:
                 hub.refresh_cloud()
             except Exception as e:
+                hub.diagnostics.emit("runtime_error", stage="cloud", error_type=type(e).__name__)
                 print("Upload-status check failed:", e, flush=True)
             time.sleep(max(1, config.get("cloud_seconds", 5) - (time.monotonic() - started)))
     threading.Thread(target=cloud_checks, daemon=True).start()

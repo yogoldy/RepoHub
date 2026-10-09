@@ -4,7 +4,7 @@ A simple local Mac app showing whether the latest iCloud-folder backups match th
 
 ## Product direction
 
-See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. The next implementation item is bounded local diagnostic logging.
+See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. Bounded local diagnostic storage is implemented; scan and display evidence is the next item.
 
 This is currently Leo's local prototype. `install.py` performs a personal migration of an earlier backup setup; general folder-picker onboarding and a distributable installer remain roadmap work. Public source publication does not upload personal backups or diagnostics.
 
@@ -99,3 +99,7 @@ Each card's folder icon is a separate **Open [repo] in Finder** button. Clicking
 Expanded Things to know uses a separate spaced block: extra space after the Finder demonstration row, between each explanatory line, and before the action buttons/footer text. Both the menu and full dashboard apply the same spacing; collapsed disclosures remain compact.
 
 Change detection compares full content hashes, paths, permissions and symlink targets. Timestamp-only differences do not request a replacement archive after verification. Finder metadata (`.DS_Store` / AppleDouble `._` files) and Git data are disclosed separately from repo files; all remain included in backups. The latest file timestamp in Advanced is informational, not proof of a user edit. Advanced lists up to eight observed differences against the saved archive.
+
+## Local diagnostics
+
+The helper writes structured events under `~/Library/Application Support/RepoHub/diagnostics/` while it runs, including startup and a per-minute heartbeat. Logging continues with the menu panel closed. Gaps are recorded as unobserved intervals; sleep/offline time is not falsely presented as monitored. Files rotate at 10 MiB, with seven-day/100 MiB total retention, owner-only permissions and recovery from failed/partial writes. Diagnostic files are outside monitored repos and helper-data archives. The status API reports recording failures without interrupting backups. Reports remain local; bug submission and sanitized export are roadmap work.
