@@ -1,3 +1,4 @@
+const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
 let menuState=null,selectedId=null,sessionToken='',loading=false,lastResponseAt=0,settingsRevision='',settingsRepo=null,defaultsRevision='',settingsDefaults=null;
 const $=s=>document.querySelector(s);
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -44,6 +45,7 @@ function render(){
   const oldIds=[...existing.keys()].join('|'),newIds=repos.map(r=>r.id).join('|');
   if(oldIds!==newIds||!repos.length){const offset=rail.scrollLeft;rail.replaceChildren(...buttons);rail.scrollLeft=offset;if(!repos.length)rail.innerHTML='<p class="empty">Repos will appear here when added to your repos folder.</p>';}
   renderDetail();updatePosition();
+  void diagnosticView.observe(menuState,[...rail.querySelectorAll('.repo-card')].map(button=>({repo_id:button.dataset.repoId,phase:button.className.split(' ')[1],display_label:button.querySelector('.card-status').textContent.split(' · ')[0],ready:button.classList.contains('ready')})));
   const notifications=menuState.notifications||{},enabled=notifications.enabled===true;
   $('#notifications').setAttribute('aria-pressed',String(enabled));
   $('#notification-caption').textContent=notifications.permission==='denied'?'macOS permission needed':enabled?'On':'Off';

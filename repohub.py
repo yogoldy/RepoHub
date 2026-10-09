@@ -23,6 +23,7 @@ from urllib.parse import unquote, urlparse
 from backup_policy import BackupScheduler, default_settings, validate_settings, power_source
 from status_health import annotate_health, ProblemTracker, age
 from diagnostics import DiagnosticLog
+from change_evidence import ChangeEvidence
 
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
@@ -316,6 +317,7 @@ class Hub:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.diagnostics = DiagnosticLog(self.state_dir / "diagnostics")
         self.diagnostics.emit("helper_started", build_id=sha256(Path(__file__))[:16])
+        self.evidence = ChangeEvidence(self.diagnostics)
         self.lock = threading.RLock()
         self.scan_lock = threading.Lock()
         self.backup_lock = threading.Lock()
@@ -353,9 +355,14 @@ class Hub:
     def scan(self, deep=True, force=False):
         if not self.scan_lock.acquire(blocking=False):
             return
+        scan_id, scan_started = secrets.token_hex(8), time.monotonic()
+        scan_complete = False
+        self.diagnostics.emit("scan_started", scan_id=scan_id, mode="content" if deep else "metadata", reason="forced" if force else "poll")
         try:
             rows = []
             for key, root in self.repositories().items():
+                repo_started = time.monotonic()
+                verification_performed = False
                 row = {"id": key, "name": root.name, "path": str(root)}
                 try:
                     entries = tree_entries(root)
@@ -388,6 +395,7 @@ class Hub:
                                  and cached.get("archive_stamp") == archive_stamp(current["archive"])
                                  and age < self.config.get("verification_seconds", 900))
                         if deep and (force or not valid):
+                            verification_performed = True
                             with self.lock:
                                 self.status["verifying"] = root.name
                                 self.persist_status()
@@ -406,13 +414,17 @@ class Hub:
                 if row["verification"]["state"] in {"different", "error"}:
                     row["needs_backup"] = True
                 row["cloud"] = self.cloud_for(key, current)
+                self.evidence.repo_checked(row, scan_id, (time.monotonic() - repo_started) * 1000, not verification_performed)
                 rows.append(row)
             with self.lock:
                 self.scheduler.observe(rows, time.monotonic())
-                self.status.update({"scanned_at": utc_now(), "repos": rows})
+                self.status.update({"scanned_at": utc_now(), "scan_id": scan_id, "repos": rows})
                 self.status["verifying"] = None
                 self.persist_status()
+                scan_complete = True
         finally:
+            self.diagnostics.emit("scan_finished", scan_id=scan_id, result="complete" if scan_complete else "failed",
+                                  duration_ms=(time.monotonic() - scan_started) * 1000)
             with self.lock:
                 self.status["verifying"] = None
             self.scan_lock.release()
@@ -433,6 +445,7 @@ class Hub:
             result["observed_at"] = utc_now()
             result["diagnostics"] = self.diagnostics.status()
             annotate_health(result, self.config, time.time())
+            result["diagnostic_observation_id"] = self.evidence.observe_status(result)
             before = json.dumps(self.problem_tracker.episodes, sort_keys=True)
             result["problems"] = self.problem_tracker.update(result, time.time())
             if before != json.dumps(self.problem_tracker.episodes, sort_keys=True):
@@ -749,7 +762,7 @@ class Handler(BaseHTTPRequestHandler):
             routes = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                       "/view-client.js": "view-client.js", "/notes.html": "notes.html",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
-                      "/repo-status.js": "repo-status.js"}
+                      "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:
                 return self.send({"error": "Not found"}, 404)
             target = WEB / routes[path]
@@ -806,6 +819,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/settings":
                 try:
                     return self.send(self.hub.save_settings(payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
+            if path == "/api/diagnostics/presentation":
+                try:
+                    return self.send(self.hub.evidence.presentation(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
             if path == "/api/backup":

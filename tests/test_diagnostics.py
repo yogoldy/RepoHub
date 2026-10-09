@@ -113,6 +113,15 @@ class DiagnosticTests(unittest.TestCase):
             thread.join()
         self.assertEqual(len(list(read_events(self.logs))), 200)
 
+    def test_reader_skips_special_files_and_malformed_schema(self):
+        log = DiagnosticLog(self.logs)
+        log.emit("valid")
+        with log.active.open('a') as output:
+            output.write('{"schema_version":1}\n')
+        fifo = self.logs/'events-00000000000000000001-aaaaaaaaaaaa-000001.jsonl'
+        os.mkfifo(fifo)
+        self.assertEqual([event['event'] for event in read_events(self.logs)], ['valid'])
+
     def test_heartbeat_is_throttled_and_gaps_are_observations(self):
         wall, mono = [1000], [0]
         log = DiagnosticLog(self.logs, clock=lambda: wall[0], monotonic=lambda: mono[0])

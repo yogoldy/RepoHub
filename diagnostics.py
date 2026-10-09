@@ -14,7 +14,7 @@ MANAGED = re.compile(r"events-\d{20}-[0-9a-f]{12}-\d{6}\.jsonl$")
 SCHEMA_VERSION = 1
 MAX_RECORD = 8192
 # Callers may supply only diagnostic facts, not opaque payloads or exception prose.
-FIELDS = frozenset("build_id run_id scan_id repo_ref archive_ref observation_id client_id surface native policy_version stage result reason mode state previous_signature source_signature backup_signature content_signature archive_content_signature verification_state verification_checked_at duration_ms files bytes counts samples cached needs_backup metadata_changed fresh scan_running backup_running repo_count uptime_seconds gap_seconds dropped_events error_type display_label phase percent previous_scan_id".split())
+FIELDS = frozenset("build_id run_id scan_id repo_ref archive_ref observation_id client_id surface native policy_version stage result reason mode state has_error has_backup backup_hash_ref previous_signature source_signature backup_signature content_signature archive_content_signature verification_state verification_checked_at duration_ms files bytes counts samples cached needs_backup metadata_changed fresh scan_running backup_running repo_count uptime_seconds gap_seconds dropped_events error_type display_label phase percent previous_scan_id".split())
 SAMPLE_FIELDS = {"path_ref", "category", "change", "known_file"}
 COUNTS = {"finder_metadata", "git_data", "repo_files"}
 
@@ -119,7 +119,7 @@ class DiagnosticLog:
                     if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
                             or info.st_size + len(body) > self.file_bytes):
                         self.active = None
-                flags = os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW
+                flags = os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW | os.O_NONBLOCK
                 if self.active is None:
                     self.sequence += 1
                     self.active = self.directory / f"events-{int(now * 1e9):020d}-{self.session_id}-{self.sequence:06d}.jsonl"
@@ -177,7 +177,7 @@ def read_events(directory):
         if not MANAGED.fullmatch(path.name):
             continue
         try:
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
             with os.fdopen(fd, "rb") as source:
                 info = os.fstat(source.fileno())
                 if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
@@ -193,7 +193,9 @@ def read_events(directory):
                         continue
                     try:
                         value = json.loads(line)
-                        if isinstance(value, dict) and value.get("schema_version") == SCHEMA_VERSION:
+                        if (isinstance(value, dict) and value.get("schema_version") == SCHEMA_VERSION
+                                and isinstance(value.get("event"), str) and isinstance(value.get("utc"), str)
+                                and isinstance(value.get("session_id"), str)):
                             yield value
                     except (ValueError, UnicodeDecodeError):
                         pass

@@ -37,5 +37,5 @@
   };
   function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
   function legend(){return '<span>'+icon('ready')+' Verified + uploaded</span><span>'+icon('pending')+' Waiting for iCloud</span><span>'+icon('changed')+' Files or background data changed</span><span>'+icon('uploading')+' Uploading</span><span>'+icon('copying')+' Backing up</span><span>'+icon('verifying')+' Checking hashes</span><span>'+icon('stale')+' Status outdated</span><span>'+icon('error')+' Needs attention</span><span>'+icon('unknown')+' Unconfirmed</span>';}
-  const policy={view,icon,legend};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,icon,legend,version:'change-evidence-1'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);
