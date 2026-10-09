@@ -70,3 +70,11 @@ Installed panel exposes separate Open [repo] in Finder buttons and the second di
 Show me targets the selected card's separate Finder button, scrolls it into view and briefly animates its icon with an enlarged gold highlight. Repeated clicks restart the demonstration; the highlight clears after 1.4 seconds. It does not invoke the native bridge. Reduced Motion removes the shake and retains a static enlargement. The full dashboard uses an inline illustration of the menu-bar folder icon. JavaScript syntax and the existing status policy checks apply; no scheduling, archive or native bridge code changes.
 
 Synthetic Show me highlighted Open Excel development in Finder while the selected repo remained Excel development and its upload status was unchanged. The live region described the correct target, the temporary class cleared, and browser console showed no errors. Native scheduling/bridge code is unchanged in this demonstration commit.
+
+## Things to know spacing
+
+Spacing-only follow-up adds 14-point gaps between explanatory paragraphs, extra separation after the Finder demonstration row, and bottom padding before following actions/footer text. Hidden disclosures remain hidden; collapsed controls retain their compact layout. No scheduler, native bridge or archive changes. Visual inspection covers expanded and collapsed states in the preview.
+
+Preview measurements show about 18 points after the folder demonstration row and 14 points between following paragraphs. Expanded spacing and full-dashboard Show me were observed; the illustration entered the demonstration state and the explanation remained visible. JavaScript syntax and 28 status policy checks pass. Existing 52 Python and 35 native bridge checks are unchanged by this CSS-only commit.
+
+Final installed verification: subsequent native UI activation completed successfully. Show me enlarged and shook the actual BlankSlate folder button, without opening Finder; clicking Open Excel development in Finder then opened the exact local `/Users/leogoldberg/Desktop/repos/Excel development` folder. This supersedes the earlier interrupted Finder-activation check. Both disclosure panels and the spaced explanation render in the installed app. No independent cloud computer/download/restore environment was configured.

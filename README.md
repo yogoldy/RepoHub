@@ -89,3 +89,5 @@ Battery settings offer **Automatic backups on battery**. Unchecking it selects m
 Each card's folder icon is a separate **Open [repo] in Finder** button. Clicking the rest of the card selects its status. **Things to know**, below the status-icon disclosure in both views, explains the Finder shortcut, default versus custom schedules, and what backups include. Browser-only previews disable Finder buttons. Folder openings use the exact menu-page bridge and never accept a user-supplied path or URL.
 
 **Show me** in Things to know briefly enlarges, shakes and highlights the selected repo's actual folder button, scrolling it into view when needed. It does not open Finder or change the selected repo. Reduced Motion uses a still enlargement/highlight. The full dashboard illustrates the same folder symbol inline because its Finder controls are in the native menu bar.
+
+Expanded Things to know uses a separate spaced block: extra space after the Finder demonstration row, between each explanatory line, and before the action buttons/footer text. Both the menu and full dashboard apply the same spacing; collapsed disclosures remain compact.
