@@ -1,0 +1,19 @@
+name: Golden rules
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  automated-contract:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Run RepoHub's golden rules
+        run: python3 tools/release_gate.py --require-clean --output "$RUNNER_TEMP/repohub-golden-rules.json"
