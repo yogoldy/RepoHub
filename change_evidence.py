@@ -17,7 +17,7 @@ def repo_facts(row):
     backup, verification, cloud = row.get('last_backup') or {}, row.get('verification') or {}, row.get('cloud') or {}
     counts = verification.get('changes', {}).get('counts', {})
     counts = {kind: counts.get(kind, 0) for kind in ('finder_metadata', 'git_data', 'repo_files')}
-    return {'repo_ref': diagnostic_ref(row['id']), 'archive_ref': diagnostic_ref(backup.get('archive')),
+    return {'repo_ref': diagnostic_ref(row['id']), 'archive_ref': diagnostic_ref(backup.get('archive')), 'run_id': backup.get('run_id'),
             'source_signature': row.get('signature'), 'backup_signature': backup.get('signature'),
             'content_signature': verification.get('content_signature'),
             'archive_content_signature': verification.get('archive_content_signature'),
@@ -53,6 +53,46 @@ def change_reason(row, facts):
             return 'finder_and_git_data'
         return 'content_difference_unclassified'
     return 'backup_pending_unclassified'
+
+
+def icon_reason(rendered, facts):
+    """Explain the reported presentation; inputs remain recorded independently."""
+    # This checks the logged inputs independently of the submitted icon. A claimed
+    # green icon never becomes proof of a verified/uploaded archive.
+    same_verification = facts['verification_archive_ref'] == facts['archive_ref']
+    same_cloud = facts['cloud_archive_ref'] == facts['archive_ref']
+    if facts['fresh'] is not True:
+        expected, reason = 'stale', 'checks_not_fresh'
+    elif facts['has_error'] or facts['cloud_state'] == 'error':
+        expected, reason = 'error', 'observed_error'
+    elif facts['copying']:
+        expected, reason = 'copying', 'active_repo_backup'
+    elif facts['needs_backup']:
+        if facts['has_backup'] and facts['verification_state'] == 'checking':
+            expected, reason = 'verifying', 'awaiting_hash_verification'
+        else:
+            expected, reason = 'changed', facts['change_reason']
+    elif (facts['needs_backup'] is False and facts['ignored_finder_only'] and facts['backup_required'] is False
+          and facts['has_backup'] and facts['backup_hash_ref'] and same_verification
+          and facts['verification_state'] == 'different'):
+        expected, reason = cloud_icon(facts, same_cloud, finder=True)
+    elif facts['verification_state'] != 'matched' or not same_verification:
+        expected, reason = 'verifying', 'awaiting_hash_verification'
+    else:
+        expected, reason = cloud_icon(facts, same_cloud)
+    if rendered['phase'] != expected or rendered['ready'] != (expected == 'ready'):
+        return 'presentation_inputs_disagree'
+    return reason
+
+
+def cloud_icon(facts, same_cloud, finder=False):
+    if facts['cloud_state'] == 'uploaded' and same_cloud and facts['archive_ref'] and facts['backup_hash_ref']:
+        return ('background', 'finder_only_project_match') if finder else ('ready', 'fresh_hashes_and_upload_confirmed')
+    if facts['cloud_state'] == 'uploading':
+        return 'uploading', 'macos_uploading'
+    if facts['cloud_state'] == 'pending':
+        return 'pending', 'macos_upload_pending'
+    return 'unknown', 'upload_not_confirmed'
 
 
 def safe_samples(row):
@@ -97,6 +137,8 @@ class ChangeEvidence:
         for row in status['repos']:
             verification, cloud = row.get('verification', {}), row.get('cloud', {})
             projection[row['id']] = {**repo_facts(row),
+                'change_reason': change_reason(row, repo_facts(row)),
+                'active_run_id': status.get('backup', {}).get('run_id') if status.get('backup', {}).get('running') and status['backup'].get('current_repo') == row['name'] else None,
                 'verification_archive_ref': diagnostic_ref(verification.get('archive')),
                 'verification_signature': verification.get('signature'),
                 'verification_checked_at': verification.get('checked_at'),
@@ -114,7 +156,9 @@ class ChangeEvidence:
                 self.log.emit('status_snapshot', observation_id=identity, scan_id=status.get('scan_id'), repo_count=len(projection))
                 for facts in projection.values():
                     self.log.emit('status_repo', observation_id=identity, scan_id=status.get('scan_id'),
-                                  repo_ref=facts['repo_ref'], archive_ref=facts['archive_ref'],
+                                  repo_ref=facts['repo_ref'], archive_ref=facts['archive_ref'], run_id=facts['active_run_id'] or facts['run_id'],
+                                  reason=facts['change_reason'],
+                                  verification_archive_ref=facts['verification_archive_ref'], cloud_archive_ref=facts['cloud_archive_ref'], copying=facts['copying'],
                                   source_signature=facts['source_signature'], backup_signature=facts['backup_signature'],
                                   verification_state=facts['verification_state'], needs_backup=facts['needs_backup'],
                                   counts=facts['counts'], fresh=facts['fresh'], mode=facts['cloud_state'],
@@ -161,9 +205,16 @@ class ChangeEvidence:
                 current[key] = signature
                 repo_ref = snapshot[key]['repo_ref']
                 if previous.get(key) != signature:
+                    reason = icon_reason(row, snapshot[key])
+                    if reason == 'presentation_inputs_disagree':
+                        self.log.emit('presentation_input_disagreement', severity='warning', repo_ref=repo_ref,
+                                      observation_id=observation, surface=payload['surface'], native=payload['native'],
+                                      phase=row['phase'], display_label=row['display_label'], reason=reason)
                     self.log.emit('ui_presented', repo_ref=repo_ref, client_id=client, observation_id=observation,
                                   surface=payload['surface'], native=payload['native'], policy_version=payload['policy_version'],
-                                  phase=row['phase'], display_label=row['display_label'], result='ready' if row['ready'] else 'not_ready')
+                                  phase=row['phase'], display_label=row['display_label'], result='ready' if row['ready'] else 'not_ready',
+                                  run_id=snapshot[key]['active_run_id'] or snapshot[key]['run_id'], archive_ref=snapshot[key]['archive_ref'],
+                                  reason=reason)
                 peers = displays.setdefault(key, {})
                 view = (payload['surface'], payload['native'])
                 rendered = (row['phase'], row['display_label'], row['ready'])

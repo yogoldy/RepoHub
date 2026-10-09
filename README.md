@@ -4,7 +4,7 @@ A simple local Mac app showing whether the latest iCloud-folder backups match th
 
 ## Product direction
 
-See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. Bounded local diagnostic storage and scan/display evidence are implemented; full backup/cloud-stage instrumentation is the next item.
+See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. Bounded local diagnostic storage, scan/display evidence and backup/cloud lifecycle instrumentation are implemented; sanitized export is the next item.
 
 This is currently Leo's local prototype. `install.py` performs a personal migration of an earlier backup setup; general folder-picker onboarding and a distributable installer remain roadmap work. Public source publication does not upload personal backups or diagnostics.
 
@@ -123,3 +123,6 @@ Ordinary `.DS_Store` file additions, deletions and content changes do not trigge
 This exception applies only to regular files named `.DS_Store`. Symlinks/directories at that name, AppleDouble `._` files, ignored/hidden files and all Git data remain protected. A new archive caused by meaningful changes includes the current `.DS_Store` files too. Timestamp-only changes continue to reuse the existing verified copy. Missing or corrupt copies still need replacement.
 
 Scheduled and manual checks may inspect all repos. They create archives only for the repos that need replacements; a targeted after-edit backup cannot create another repo's archive. Explicit selections must use current workspace IDs. The shared iCloud index is written only when its data changes or a failed publication needs recovery, so successful unchanged checks do not repeatedly upload identical index data. Saved app data remains a separately verified backup. macOS controls transfer timing; Repo Hub decides which new archives to publish.
+
+
+Lifecycle diagnostics record scheduling/power decisions, quiet-period/retry waits, backup stages, failures and restart interruptions. New archives carry their creating run ID; upload and cleanup events identify that exact archive. Unchanged observations are recorded at most once per minute. Icon receipts include their decision explanation and run/archive links, with backend-input disagreements separated from cross-view disagreements. These are diagnostic checks, not a replacement for hash verification or independent restore testing. The local report retains the latest 200 lifecycle events; it is not a sanitized sharing bundle.

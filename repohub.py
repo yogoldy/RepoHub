@@ -22,7 +22,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
 from backup_policy import BackupScheduler, default_settings, validate_settings, power_source
 from status_health import annotate_health, ProblemTracker, age
-from diagnostics import DiagnosticLog
+from diagnostics import DiagnosticLog, diagnostic_ref
+from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
 
@@ -276,9 +277,11 @@ def git_info(root):
             "last_commit": run("log", "-1", "--format=%cI")}
 
 
-def snapshot(root, destination, staging, expected=None, after_archive=None):
+def snapshot(root, destination, staging, expected=None, after_archive=None, observe=None):
     """Verify source bytes, stored archive contents, and destination checksum before publication."""
     root, destination, staging = map(Path, (root, destination, staging))
+    observe = observe or (lambda stage: None)
+    observe("source_hashing")
     before = tree_entries(root)
     if expected is not None and fingerprint(before) != expected:
         raise RuntimeError("Repo changed before the backup started; retry later")
@@ -287,6 +290,7 @@ def snapshot(root, destination, staging, expected=None, after_archive=None):
     temporary = staging / (secrets.token_hex(12) + ".tar.gz")
     published = None
     try:
+        observe("archive_creation")
         with tarfile.open(temporary, "w:gz", compresslevel=1, dereference=False) as archive:
             archive.add(root, arcname=root.name, recursive=False)
             for relative, *_ in before:
@@ -295,13 +299,16 @@ def snapshot(root, destination, staging, expected=None, after_archive=None):
             after_archive()
         if before != tree_entries(root):
             raise RuntimeError("Repo changed during the backup; no snapshot was published")
+        observe("archive_verification")
         if archive_manifest(temporary, root.name) != contents or content_manifest(root) != contents:
             raise RuntimeError("Repo content changed during the backup; no snapshot was published")
         digest = sha256(temporary)
         destination.mkdir(parents=True, exist_ok=True)
         filename = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S.%fZ") + ".tar.gz"
         published = destination / filename
+        observe("archive_transfer")
         shutil.move(str(temporary), str(published))
+        observe("destination_verification")
         if sha256(published) != digest:
             raise RuntimeError("Snapshot checksum verification failed")
         return {"completed_at": utc_now(), "archive": str(published), "sha256": digest,
@@ -332,6 +339,7 @@ class Hub:
         self.diagnostics = DiagnosticLog(self.state_dir / "diagnostics")
         self.diagnostics.emit("helper_started", build_id=sha256(Path(__file__))[:16])
         self.evidence = ChangeEvidence(self.diagnostics)
+        self.lifecycle = BackupLifecycle(self.diagnostics)
         self.lock = threading.RLock()
         self.scan_lock = threading.Lock()
         self.backup_lock = threading.Lock()
@@ -358,6 +366,10 @@ class Hub:
         self.problem_tracker = ProblemTracker(load_json(self.state_dir / "problem-episodes.json", {}))
         self.power = "unknown"
         self.views = load_json(self.data_dir / "views.json", [])
+        previous_backup = load_json(self.state_dir / "status.json", {}).get("backup", {})
+        self.previous_backup_run = previous_backup.get("run_id")
+        if previous_backup.get("running"):
+            self.lifecycle.emit("backup_interrupted", run_id=self.previous_backup_run, reason="helper_restarted", result="unobserved_completion")
         self.status = {"scanned_at": None, "repos": [], "backup": {"running": False},
                        "repos_root": str(self.root), "backup_root": str(self.backups)}
         self.scan(deep=False)
@@ -523,12 +535,14 @@ class Hub:
             self.scheduler.periodic = {key: time.monotonic() - max(0, time.time() - timestamp)
                                        for key, timestamp in self.repo_periodic_at.items()}
             plan = self.scheduler.plan(self.settings, source, rows, time.monotonic(), self.repo_settings)
+            plan_run_id = secrets.token_hex(12) if plan else None
+            self.lifecycle.schedule(self.scheduler, self.settings, source, rows, time.monotonic(), self.repo_settings, plan, run_id=plan_run_id)
             policies = [self.repo_settings.get(row["id"], self.settings).get(source) for row in rows]
             self.status["schedule"] = {"paused": source == "unknown" or not any(
                 policy and (policy["frequency_minutes"] or policy["after_edits"]) for policy in policies)}
         attempted = []
         if plan and self.backup(keys=plan["keys"], reason=plan["reason"], expected_power=source,
-                                attempted_keys=attempted):
+                                attempted_keys=attempted, run_id=plan_run_id):
             with self.lock:
                 completed = dict(plan)
                 completed["keys"] = attempted
@@ -553,6 +567,7 @@ class Hub:
         if not current or observed.get("archive") != current["archive"]:
             return {"state": "unknown"}
         if age(observed.get("checked_at"), time.time()) > max(45, self.config.get("cloud_seconds", 5) * 6):
+            self.lifecycle.transition("upload_stale", key=key, current=current, result="unknown", reason="observation_expired")
             return {"state": "unknown", "detail": "Upload status is outdated", "archive": current["archive"]}
         return observed
 
@@ -579,6 +594,11 @@ class Hub:
             state = cloud_status(item)
             if item.get("probe_error"):
                 state = {"state": "unknown", "detail": "Upload-status helper unavailable"}
+            self.lifecycle.transition("upload_observed", key=request["id"], current=copies[request["id"]],
+                                      state=state["state"], percent=state.get("percent"),
+                                      reason=state.get("reason", "helper_unavailable" if item.get("probe_error") else "macos_observation"),
+                                      has_error=bool(item.get("error") or item.get("probe_error")),
+                                      error_code=item.get("error_code") if type(item.get("error_code")) is int else None)
             observed[request["id"]] = {**state, "archive": request["path"], "checked_at": checked}
         with self.lock:
             self.cloud_states = observed
@@ -595,6 +615,8 @@ class Hub:
                         try:
                             self.retain_current(key, current)
                         except Exception as e:
+                            self.lifecycle.transition("retention_failed", key=key, current=current,
+                                                      severity="error", result="deferred", error_type=type(e).__name__)
                             print("Retention cleanup deferred:", key, str(e), flush=True)
             finally:
                 self.backup_lock.release()
@@ -602,6 +624,7 @@ class Hub:
     def retain_current(self, key, current):
         """Remove only managed superseded archives after verifying the retained copy."""
         if self.retention != "latest":
+            self.lifecycle.transition("retention_decision", key=key, current=current, reason="keep_all", result="kept")
             return
         with self.lock:
             if self.index.get(key, {}).get("archive") != current["archive"]:
@@ -615,17 +638,25 @@ class Hub:
         obsolete = [p for p in destination.iterdir() if p != retained
                     and ARCHIVE_NAME.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
         if not obsolete:
+            self.lifecycle.transition("retention_decision", key=key, current=current, reason="no_superseded_archives", result="kept")
             return
         if (self.config.get("require_upload_before_prune", False)
                 and self.cloud_for(key, current).get("state") != "uploaded"):
+            self.lifecycle.transition("retention_decision", key=key, current=current, reason="awaiting_upload", result="kept")
             return  # Keep the previously uploaded copy until its replacement reaches iCloud.
         if sha256(retained) != current["sha256"]:
             raise RuntimeError("Current archive failed verification; older backups were kept")
+        self.lifecycle.emit("retention_verified", key=key, current=current, files=len(obsolete), result="verified")
         for path in obsolete:
+            self.lifecycle.emit("prune_started", key=key, current=current, previous_archive_ref=diagnostic_ref(str(path)))
             path.unlink()
+            self.lifecycle.emit("prune_finished", key=key, current=current, previous_archive_ref=diagnostic_ref(str(path)), result="removed")
 
-    def backup(self, keys=None, reason="manual", expected_power=None, attempted_keys=None):
+    def backup(self, keys=None, reason="manual", expected_power=None, attempted_keys=None, run_id=None):
+        run_id = run_id or secrets.token_hex(12)
+        started = time.monotonic()
         if expected_power is not None and power_source() != expected_power:
+            self.lifecycle.emit("backup_deferred", run_id=run_id, reason="power_changed", result="not_started")
             return False
         repositories = self.repositories()
         if keys is not None:
@@ -634,11 +665,15 @@ class Hub:
             if not keys:
                 return False
         if not self.backup_lock.acquire(blocking=False):
+            self.lifecycle.emit("backup_deferred", run_id=run_id, reason="backup_busy", result="not_started")
             return False
         failures = []
+        outcome = "complete"
+        self.lifecycle.emit("backup_started", run_id=run_id, previous_run_id=self.status.get("backup", {}).get("run_id") or self.previous_backup_run,
+                            reason=reason, mode="all" if keys is None else "selected")
         try:
             with self.lock:
-                self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "reason": reason}
+                self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "reason": reason, "run_id": run_id}
                 self.persist_status()
             if not self.backups.parent.is_dir():
                 raise RuntimeError("iCloud Repository Backups folder is unavailable")
@@ -646,6 +681,8 @@ class Hub:
             backup_sources["repohub-data"] = self.data_dir
             for key, root in backup_sources.items():
                 if expected_power is not None and power_source() != expected_power:
+                    outcome = "failed_power_paused" if failures else "power_paused"
+                    self.lifecycle.emit("backup_paused", run_id=run_id, reason="power_changed", result="partial")
                     break  # Finish an in-flight archive, then respect the new power source.
 
                 if attempted_keys is not None and key != "repohub-data":
@@ -653,28 +690,51 @@ class Hub:
                 with self.lock:
                     self.status["backup"]["current_repo"] = root.name
                     self.persist_status()
+                current_archive = None
+                stage = "source_inspection"
+                repo_started = time.monotonic()
+                self.lifecycle.emit("repo_backup_started", key=key, run_id=run_id)
+                def observe(value):
+                    nonlocal stage
+                    stage = value
+                    self.lifecycle.emit("archive_stage", key=key, run_id=run_id, stage=value)
                 try:
                     entries = tree_entries(root)
                     signature = fingerprint(entries)
                     with self.lock:
                         previous = self.index.get(key)
+                    current_archive = (previous or {}).get("archive")
                     verified = None
                     if previous and Path(previous["archive"]).is_file():
                         try:
+                            observe("existing_verification")
                             verified = verify_current(root, previous)
-                        except (OSError, RuntimeError, tarfile.TarError):
+                        except (OSError, RuntimeError, tarfile.TarError) as error:
+                            self.lifecycle.emit("archive_repair_needed", key=key, run_id=run_id,
+                                                previous_archive_ref=diagnostic_ref(previous["archive"]), error_type=type(error).__name__)
                             pass  # Replace a corrupt copy from the intact source; do not prune first.
                     if verified and (verified["state"] == "matched" or verified.get("ignored_finder_only") is True):
                         with self.lock:
                             self.verifications[key] = verified
                             previous["content_signature"] = verified["archive_content_signature"]
                             atomic_json_if_changed(self.state_dir / "backups.json", self.index)
+                        self.lifecycle.emit("archive_reused", key=key, run_id=run_id,
+                                            archive_ref=diagnostic_ref(previous["archive"]),
+                                            reason="finder_only" if verified.get("ignored_finder_only") else "contents_match")
+                        observe("publication_recovery")
                         # Finish an interrupted publication/cleanup without making another copy.
                         atomic_json_if_changed(self.backups / "index.json", self.index)
                         self.retain_current(key, previous)
+                        self.lifecycle.emit("repo_backup_finished", key=key, run_id=run_id, result="reused",
+                                            archive_ref=diagnostic_ref(previous["archive"]), duration_ms=(time.monotonic()-repo_started)*1000)
                         continue
-                    result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature)
+                    result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature, observe=observe)
+                    current_archive = result["archive"]
+                    self.lifecycle.emit("archive_verified", key=key, run_id=run_id, archive_ref=diagnostic_ref(current_archive),
+                                        backup_hash_ref=diagnostic_ref(result["sha256"]), result="verified")
+                    result["run_id"] = run_id
                     result["name"] = root.name
+                    observe("index_publication")
                     with self.lock:
                         self.index[key] = result
                         atomic_json(self.state_dir / "backups.json", self.index)
@@ -684,18 +744,28 @@ class Hub:
                         self.verifications[key] = {"state": "matched", "checked_at": utc_now(),
                                                    "signature": result["signature"], "archive": result["archive"],
                                                    "archive_stamp": archive_stamp(result["archive"])}
+                    observe("retention")
                     self.retain_current(key, result)
+                    self.lifecycle.emit("repo_backup_finished", key=key, current=result, result="created",
+                                        bytes=result["archive_bytes"], duration_ms=(time.monotonic()-repo_started)*1000)
                 except Exception as e:
+                    outcome = "failed"
+                    self.lifecycle.emit("repo_backup_failed", key=key, run_id=run_id, stage=stage, archive_ref=diagnostic_ref(current_archive),
+                                        severity="error", result="failed", error_type=type(e).__name__,
+                                        duration_ms=(time.monotonic()-repo_started)*1000)
                     failures.append({"repo": root.name, "error": str(e)})
             with self.lock:
-                self.status["backup"] = {"running": False, "finished_at": utc_now(), "errors": failures,
+                self.status["backup"] = {"running": False, "finished_at": utc_now(), "run_id": run_id, "errors": failures,
                                          "note": "Archives verified locally. macOS manages iCloud upload."}
                 self.persist_status()
         except Exception as e:
+            outcome = "failed"
+            self.lifecycle.emit("backup_failed", run_id=run_id, severity="error", error_type=type(e).__name__)
             with self.lock:
-                self.status["backup"] = {"running": False, "finished_at": utc_now(), "errors": [{"error": str(e)}]}
+                self.status["backup"] = {"running": False, "finished_at": utc_now(), "run_id": run_id, "errors": [{"error": str(e)}]}
                 self.persist_status()
         finally:
+            self.lifecycle.emit("backup_finished", run_id=run_id, result=outcome, duration_ms=(time.monotonic()-started)*1000)
             self.backup_lock.release()
             self.scan()
             if reason == "manual":

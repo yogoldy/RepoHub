@@ -9,7 +9,9 @@ from diagnostics import read_events
 def summarize(events):
     counts = Counter()
     latest, presentations, agreements = {}, {}, {}
+    lifecycle = []
     mismatches = []
+    input_mismatches = []
     sessions = set()
     first = last = None
     backend = {}
@@ -18,32 +20,41 @@ def summarize(events):
         counts[kind] += 1
         sessions.add(event.get('session_id'))
         first = first or event.get('utc'); last = event.get('utc')
+        if kind in {'schedule_decision', 'backup_deferred', 'backup_interrupted', 'backup_started', 'backup_paused', 'backup_failed', 'backup_finished',
+                    'repo_backup_started', 'archive_stage', 'archive_verified', 'archive_repair_needed', 'archive_reused', 'repo_backup_finished',
+                    'repo_backup_failed', 'upload_observed', 'upload_stale', 'retention_decision', 'retention_verified',
+                    'retention_failed', 'prune_started', 'prune_finished'}:
+            lifecycle.append(event)
+            lifecycle = lifecycle[-200:]
         ref = event.get('repo_ref')
         if kind == 'repo_checked':
             latest[ref] = {key: event.get(key) for key in ('utc', 'scan_id', 'reason', 'verification_state', 'needs_backup', 'counts', 'source_signature', 'backup_signature', 'samples', 'ignored_finder_only', 'backup_required', 'edit_signature')}
         elif kind == 'status_repo':
-            backend[(event.get('session_id'), event.get('observation_id'), ref)] = {key: event.get(key) for key in ('verification_state', 'needs_backup', 'counts', 'fresh', 'mode', 'has_error', 'has_backup', 'backup_hash_ref', 'ignored_finder_only', 'backup_required', 'edit_signature')}
+            backend[(event.get('session_id'), event.get('observation_id'), ref)] = {key: event.get(key) for key in ('run_id', 'archive_ref', 'reason', 'copying', 'verification_archive_ref', 'cloud_archive_ref', 'verification_state', 'needs_backup', 'counts', 'fresh', 'mode', 'has_error', 'has_backup', 'backup_hash_ref', 'ignored_finder_only', 'backup_required', 'edit_signature')}
             # The report has bounded working memory even across seven days of logs.
             if len(backend) > 8192:
                 backend.pop(next(iter(backend)))
         elif kind == 'ui_presented':
             surface = event.get('surface') + ('_native' if event.get('native') else '_browser')
-            presented = {key: event.get(key) for key in ('utc', 'observation_id', 'phase', 'display_label', 'result', 'policy_version')}
+            presented = {key: event.get(key) for key in ('utc', 'run_id', 'archive_ref', 'reason', 'observation_id', 'phase', 'display_label', 'result', 'policy_version')}
             presented['backend'] = backend.get((event.get('session_id'), event.get('observation_id'), ref))
             presentations.setdefault(ref, {})[surface] = presented
             peers = agreements.setdefault((event.get('session_id'), event.get('observation_id'), ref), {})
             peers[surface] = (event.get('phase'), event.get('display_label'), event.get('result'))
             if len(agreements) > 4096:
                 agreements.pop(next(iter(agreements)))
+        elif kind == 'presentation_input_disagreement':
+            input_mismatches.append({key: event.get(key) for key in ('utc', 'observation_id', 'repo_ref', 'surface', 'native', 'display_label', 'reason')})
+            input_mismatches = input_mismatches[-20:]
         elif kind == 'presentation_disagreement':
             mismatches.append({key: event.get(key) for key in ('utc', 'observation_id', 'repo_ref', 'surface', 'native', 'display_label')})
             mismatches = mismatches[-20:]
     compared = [peers for peers in agreements.values() if len(peers) > 1]
     return {'schema_version': 1, 'first_utc': first, 'last_utc': last,
-            'helper_sessions': len(sessions), 'event_counts': dict(counts),
+            'recent_lifecycle': lifecycle, 'helper_sessions': len(sessions), 'event_counts': dict(counts),
             'same_observation_comparisons': len(compared),
             'matching_comparisons': sum(len(set(peers.values())) == 1 for peers in compared),
-            'disagreements': mismatches, 'repos': {ref: {'scan': latest.get(ref), 'views': presentations.get(ref, {})}
+            'input_disagreements': input_mismatches, 'disagreements': mismatches, 'repos': {ref: {'scan': latest.get(ref), 'views': presentations.get(ref, {})}
                                               for ref in latest.keys() | presentations.keys()},
             'limits': 'Only recorded observations are evidence. No view record does not prove a view agreed. No public upload or restore audit.'}
 
