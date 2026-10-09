@@ -212,6 +212,40 @@ class HubTests(unittest.TestCase):
         self.hub.retain_current(key, current)
         self.assertFalse(Path(old).exists())
 
+    def test_progress_and_retry_error_do_not_confirm_or_prune(self):
+        raw = {"ubiquitous": True, "uploading": True, "uploaded": False,
+               "percent": 100, "error": "unreachable", "error_domain": "NSCocoaErrorDomain", "error_code": 4355}
+        state = cloud_status(raw)
+        self.assertEqual(state["state"], "uploading")
+        self.assertEqual(state["percent"], 100)
+        self.assertEqual(state["last_error"], "unreachable")
+        self.assertEqual(cloud_status({**raw, "conflicts": True})["state"], "error")
+        self.assertEqual(cloud_status({"ubiquitous": True, "uploaded": False, "percent": 100})["state"], "pending")
+        for percent in [-1, 101, float("nan"), float("inf"), True, "50", None]:
+            self.assertNotIn("percent", cloud_status({"ubiquitous": True, "uploading": True, "percent": percent}))
+        self.hub.config["require_upload_before_prune"] = True
+        self.hub.backup()
+        key = workspace_id("Example")
+        old = self.hub.index[key]["archive"]
+        (self.repo / "work.txt").write_text("new work")
+        self.hub.backup()
+        current = self.hub.index[key]
+        self.hub.cloud_states[key] = {**state, "archive": current["archive"]}
+        self.hub.retain_current(key, current)
+        self.assertTrue(Path(old).exists())
+
+    def test_live_progress_is_replaced_by_latest_observation(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        for percent in [42.5, 79.0]:
+            response = subprocess.CompletedProcess([], 0, json.dumps({key:{"ubiquitous":True, "uploading":True, "percent":percent}}))
+            with patch("repohub.subprocess.run", return_value=response):
+                self.hub.refresh_cloud()
+            self.assertEqual(self.hub.public_status()["repos"][0]["cloud"]["percent"], percent)
+        with patch("repohub.subprocess.run", side_effect=OSError("unavailable")):
+            self.hub.refresh_cloud()
+        self.assertNotIn("percent", self.hub.public_status()["repos"][0]["cloud"])
+
     def test_failed_cloud_probe_revokes_previous_confirmation(self):
         self.hub.backup()
         key = workspace_id("Example")

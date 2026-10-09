@@ -1,7 +1,8 @@
 import AppKit
 import WebKit
+import UserNotifications
 
-final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
+final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, UNUserNotificationCenterDelegate {
     var statusItem: NSStatusItem!
     var window: NSWindow?
     var webView: WKWebView?
@@ -9,6 +10,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var detailItem: NSMenuItem!
     var backupItem: NSMenuItem!
     var cloudItem: NSMenuItem!
+    var notificationItem: NSMenuItem!
+    var notificationInFlight = false
+    var notificationsEnabled: Bool { UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true }
     var polling: Timer?
     let address = URL(string: "http://127.0.0.1:8767/")!
 
@@ -34,15 +38,21 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         backupItem.target = self
         backupItem.isEnabled = false
         menu.addItem(withTitle: "Open Repository Backups", action: #selector(openBackups), keyEquivalent: "").target = self
+        notificationItem = menu.addItem(withTitle: "Notify when backups are ready", action: #selector(toggleNotifications), keyEquivalent: "")
+        notificationItem.target = self
+        notificationItem.state = notificationsEnabled ? .on : .off
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit menu-bar app", action: #selector(quit), keyEquivalent: "q").target = self
         statusItem.menu = menu
+        UNUserNotificationCenter.current().delegate = self
+        if notificationsEnabled { requestNotifications() }
         pollStatus()
-        polling = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in self?.pollStatus() }
+        polling = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.pollStatus() }
         if !CommandLine.arguments.contains("--background") { showHub() }
     }
 
     func pollStatus() {
+        updateNotificationStatus()
         let url = address.appendingPathComponent("api/status")
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
             guard let self = self else { return }
@@ -66,13 +76,22 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 let verificationErrors = repos.filter { ($0["verification"] as? [String: Any])?["state"] as? String == "error" }.count
                 let uploaded = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "uploaded" }.count
                 let cloudErrors = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "error" }.count
+                let uploading = repos.filter { ($0["cloud"] as? [String: Any])?["state"] as? String == "uploading" }
                 let dataError = (status["data_cloud"] as? [String: Any])?["state"] as? String == "error"
                 self.cloudItem.title = "iCloud: \(uploaded)/\(repos.count) uploads confirmed" + (cloudErrors > 0 ? " · \(cloudErrors) error(s)" : "") + (dataError ? " · saved data error" : "")
+                if let active = uploading.first(where: { repo in
+                    let percent = (repo["cloud"] as? [String: Any])?["percent"] as? Double ?? 0
+                    return percent > 0 && percent < 99
+                }) ?? uploading.first {
+                    let cloud = active["cloud"] as? [String: Any] ?? [:]
+                    let percent = (cloud["percent"] as? Double).map { " \(Int($0))%" } ?? ""
+                    self.cloudItem.title += " · \(active["name"] as? String ?? "Repo")\(percent) uploading"
+                }
                 let count = repos.filter { $0["last_backup"] is [String: Any] }.count
                 self.summaryItem.title = running ? "Backing up: \(backup["current_repo"] as? String ?? "repos")" :
                     !errors.isEmpty ? "\(errors.count) backup issue(s) — check hub" :
                     verificationErrors > 0 ? "\(verificationErrors) verification issue(s) — check hub" :
-                    pending > 0 ? "\(pending) repo(s) changed since backup" : verified < repos.count ? "Verifying contents: \(verified)/\(repos.count) checked" : "All \(repos.count) repo contents match"
+                    pending > 0 ? "\(pending) repo(s) changed since backup" : verified < repos.count ? "Verifying hashes: \(verified)/\(repos.count) checked" : "All \(repos.count) repo hashes verified"
                 let parser = ISO8601DateFormatter()
                 parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let newest = repos.compactMap { ($0["last_backup"] as? [String: Any])?["completed_at"] as? String }
@@ -82,8 +101,75 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 self.statusItem.button?.title = running ? " ↻" : (!errors.isEmpty || verificationErrors > 0 || cloudErrors > 0 || dataError) ? " !" : pending > 0 ? " \(pending)" : uploaded < repos.count ? " ↑" : ""
                 self.statusItem.button?.toolTip = "Repo Hub: " + self.summaryItem.title + " · " + self.cloudItem.title
                 self.backupItem.isEnabled = !running
+                self.notifyReadyBackups(repos)
             }
         }.resume()
+    }
+
+    func requestNotifications() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
+            if let error = error { print("Notification authorization:", error.localizedDescription) }
+            DispatchQueue.main.async { self.updateNotificationStatus() }
+        }
+    }
+
+    func updateNotificationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                let permission: String
+                switch settings.authorizationStatus {
+                case .authorized, .provisional: permission = "allowed"
+                case .denied: permission = "denied"
+                case .notDetermined: permission = "waiting"
+                default: permission = "unknown"
+                }
+                let status: [String: Any] = ["enabled": self.notificationsEnabled, "permission": permission]
+                let path = FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Library/Application Support/RepoHub/notifications.json")
+                if let data = try? JSONSerialization.data(withJSONObject: status) { try? data.write(to: path, options: .atomic) }
+                self.notificationItem.title = "Notify when backups are ready" + (permission == "denied" ? " (macOS permission needed)" : "")
+            }
+        }
+    }
+
+    @objc func toggleNotifications() {
+        UserDefaults.standard.set(!notificationsEnabled, forKey: "notificationsEnabled")
+        notificationItem.state = notificationsEnabled ? .on : .off
+        if notificationsEnabled { requestNotifications(); pollStatus() }
+    }
+
+    func notifyReadyBackups(_ repos: [[String: Any]]) {
+        guard notificationsEnabled, !notificationInFlight else { return }
+        let seen = Set(UserDefaults.standard.stringArray(forKey: "notifiedBackups") ?? [])
+        let ready = BackupReadiness.pendingNotifications(repos, seen: seen)
+        guard !ready.isEmpty else { return }
+        notificationInFlight = true
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+                    self.notificationInFlight = false
+                    return
+                }
+                let content = UNMutableNotificationContent()
+                content.title = ready.count == 1 ? "\(ready[0].name) backup ready" : "\(ready.count) backups ready"
+                content.body = "Hashes verified. macOS confirmed the iCloud upload." + (ready.count > 1 ? "\n" + ready.map { $0.name }.joined(separator: ", ") : "")
+                content.sound = .default
+                let request = UNNotificationRequest(identifier: "repohub-ready-" + UUID().uuidString, content: content, trigger: nil)
+                UNUserNotificationCenter.current().add(request) { error in
+                    DispatchQueue.main.async {
+                        self.notificationInFlight = false
+                        if error == nil {
+                            UserDefaults.standard.set(Array(seen.union(ready.map { $0.key })), forKey: "notifiedBackups")
+                        } else { print("Completion notification failed:", error!.localizedDescription) }
+                    }
+                }
+            }
+        }
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
     }
 
     @objc func backupNow() {
@@ -146,7 +232,11 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
-let application = NSApplication.shared
-let delegate = HubDelegate()
-application.delegate = delegate
-application.run()
+@main enum RepoHubMain {
+    static func main() {
+        let application = NSApplication.shared
+        let delegate = HubDelegate()
+        application.delegate = delegate
+        withExtendedLifetime(delegate) { application.run() }
+    }
+}

@@ -97,7 +97,7 @@ def main():
     config = {"repos_root": str(HOME_DIR / "Desktop/repos"),
               "backup_root": str(backup_root / "Snapshots"), "state_dir": str(STATE),
               "port": 8767, "scan_seconds": 30, "backup_seconds": 3600, "retention": "latest",
-              "verification_seconds": 900, "cloud_seconds": 30, "require_upload_before_prune": True,
+              "verification_seconds": 900, "cloud_seconds": 5, "require_upload_before_prune": True,
               "cloud_helper": str(runtime / "cloud-status")}
     (STATE / "config.json").write_text(json.dumps(config, indent=2) + "\n")
     os.chmod(STATE / "config.json", 0o600)
@@ -107,9 +107,9 @@ def main():
     run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/CloudStatus.swift"), "-o", str(cloud_binary),
         "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0")
     shutil.copy2(cloud_binary, runtime / "cloud-status")
-    run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), "-o", str(app_binary),
+    run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), str(SOURCE / "native/BackupReadiness.swift"), "-o", str(app_binary),
         "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0",
-        "-framework", "AppKit", "-framework", "WebKit")
+        "-framework", "AppKit", "-framework", "WebKit", "-framework", "UserNotifications")
     (APP / "Contents/MacOS").mkdir(parents=True, exist_ok=True)
     shutil.copy2(app_binary, APP / "Contents/MacOS/RepoHub")
     info = {"CFBundleIdentifier": "com.leogoldberg.repohub", "CFBundleName": "Repo Hub",

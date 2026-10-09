@@ -10,3 +10,12 @@ button{font:inherit;background:#202734;color:var(--text);border:1px solid var(--
 @media(max-width:800px){header{align-items:flex-start;flex-direction:column}}@media(max-width:650px){main{padding:22px 16px}.repo-line{padding:15px;gap:12px}.snapshot-time{font-size:10px}.repo-detail{padding-left:55px}}
 
 .upload-state.uploaded{color:var(--green)}.upload-state.uploading,.upload-state.pending{color:var(--gold)}.upload-state.error{color:#f5a8b8}
+.upload-progress{display:flex;align-items:center;gap:10px;margin-top:9px;max-width:380px;font-size:11px;color:var(--muted)}
+.upload-progress progress{width:170px;height:6px;appearance:none;border:0;border-radius:4px;overflow:hidden;background:#303846;accent-color:var(--gold)}
+.upload-progress progress::-webkit-progress-bar{background:#303846;border-radius:4px}
+.upload-progress progress::-webkit-progress-value{background:var(--gold);border-radius:4px}
+.upload-progress progress::-moz-progress-bar{background:var(--gold)}
+.upload-progress progress:indeterminate{background:linear-gradient(90deg,#303846 20%,var(--gold) 50%,#303846 80%);background-size:200% 100%;animation:upload-pulse 2s linear infinite}
+@keyframes upload-pulse{to{background-position:200% 0}}
+@media(prefers-reduced-motion:reduce){.upload-progress progress:indeterminate{animation:none}}
+@media(max-width:650px){.upload-progress{flex-wrap:wrap}.upload-progress progress{width:120px}}

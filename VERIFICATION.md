@@ -1,6 +1,6 @@
 # Verification — 2026-10-09
 
-## Current checks
+## Earlier integrity-check checkpoint
 
 - Nineteen synthetic tests pass. Content checks detect equal-size edits with restored modification timestamps, reject content changes during copying, compare actual archived members including hardlinks/empty directories, and detect/repair corrupted archives. Retention tests cover copy/index failures, stale observations, and waiting for upload confirmation. Existing JSON, path, Host/Origin, Git and backup-content tests pass.
 - Both native Swift executables compiled for arm64-apple-macos13.0. JavaScript syntax check passed. The installed app displays separate content verification and per-archive upload status; green requires both checks.
@@ -13,3 +13,12 @@
 Deep content checks run every 15 minutes, at startup/backup time, and on Refresh; normal metadata and upload checks run every 30 seconds. The displayed verification time identifies the last observation. New archives are decompressed and compared to before/after source content hashes, and destination archive bytes are checksum verified. Existing verified archive content digests can be reused only alongside a fresh source-content hash and a fresh archive checksum.
 
 The prior archive is kept until the replacement is verified, indexed and explicitly confirmed uploaded. Legacy backups and saved JSON are preserved. The iCloud connection issue remains unresolved: no Apple Account, network, sync settings or daemon resets were performed. No logout/reboot or menu-bar dropdown UI inspection was done. Upload confirmation is macOS acknowledgement, not an independently redownloaded server copy. Live copies are not atomic database/filesystem snapshots. Source repos other than RepoHub were not edited or committed.
+
+## Live progress checkpoint — 2026-10-09
+
+- Twenty-one Python tests pass, including progress updates/failure invalidation, non-finite/out-of-range percentage rejection, concurrent upload/error handling, and refusing cleanup at 100% without acknowledgement. Eight Swift notification-readiness checks pass: only the exact current verified/uploaded archive is eligible, repeated receipts are suppressed, pending/100% progress and stale archive signals cannot notify.
+- Both Swift binaries compile for arm64-apple-macos13.0, with UserNotifications linked for the native app. JavaScript syntax passes. Published NSProgress observed real archive percentages on this Mac, including WebApp advancing from about 60% to 82%; several other archives report about 99% while acknowledgement is pending.
+- Finder/script diagnostics showed identical pending/uploading flags and 4355 errors while Finder bytes and cloudd upload bandwidth kept advancing. Therefore 4355 alongside an active upload does not establish that transfers are blocked. The new app preserves that error in Advanced, shows live upload progress, and continues to reserve green/completion notifications for verified hashes plus macOS acknowledgement.
+- Upload/helper/menu/page polling is about five seconds. Hash verification remains every fifteen minutes or Refresh, with all ignored/uncommitted files included. Progress percentages are observed, not estimated. No independent remote download audit has been run; authenticated cloud access must be configured separately. Account/network/sync settings remain unchanged.
+
+Installed observations: all eleven previously pending/current archive upload flags became Uploaded without an iCloud reset. macOS notification permission was initially Denied; the user-requested Repo Hub notification switch was enabled in System Settings and the app now observes Allowed. Completion requests were accepted and archive/hash receipts persisted in preferences. Notification delivery display can still depend on Focus/system presentation settings; no independent cloud download was performed.

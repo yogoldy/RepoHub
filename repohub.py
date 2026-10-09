@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import mimetypes
 import os
 from pathlib import Path
@@ -173,6 +174,15 @@ def verify_current(root, current):
 
 
 def cloud_status(raw):
+    percent = raw.get("percent")
+    progress = ({"percent": percent, "progress_source": "macOS published progress"}
+                if type(percent) in (int, float) and math.isfinite(percent) and 0 <= percent <= 100 else {})
+    if raw.get("ubiquitous") is True and raw.get("uploading") is True and raw.get("conflicts") is not True:
+        result = {"state": "uploading", **progress}
+        if raw.get("error"):
+            result.update(last_error=raw["error"], error_code=raw.get("error_code"),
+                          detail="macOS reports an upload in progress; it also reports: " + raw["error"])
+        return result
     if raw.get("error") or raw.get("conflicts") is True:
         reason = ("connection" if raw.get("error_domain") == "NSCocoaErrorDomain" and raw.get("error_code") == 4355
                   else "storage" if raw.get("error_domain") == "NSCocoaErrorDomain" and raw.get("error_code") == 4354
@@ -186,7 +196,7 @@ def cloud_status(raw):
     if raw.get("uploaded") is True:
         return {"state": "uploaded", "detail": "Upload confirmed by macOS"}
     if raw.get("uploaded") is False:
-        return {"state": "pending"}
+        return {"state": "pending", **progress}
     return {"state": "unknown", "detail": "macOS did not return upload completion"}
 
 
@@ -356,6 +366,7 @@ class Hub:
         with self.lock:
             result = json.loads(json.dumps(self.status))
             result["views"] = self.views
+            result["notifications"] = load_json(self.state_dir / "notifications.json", {"permission": "unknown"})
             return result
 
     def cloud_for(self, key, current):
@@ -393,6 +404,8 @@ class Hub:
             for row in self.status["repos"]:
                 row["cloud"] = self.cloud_for(row["id"], row.get("last_backup"))
             self.status["data_cloud"] = self.cloud_for("repohub-data", self.index.get("repohub-data"))
+            self.status["cloud_checked_at"] = checked
+            self.status["cloud_poll_seconds"] = self.config.get("cloud_seconds", 5)
             self.persist_status()
         if self.backup_lock.acquire(blocking=False):
             try:
@@ -670,11 +683,12 @@ def main():
     threading.Thread(target=backups, daemon=True).start()
     def cloud_checks():
         while True:
+            started = time.monotonic()
             try:
                 hub.refresh_cloud()
             except Exception as e:
                 print("Upload-status check failed:", e, flush=True)
-            time.sleep(config.get("cloud_seconds", 30))
+            time.sleep(max(1, config.get("cloud_seconds", 5) - (time.monotonic() - started)))
     threading.Thread(target=cloud_checks, daemon=True).start()
     server.serve_forever()
 
