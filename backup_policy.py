@@ -53,7 +53,7 @@ class BackupScheduler:
         present = {row["id"] for row in rows}
         self.changes = {key: value for key, value in self.changes.items() if key in present}
         for row in rows:
-            key, signature = row["id"], row.get("signature")
+            key, signature = row["id"], row.get("edit_signature", row.get("signature"))
             previous = self.changes.get(key)
             if previous is None or signature != previous[0]:
                 self.changes[key] = (signature, now)

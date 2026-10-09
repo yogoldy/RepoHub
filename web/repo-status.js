@@ -1,5 +1,6 @@
 /* Pure presentation policy: the same exact archive and fresh checks are required. */
 (function(root){
+  function finderOnly(repo){const v=repo.verification||{},b=repo.last_backup||{};return repo.needs_backup===false&&!!b.archive&&typeof b.sha256==='string'&&b.sha256.length>0&&v.state==='different'&&v.archive===b.archive&&v.ignored_finder_only===true&&v.backup_required===false;}
   function view(repo,backup={}){
     const cloud=repo.cloud||{},verification=repo.verification||{},archive=repo.last_backup?.archive;
     const percent=typeof cloud.percent==='number'&&Number.isFinite(cloud.percent)&&cloud.percent>=0&&cloud.percent<=100?cloud.percent:null;
@@ -18,6 +19,13 @@
       if(cloud.state==='uploading')detail+=' The saved copy is still uploading.';
       return {phase:'changed',label,detail,ready:false,percent:cloud.state==='uploading'?percent:null};
     }
+    if(finderOnly(repo)){
+      const detail='Project files, ignored files and Git match. Only .DS_Store differs; no new backup needed.';
+      if(cloud.state==='uploaded'&&cloud.archive===archive)return {phase:'background',label:'Project files match',detail,ready:false,percent:null};
+      if(cloud.state==='uploading')return {phase:'uploading',label:'Uploading',detail:detail+' The saved archive is uploading.',ready:false,percent};
+      if(cloud.state==='pending')return {phase:'pending',label:'Waiting for iCloud',detail:detail+' Upload not yet confirmed.',ready:false,percent};
+      return {phase:'unknown',label:'Awaiting confirmation',detail:detail+' iCloud status unknown.',ready:false,percent:null};
+    }
     if(verification.state!=='matched'||verification.archive!==archive)return {phase:'verifying',label:'Verifying',detail:'Checking hashes against the saved backup',ready:false,percent:null};
     if(ready)return {phase:'ready',label:'Backed up',detail:'Hashes verified · iCloud upload confirmed',ready:true,percent:null};
     if(cloud.state==='uploading')return {phase:'uploading',label:'Uploading',detail:percent===100?'Waiting for iCloud confirmation':'Hashes verified · uploading to iCloud',ready:false,percent};
@@ -25,6 +33,7 @@
     return {phase:'unknown',label:'Awaiting confirmation',detail:'Hashes verified · iCloud status unknown',ready:false,percent:null};
   }
   const paths={
+    background:'<circle cx="12" cy="12" r="8"/><path d="M12 11v6m0-10h.01"/>',
     ready:'<path d="m5 12 4 4L19 6"/>',
     pending:'<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
     unknown:'<circle cx="12" cy="12" r="8"/><path d="M10 9a2 2 0 0 1 4 0c0 2-2 2-2 4m0 3h.01"/>',
@@ -36,6 +45,6 @@
     error:'<path d="m12 3 10 18H2zm0 6v5m0 3h.01"/>'
   };
   function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
-  function legend(){return '<span>'+icon('ready')+' Verified + uploaded</span><span>'+icon('pending')+' Waiting for iCloud</span><span>'+icon('changed')+' Files or background data changed</span><span>'+icon('uploading')+' Uploading</span><span>'+icon('copying')+' Backing up</span><span>'+icon('verifying')+' Checking hashes</span><span>'+icon('stale')+' Status outdated</span><span>'+icon('error')+' Needs attention</span><span>'+icon('unknown')+' Unconfirmed</span>';}
-  const policy={view,icon,legend,version:'change-evidence-1'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  function legend(){return '<span>'+icon('ready')+' Verified + uploaded</span><span>'+icon('background')+' Project/Git match; Finder-only difference</span><span>'+icon('pending')+' Waiting for iCloud</span><span>'+icon('changed')+' Files or background data changed</span><span>'+icon('uploading')+' Uploading</span><span>'+icon('copying')+' Backing up</span><span>'+icon('verifying')+' Checking hashes</span><span>'+icon('stale')+' Status outdated</span><span>'+icon('error')+' Needs attention</span><span>'+icon('unknown')+' Unconfirmed</span>';}
+  const policy={view,icon,legend,finderOnly,version:'change-evidence-2'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

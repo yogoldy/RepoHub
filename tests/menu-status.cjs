@@ -34,4 +34,17 @@ assert.equal(check(changed({finder_metadata:1,git_data:1,repo_files:2}),'changed
 assert.doesNotMatch(view(changed({finder_metadata:1,git_data:1,repo_files:2})).detail,/repo files still match/);
 assert.equal(check(changed({finder_metadata:1,git_data:0,repo_files:0},'/old'),'changed').label,'Backup needs updating');
 assert.equal(check({...good,needs_backup:true,verification:{state:'checking'}},'verifying').label,'Checking for changes');
+const finderIgnored={...good,verification:{state:'different',archive:'/current',backup_required:false,ignored_finder_only:true,changes:{counts:{finder_metadata:2,git_data:0,repo_files:0}}}};
+assert.equal(check(finderIgnored,'background').label,'Project files match');
+assert.match(view(finderIgnored).detail,/Only .DS_Store differs/);
+check({...finderIgnored,health:{fresh:false}},'stale');
+check({...finderIgnored,verification:{...finderIgnored.verification,archive:'/old'}},'verifying');
+check({...finderIgnored,last_backup:{archive:'/current'}},'verifying');
+check({...finderIgnored,verification:{...finderIgnored.verification,backup_required:true}},'verifying');
+check({...finderIgnored,needs_backup:true},'changed');
+check({...finderIgnored,cloud:{state:'uploaded',archive:'/old'}},'unknown');
+check({...finderIgnored,cloud:{state:'uploading',archive:'/current',percent:49}},'uploading');
+check({...finderIgnored,cloud:{state:'pending',archive:'/current'}},'pending');
+check({...finderIgnored,cloud:{state:'error',archive:'/current'}},'error');
+check(finderIgnored,'copying',false,{running:true,current_repo:'Example'});
 console.log(count+' menu status checks passed');

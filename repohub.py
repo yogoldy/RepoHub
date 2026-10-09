@@ -24,6 +24,7 @@ from backup_policy import BackupScheduler, default_settings, validate_settings, 
 from status_health import annotate_health, ProblemTracker, age
 from diagnostics import DiagnosticLog
 from change_evidence import ChangeEvidence
+from backup_changes import finder_only_difference, edit_entries
 
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
@@ -55,6 +56,16 @@ def load_json(path, default):
         return json.loads(Path(path).read_text())
     except FileNotFoundError:
         return default
+
+
+def atomic_json_if_changed(path, value):
+    try:
+        if load_json(path, None) == value:
+            return False
+    except (ValueError, OSError):
+        pass
+    atomic_json(path, value)
+    return True
 
 
 def workspace_id(name):
@@ -196,17 +207,20 @@ def verify_current(root, current):
         saved = archive_manifest(current["archive"], Path(root).name)
         stored_digest = content_signature(saved)
     changes = {}
+    ignored_finder_only = False
     if source_digest != stored_digest:
         if saved is None:
             saved = archive_manifest(current["archive"], Path(root).name)
         changes = summarize_changes(source, saved)
+        ignored_finder_only = finder_only_difference(source, saved)
     if entries != tree_entries(root) or stamp != archive_stamp(current["archive"]):
         raise RuntimeError("Files changed while verifying; retry later")
     return {"state": "matched" if source_digest == stored_digest else "different",
             "checked_at": utc_now(), "signature": fingerprint(entries),
             "archive": current["archive"], "archive_stamp": stamp,
             "content_signature": source_digest, "archive_content_signature": stored_digest,
-            "changes": changes}
+            "changes": changes, "ignored_finder_only": ignored_finder_only,
+            "backup_required": source_digest != stored_digest and not ignored_finder_only}
 
 
 def cloud_status(raw):
@@ -376,7 +390,7 @@ class Hub:
                                 "last_changed_file": latest[0] if latest else None,
                                 "files": sum(stat.S_ISREG(e[1]) for e in entries),
                                 "bytes": sum(e[2] for e in entries if stat.S_ISREG(e[1])),
-                                "signature": fingerprint(entries)})
+                                "signature": fingerprint(entries), "edit_signature": fingerprint(edit_entries(entries))})
                 except Exception as e:
                     row["error"] = str(e)
                 with self.lock:
@@ -411,7 +425,9 @@ class Hub:
                     # Timestamps/sizes of directories are hints, not content differences.
                     # This cached receipt is bound to the current tree and archive above.
                     row["needs_backup"] = False
-                if row["verification"]["state"] in {"different", "error"}:
+                if row["verification"]["state"] == "different":
+                    row["needs_backup"] = row["verification"].get("backup_required", True)
+                if row["verification"]["state"] == "error":
                     row["needs_backup"] = True
                 row["cloud"] = self.cloud_for(key, current)
                 self.evidence.repo_checked(row, scan_id, (time.monotonic() - repo_started) * 1000, not verification_performed)
@@ -611,6 +627,12 @@ class Hub:
     def backup(self, keys=None, reason="manual", expected_power=None, attempted_keys=None):
         if expected_power is not None and power_source() != expected_power:
             return False
+        repositories = self.repositories()
+        if keys is not None:
+            if not isinstance(keys, (list, tuple, set)) or any(not isinstance(key, str) or key not in repositories for key in keys):
+                raise ValueError("Backup selection must contain current workspace IDs")
+            if not keys:
+                return False
         if not self.backup_lock.acquire(blocking=False):
             return False
         failures = []
@@ -620,7 +642,6 @@ class Hub:
                 self.persist_status()
             if not self.backups.parent.is_dir():
                 raise RuntimeError("iCloud Repository Backups folder is unavailable")
-            repositories = self.repositories()
             backup_sources = {key: root for key, root in repositories.items() if keys is None or key in keys}
             backup_sources["repohub-data"] = self.data_dir
             for key, root in backup_sources.items():
@@ -643,13 +664,13 @@ class Hub:
                             verified = verify_current(root, previous)
                         except (OSError, RuntimeError, tarfile.TarError):
                             pass  # Replace a corrupt copy from the intact source; do not prune first.
-                    if verified and verified["state"] == "matched":
+                    if verified and (verified["state"] == "matched" or verified.get("ignored_finder_only") is True):
                         with self.lock:
                             self.verifications[key] = verified
                             previous["content_signature"] = verified["archive_content_signature"]
-                            atomic_json(self.state_dir / "backups.json", self.index)
+                            atomic_json_if_changed(self.state_dir / "backups.json", self.index)
                         # Finish an interrupted publication/cleanup without making another copy.
-                        atomic_json(self.backups / "index.json", self.index)
+                        atomic_json_if_changed(self.backups / "index.json", self.index)
                         self.retain_current(key, previous)
                         continue
                     result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature)

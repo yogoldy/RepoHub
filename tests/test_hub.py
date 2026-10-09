@@ -185,7 +185,8 @@ class HubTests(unittest.TestCase):
         (self.repo / ".git/.DS_Store").write_bytes(b"finder in git")
         self.hub.scan(force=True)
         row = self.hub.status["repos"][0]
-        self.assertTrue(row["needs_backup"])
+        self.assertFalse(row["needs_backup"])
+        self.assertTrue(row["verification"]["ignored_finder_only"])
         self.assertEqual(row["verification"]["changes"]["counts"],
                          {"finder_metadata": 2, "git_data": 0, "repo_files": 0})
         (self.repo / ".git/marker").write_text("new history")

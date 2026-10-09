@@ -27,7 +27,8 @@ function render(){
   const repos=menuState.repos||[];
   if(!repos.some(r=>r.id===selectedId))selectedId=repos[0]?.id||null;
   const ready=repos.filter(r=>view(r).ready).length;
-  $('#summary').textContent=repos.length?`${ready} of ${repos.length} repos backed up`:'No repos found';
+  const ignored=repos.filter(r=>view(r).phase==='background').length;
+  $('#summary').textContent=repos.length?(ignored?`${ready} fully matched · ${ignored} Finder-only · ${repos.length} repos`:`${ready} of ${repos.length} repos backed up`):'No repos found';
   $('#backup').disabled=!!menuState.backup?.running;
   $('#backup').lastElementChild.textContent=menuState.backup?.running?'Backing up…':'Back up now';
   const problems=menuState.problems||[];

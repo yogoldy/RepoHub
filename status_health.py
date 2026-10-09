@@ -23,7 +23,7 @@ def annotate_health(status, config, now):
             reasons.append("Repo checks stopped updating")
         if age(cloud.get("checked_at"), now) > cloud_limit:
             reasons.append("Upload status needs a fresh check")
-        if verification.get("state") == "matched" and age(verification.get("checked_at"), now) > hash_limit:
+        if (verification.get("state") == "matched" or verification.get("ignored_finder_only") is True) and age(verification.get("checked_at"), now) > hash_limit:
             reasons.append("Hash verification is outdated")
         row["health"] = {"fresh": not reasons, "reasons": reasons}
     status["health"] = {"fresh": not scan_old, "scan_max_age_seconds": scan_limit,

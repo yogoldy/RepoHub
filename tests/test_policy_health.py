@@ -79,6 +79,14 @@ class PolicyTests(unittest.TestCase):
         self.scheduler.manual_completed(3500)
         self.assertIsNone(self.scheduler.plan(self.settings, 'adapter', self.rows, 4000))
 
+    def test_finder_hints_do_not_restart_a_real_edit_quiet_period(self):
+        self.rows[0]['edit_signature'] = 'real edit'
+        self.scheduler.observe(self.rows, 250)
+        self.rows[0]['signature'] = 'finder changed full fingerprint'
+        self.scheduler.observe(self.rows, 500)
+        plan = self.scheduler.plan(self.settings, 'battery', self.rows, 551)
+        self.assertIn('one', plan['keys'])
+
     def test_current_repos_only_and_unchanged_repos_do_not_trigger(self):
         self.rows[0]['needs_backup'] = False
         self.scheduler.observe(self.rows[:1], 500)
@@ -150,6 +158,12 @@ class HealthTests(unittest.TestCase):
         status = status_at(5000)
         annotate_health(status, {}, 5000)
         self.assertTrue(status['repos'][0]['health']['fresh'])
+
+    def test_ignored_finder_receipt_also_requires_fresh_hash_check(self):
+        status = status_at(5000)
+        status['repos'][0]['verification'].update(state='different', ignored_finder_only=True, checked_at=stamp(3979))
+        annotate_health(status, {}, 5000)
+        self.assertFalse(status['repos'][0]['health']['fresh'])
 
     def test_future_or_missing_checks_cannot_stay_green(self):
         status = status_at(5000)

@@ -20,9 +20,9 @@ def summarize(events):
         first = first or event.get('utc'); last = event.get('utc')
         ref = event.get('repo_ref')
         if kind == 'repo_checked':
-            latest[ref] = {key: event.get(key) for key in ('utc', 'scan_id', 'reason', 'verification_state', 'needs_backup', 'counts', 'source_signature', 'backup_signature', 'samples')}
+            latest[ref] = {key: event.get(key) for key in ('utc', 'scan_id', 'reason', 'verification_state', 'needs_backup', 'counts', 'source_signature', 'backup_signature', 'samples', 'ignored_finder_only', 'backup_required', 'edit_signature')}
         elif kind == 'status_repo':
-            backend[(event.get('session_id'), event.get('observation_id'), ref)] = {key: event.get(key) for key in ('verification_state', 'needs_backup', 'counts', 'fresh', 'mode', 'has_error', 'has_backup', 'backup_hash_ref')}
+            backend[(event.get('session_id'), event.get('observation_id'), ref)] = {key: event.get(key) for key in ('verification_state', 'needs_backup', 'counts', 'fresh', 'mode', 'has_error', 'has_backup', 'backup_hash_ref', 'ignored_finder_only', 'backup_required', 'edit_signature')}
             # The report has bounded working memory even across seven days of logs.
             if len(backend) > 8192:
                 backend.pop(next(iter(backend)))

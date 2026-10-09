@@ -35,21 +35,24 @@ class EvidenceTests(unittest.TestCase):
     def events(self):
         return list(read_events(self.hub.state_dir/'diagnostics'))
 
-    def payload(self, surface, label='Finder metadata changed', phase='changed'):
+    def payload(self, surface, label='Project files match', phase='background'):
         status = self.hub.public_status()
         return {'surface':surface, 'native':surface=='menu', 'client_id':('a' if surface=='menu' else 'b')*24,
-                'observation_id':status['diagnostic_observation_id'], 'policy_version':'change-evidence-1',
+                'observation_id':status['diagnostic_observation_id'], 'policy_version':'change-evidence-2',
                 'rows':[{'repo_id':self.key, 'display_label':label, 'phase':phase, 'ready':phase=='ready'}]}
 
     def test_finder_timestamp_and_real_edits_have_distinct_evidence(self):
         (self.repo/'.DS_Store').write_text('finder after')
         self.hub.scan(force=True)
         event = [e for e in self.events() if e['event']=='repo_checked' and e['repo_ref']==diagnostic_ref(self.key)][-1]
-        self.assertEqual(event['reason'], 'finder_metadata_only')
+        self.assertEqual(event['reason'], 'finder_metadata_ignored')
+        self.assertFalse(event['needs_backup'])
         self.assertEqual(event['counts']['repo_files'], 0)
         self.assertEqual(event['samples'][0]['known_file'], 'finder_store')
+        path = self.repo/'confidential-name.txt'
+        path.write_text('new baseline, including current Finder metadata')
         self.hub.backup()
-        path = self.repo/'confidential-name.txt'; info = path.stat()
+        info = path.stat()
         os.utime(path, ns=(info.st_atime_ns,info.st_mtime_ns+1_000_000_000))
         self.hub.scan(force=True)
         event = [e for e in self.events() if e['event']=='repo_checked' and e['repo_ref']==diagnostic_ref(self.key)][-1]

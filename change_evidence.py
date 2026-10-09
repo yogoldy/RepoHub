@@ -6,8 +6,8 @@ from pathlib import Path
 import threading
 from diagnostics import diagnostic_ref
 
-PHASES = {'stale', 'error', 'copying', 'changed', 'verifying', 'ready', 'uploading', 'pending', 'unknown'}
-LABELS = {'Status outdated', 'Needs attention', 'Backing up', 'Checking for changes',
+PHASES = {'background', 'stale', 'error', 'copying', 'changed', 'verifying', 'ready', 'uploading', 'pending', 'unknown'}
+LABELS = {'Project files match', 'Status outdated', 'Needs attention', 'Backing up', 'Checking for changes',
           'First backup pending', 'Files changed', 'Finder metadata changed', 'Git data changed',
           'Finder / Git data changed', 'Backup needs updating', 'Verifying', 'Backed up',
           'Uploading', 'Waiting for iCloud', 'Awaiting confirmation'}
@@ -22,7 +22,9 @@ def repo_facts(row):
             'content_signature': verification.get('content_signature'),
             'archive_content_signature': verification.get('archive_content_signature'),
             'verification_state': verification.get('state'),
-            'needs_backup': row.get('needs_backup'), 'metadata_changed': row.get('signature') != backup.get('signature'),
+            'needs_backup': row.get('needs_backup'),
+            'ignored_finder_only': verification.get('ignored_finder_only') is True,
+            'backup_required': verification.get('backup_required'), 'edit_signature': row.get('edit_signature'), 'metadata_changed': row.get('signature') != backup.get('signature'),
             'counts': counts}
 
 
@@ -39,6 +41,8 @@ def change_reason(row, facts):
     if state == 'matched' and not facts['needs_backup']:
         return 'timestamp_only_match' if facts['metadata_changed'] else 'contents_match'
     if state == 'different':
+        if facts['ignored_finder_only']:
+            return 'finder_metadata_ignored'
         if counts['repo_files']:
             return 'repo_files_differ'
         if counts['finder_metadata'] and not counts['git_data']:
@@ -114,7 +118,8 @@ class ChangeEvidence:
                                   source_signature=facts['source_signature'], backup_signature=facts['backup_signature'],
                                   verification_state=facts['verification_state'], needs_backup=facts['needs_backup'],
                                   counts=facts['counts'], fresh=facts['fresh'], mode=facts['cloud_state'],
-                                  has_error=facts['has_error'], has_backup=facts['has_backup'], backup_hash_ref=facts['backup_hash_ref'])
+                                  has_error=facts['has_error'], has_backup=facts['has_backup'], backup_hash_ref=facts['backup_hash_ref'],
+                                  ignored_finder_only=facts['ignored_finder_only'], backup_required=facts['backup_required'], edit_signature=facts['edit_signature'])
                 while len(self.snapshots) > 16:
                     old, _ = self.snapshots.popitem(last=False)
                     self.displays.pop(old, None)
@@ -128,7 +133,7 @@ class ChangeEvidence:
         if (not isinstance(payload['surface'], str) or payload['surface'] not in {'menu', 'app'} or type(payload['native']) is not bool
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
-                or payload['policy_version'] != 'change-evidence-1'
+                or payload['policy_version'] != 'change-evidence-2'
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
         with self.lock:
