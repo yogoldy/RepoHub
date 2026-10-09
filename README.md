@@ -126,3 +126,10 @@ Scheduled and manual checks may inspect all repos. They create archives only for
 
 
 Lifecycle diagnostics record scheduling/power decisions, quiet-period/retry waits, backup stages, failures and restart interruptions. New archives carry their creating run ID; upload and cleanup events identify that exact archive. Unchanged observations are recorded at most once per minute. Icon receipts include their decision explanation and run/archive links, with backend-input disagreements separated from cross-view disagreements. These are diagnostic checks, not a replacement for hash verification or independent restore testing. The local report retains the latest 200 lifecycle events; it is not a sanitized sharing bundle.
+
+
+## Public repository and private inputs
+
+GitHub hosts the app source at https://github.com/yogoldy/RepoHub. Environment values, credential/signing files, runtime state, raw diagnostic logs and backup/restore archives are excluded through `.gitignore`. Example environment files may be tracked only with placeholders. Ignore rules do not remove already tracked files or secrets from history, so review staged changes before pushing.
+
+Keep restore inputs outside the repository, or in the ignored `restore-inputs/` directory. Never commit personal backup archives to make them available to a cloud task. Any future transfer to a cloud test environment is separate from publishing source and needs an explicitly chosen private transfer route. Git ignore rules do not change RepoHub backup coverage: ignored files, including local environment files, remain part of full backups.
