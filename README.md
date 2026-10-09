@@ -2,6 +2,12 @@
 
 A simple local Mac app showing whether the latest iCloud-folder backups match the repos on Leo's Desktop. A horizontal menu-bar panel, expandable repo details, and an optional full status page with Advanced details. The scoped JSON helper remains available as a foundation for future tools.
 
+## Product direction
+
+See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. The next implementation item is bounded local diagnostic logging.
+
+This is currently Leo's local prototype. `install.py` performs a personal migration of an earlier backup setup; general folder-picker onboarding and a distributable installer remain roadmap work. Public source publication does not upload personal backups or diagnostics.
+
 ## Pieces
 
 - A Python standard-library helper serves only `127.0.0.1:8767`, scans the configured repos every 30 seconds, and backs them up on a configurable schedule while the Mac is awake.
