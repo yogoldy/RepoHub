@@ -21,6 +21,10 @@ class RestoreAuditTests(unittest.TestCase):
         (self.root/'ignored').mkdir();(self.root/'ignored/data').write_text('ignored bytes')
         (self.root/'link').symlink_to('script.sh')
         subprocess.run(['git','init','-q',str(self.root)],check=True,capture_output=True)
+        # Keep this controlled fixture idle: recent Git can start maintenance
+        # after commit and remove its lock while snapshot inventories entries.
+        for key in ['maintenance.auto', 'gc.auto']:
+            subprocess.run(['git','-C',str(self.root),'config',key,'0'],check=True)
         (self.root/'.gitignore').write_text('.env\nignored/\n')
         subprocess.run(['git','-C',str(self.root),'add','.'],check=True)
         subprocess.run(['git','-C',str(self.root),'-c','user.name=Fixture','-c','user.email=fixture@example.invalid',
