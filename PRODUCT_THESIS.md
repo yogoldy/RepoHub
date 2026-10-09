@@ -32,7 +32,7 @@ Publish app source and product documentation. Local diagnostics, personal backup
 The helper records diagnostics continuously from login, while the Mac is awake and the helper is running. Closing the menu-bar panel does not stop logging. Sleep and shutdown are gaps, not periods the app can observe; record startup, wake/resume and interruptions explicitly. “24/7” means an always-running local helper where macOS permits it, not activity while the computer is off.
 
 - [x] **1A — Bounded log storage.** Add a structured JSONL writer under the app's local Application Support diagnostics directory, outside monitored repos and the saved workspace-data folder. Start with seven days or 100 MiB total retention, whichever limit is reached first; rotate individual files at 10 MiB. Restrict local file permissions. Handle full disks or logging errors without stopping backups. Test rotation, recovery and retention using synthetic data.
-- [ ] **1B — Change-detection evidence.** Log scan IDs, UTC timestamps, durations, scan/hash freshness, source-signature transitions, timestamp-only matches and counts of Finder/Git/repo-file differences. Record why a repo needs backup instead of treating its latest timestamp as proof of an edit. Verify that Finder browsing, timestamp changes and real file changes produce distinguishable events.
+- [x] **1B — Change-detection evidence.** Log scan IDs, UTC timestamps, durations, scan/hash freshness, source-signature transitions, timestamp-only matches and counts of Finder/Git/repo-file differences. Record why a repo needs backup instead of treating its latest timestamp as proof of an edit. Verify that Finder browsing, timestamp changes and real file changes produce distinguishable events.
 - [ ] **1C — Backup and cloud evidence.** Log schedule decisions and power-source pauses, archive creation and verification stages, retries, failures, upload observations, stale checks, pruning decisions and recovery. Tie related events to a backup/run ID and the exact archive identity. Record state transitions and a periodic heartbeat; avoid dumping every unchanged five-second poll. Test error/recovery flows without damaging personal backups.
 - [ ] **1D — Diagnostic export.** Offer a readable summary and a bounded recent log bundle. Redact home-directory names, absolute paths, repo names and other identifiers from the shareable copy by default. Use report-local aliases so events can still be correlated. Test redaction of nested error messages, URL credentials and unusual filenames; local originals stay local.
 
@@ -94,7 +94,7 @@ Folder-based destinations come first. **Do not implement cloud account linking i
 
 ## Completion and commit discipline
 
-1. Pick one unchecked atomic item, beginning with **1A: bounded diagnostic log storage** once publication is complete.
+1. Pick one unchecked atomic item, next **1C: backup and cloud evidence** after reviewing the installed 1A/1B diagnostic capture.
 2. Implement it on the authorized work branch, with proportionate checks against synthetic data and a live UI check when behavior changes.
 3. Commit the implementation separately from the next item. Add its SHA and evidence to this checklist; a plan or screenshot alone does not mark a backend feature complete.
 4. Preserve stable main until the completed tier is reviewed for merging. Do not enable cloud/AI accounts, telemetry or scheduled maintainer agents as a side effect.
@@ -103,4 +103,9 @@ The product should stay visually small: repo cards and useful status first; a ge
 
 ## Implementation evidence
 
-**Tier 1A (2026-10-09):** structured local logs, owner-only permissions, 10 MiB rotation, seven-day/100 MiB retention, startup events, throttled heartbeats and observed runtime gaps. Sixty-five Python checks pass, including nine storage/failure/privacy/concurrency regressions. Native macOS 13 compilation passes after adding the Python module to installer packaging. Scan/display evidence and local dogfooding are the next separate commit; no diagnostic upload is enabled.
+**Tier 1A — `6826b7e` (2026-10-09):** structured local logs, owner-only permissions, 10 MiB rotation, seven-day/100 MiB retention, startup events, throttled heartbeats and observed runtime gaps. Sixty-five Python checks pass, including nine storage/failure/privacy/concurrency regressions. Native macOS 13 compilation passes after adding the Python module to installer packaging. Scan/display evidence and local dogfooding follow in the separate Tier 1B commit; no diagnostic upload is enabled.
+
+
+**Tier 1B — `ec5cabe` (2026-10-09):** scan IDs, durations, signature transitions, hash receipts, classified Finder/Git/repo-file differences and source/archive references are logged. Menu and full-app renderers report their actual displayed label, phase and readiness against a shared backend observation ID. Its identity includes publication errors and saved archive hashes, so changing readiness inputs cannot silently reuse a previous observation. A local report reader correlates same-observation receipts; absent receipts are not counted as agreement. Seventy-three Python tests, 34 JavaScript status checks and diagnostic delivery checks pass.
+
+Installed dogfooding recorded seven Finder-only repo alerts with zero project-file differences, and 34 of 34 native-menu/full-app comparisons agreed. The readable case and detailed evidence remain in local Application Support, outside Git; this capture cannot explain behavior before logging began. Backup/status policy was not changed in this diagnostic pass. Tier 1C stage instrumentation, Tier 1D shareable export and the reporting dialogs remain separate unfinished items.

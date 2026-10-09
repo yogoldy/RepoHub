@@ -4,7 +4,7 @@ A simple local Mac app showing whether the latest iCloud-folder backups match th
 
 ## Product direction
 
-See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. Bounded local diagnostic storage is implemented; scan and display evidence is the next item.
+See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. Bounded local diagnostic storage and scan/display evidence are implemented; full backup/cloud-stage instrumentation is the next item.
 
 This is currently Leo's local prototype. `install.py` performs a personal migration of an earlier backup setup; general folder-picker onboarding and a distributable installer remain roadmap work. Public source publication does not upload personal backups or diagnostics.
 
@@ -103,3 +103,14 @@ Change detection compares full content hashes, paths, permissions and symlink ta
 ## Local diagnostics
 
 The helper writes structured events under `~/Library/Application Support/RepoHub/diagnostics/` while it runs, including startup and a per-minute heartbeat. Logging continues with the menu panel closed. Gaps are recorded as unobserved intervals; sleep/offline time is not falsely presented as monitored. Files rotate at 10 MiB, with seven-day/100 MiB total retention, owner-only permissions and recovery from failed/partial writes. Diagnostic files are outside monitored repos and helper-data archives. The status API reports recording failures without interrupting backups. Reports remain local; bug submission and sanitized export are roadmap work.
+
+
+Scan events capture signature transitions, hash freshness, duration and counts of Finder metadata, Git data and repo-file differences. Repo/path references are hashed identifiers; events exclude raw repo names, file contents, exception prose and credentials. When a view is rendered, the native menu and full dashboard report their actual label and readiness against the same backend observation ID. Recording failures never change backup decisions, and missing view receipts never establish agreement.
+
+Read a local diagnostic summary with:
+
+```sh
+python3 diagnostics_report.py --log-dir "$HOME/Library/Application Support/RepoHub/diagnostics"
+```
+
+The reader skips malformed records and unsafe file types. An optional `--output` writes a new owner-only JSON file and refuses to overwrite an existing one. These summaries are local investigation tools; shareable redacted export and GitHub submission remain unfinished. Manually saved case reports live separately from the automatic seven-day log retention.
