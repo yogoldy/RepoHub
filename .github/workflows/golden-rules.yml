@@ -17,3 +17,26 @@ jobs:
           fetch-depth: 0
       - name: Run RepoHub's golden rules
         run: python3 tools/release_gate.py --require-clean --output "$RUNNER_TEMP/repohub-golden-rules.json"
+      - name: Explain failed synthetic checks
+        if: failure()
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          path = Path(os.environ['RUNNER_TEMP']) / 'repohub-golden-rules.json'
+          if not path.exists():
+              raise SystemExit('No gate receipt was created')
+          report = json.loads(path.read_text())
+          print('Gate error:', report.get('gate_error', 'none'))
+          print('Source unchanged:', report.get('source_unchanged'))
+          python = report.get('python', {})
+          if not python.get('successful') or python.get('skipped'):
+              print(Path(python['log']).read_text())
+          for check in report.get('commands', []):
+              if check['result'] != 'passed':
+                  print(check['check'], check['returncode'])
+                  print(Path(check['log']).read_text())
+          for rule in report.get('rules', []):
+              if rule['result'] != 'passed':
+                  print(rule['id'], rule['tests'])
+          PYTHON
