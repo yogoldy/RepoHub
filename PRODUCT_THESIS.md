@@ -19,7 +19,9 @@ The first six items are on main at `cb01813`. The change-detection fix is commit
 ## Tier 0 — Publish the direction
 
 - [x] Add this thesis to the existing latest work branch as a documentation commit.
-- [ ] Publish RepoHub as a public GitHub repository, keeping stable main and the current work branch available.
+- [x] Publish RepoHub as a public GitHub repository, keeping stable main and the current work branch available.
+
+Published on 2026-10-09 at [yogoldy/RepoHub](https://github.com/yogoldy/RepoHub). GitHub visibility is Public and Issues are enabled. The default branch is stable main; this thesis and the latest change-detection fix are on `codex/backup-change-detection`. No diagnostics or backup archives were uploaded.
 
 Publish app source and product documentation. Local diagnostics, personal backup archives, saved workspace JSON and credentials belong outside Git. Public source publication is separate from choosing a license or shipping a general-purpose installer.
 
