@@ -199,6 +199,8 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                                              isMainFrame: message.frameInfo.isMainFrame) else { return }
         switch action {
         case .openBackups: openBackups()
+        case .openRepo:
+            if let body = message.body as? [String: Any], let id = body["repo_id"] as? String { openRepository(id) }
         case .toggleNotifications: toggleNotifications()
         case .quit: quit()
         }
@@ -214,6 +216,29 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             guard let self = self else { return }
             webView.load(URLRequest(url: self.address.appendingPathComponent("menu.html")))
         }
+    }
+
+    func finderNotice(_ message: String) {
+        guard let data = try? JSONSerialization.data(withJSONObject: [message]),
+              let json = String(data: data, encoding: .utf8) else { return }
+        popoverWebView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('repoHubFinderError',{detail: " + json + "[0]}))")
+    }
+
+    func openRepository(_ id: String) {
+        var request = URLRequest(url: address.appendingPathComponent("api/status"))
+        request.timeoutInterval = 8
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            let status = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            let target = status.flatMap { MenuBridge.repositoryURL(id: id, status: $0) }
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard error == nil, (response as? HTTPURLResponse)?.statusCode == 200, let target = target else {
+                    self.finderNotice("Could not find this repo on your Mac. Refresh its status and try again.")
+                    return
+                }
+                if !NSWorkspace.shared.open(target) { self.finderNotice("Finder could not open this repo.") }
+            }
+        }.resume()
     }
 
     @objc func openBackups() {

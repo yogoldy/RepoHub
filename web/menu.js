@@ -4,9 +4,11 @@ const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 function when(value){if(!value)return 'Not yet';return new Date(value).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
 function bytes(n){if(!Number.isFinite(n))return '—';const units=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<3){n/=1024;i++;}return new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(n)+' '+units[i];}
 async function api(path,payload){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);try{const response=await fetch(path,{signal:controller.signal,...(payload===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-RepoHub-Token':sessionToken},body:JSON.stringify(payload)})});const value=await response.json();if(!response.ok)throw new Error(value.error||'Request failed');return value;}finally{clearTimeout(timer);}}
-function nativeAction(action){const bridge=window.webkit?.messageHandlers?.repoHub;if(!bridge){$('#notice').textContent='This control is available from the Mac menu bar.';return false;}bridge.postMessage({action});return true;}
+function nativeAction(action,repoId){const bridge=window.webkit?.messageHandlers?.repoHub;if(!bridge){$('#notice').textContent='This control is available from the Mac menu bar.';return false;}bridge.postMessage(repoId?{action,repo_id:repoId}:{action});return true;}
 function view(repo){return RepoStatus.view(repo,menuState?.backup);}
 $('#status-legend').innerHTML=RepoStatus.legend();
+$('#things-toggle').onclick=()=>{const open=$('#things-panel').hidden;$('#things-panel').hidden=!open;$('#things-toggle').setAttribute('aria-expanded',String(open));};
+window.addEventListener('repoHubFinderError',e=>{$('#notice').textContent=e.detail;});
 $('#status-key-toggle').onclick=()=>{const open=$('#status-legend').hidden;$('#status-legend').hidden=!open;$('#status-key-toggle').setAttribute('aria-expanded',String(open));};
 function percentLabel(percent){return percent.toFixed(1).replace(/\.0$/,'')+'%';}
 function render(){
@@ -21,12 +23,12 @@ function render(){
   const rail=$('#cards'),existing=new Map([...rail.querySelectorAll('.repo-card')].map(b=>[b.dataset.repoId,b]));
   const buttons=repos.map(repo=>{
     let button=existing.get(repo.id);
-    if(!button){button=document.createElement('button');button.type='button';button.dataset.repoId=repo.id;button.addEventListener('click',()=>selectRepo(repo.id));}
+    if(!button){const slot=document.createElement('div');slot.className='card-slot';button=document.createElement('button');button.type='button';button.dataset.repoId=repo.id;button.addEventListener('click',()=>selectRepo(repo.id));slot.append(button);const folder=document.createElement('button');folder.type='button';folder.className='open-repo';folder.setAttribute('aria-label','Open '+repo.name+' in Finder');folder.title='Open '+repo.name+' on this Mac in Finder';folder.innerHTML='<span class="folder-shape" aria-hidden="true"></span>';folder.onclick=()=>nativeAction('openRepo',repo.id);folder.disabled=!window.webkit?.messageHandlers?.repoHub;if(folder.disabled)folder.title+=' · Available from the Mac menu bar';slot.append(folder);}
     const state=view(repo),label=state.label+(state.percent===null?'':' · '+percentLabel(state.percent));
     button.className='repo-card '+state.phase;button.setAttribute('aria-pressed',String(repo.id===selectedId));button.setAttribute('aria-label',repo.name+' · '+label);button.setAttribute('aria-controls','detail');
-    const markup=`<span class="card-top"><span class="folder-shape" aria-hidden="true"></span><span class="status-mark" aria-hidden="true">${RepoStatus.icon(state.phase)}</span></span><span class="card-name">${escape(repo.name)}</span><span class="card-status">${escape(label)}</span>`;
+    const markup=`<span class="card-top"><span class="folder-placeholder" aria-hidden="true"></span><span class="status-mark" aria-hidden="true">${RepoStatus.icon(state.phase)}</span></span><span class="card-name">${escape(repo.name)}</span><span class="card-status">${escape(label)}</span>`;
     if(button.innerHTML!==markup)button.innerHTML=markup;
-    return button;
+    return button.parentElement;
   });
   const oldIds=[...existing.keys()].join('|'),newIds=repos.map(r=>r.id).join('|');
   if(oldIds!==newIds||!repos.length){const offset=rail.scrollLeft;rail.replaceChildren(...buttons);rail.scrollLeft=offset;if(!repos.length)rail.innerHTML='<p class="empty">Repos will appear here when added to your repos folder.</p>';}
