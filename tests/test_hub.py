@@ -11,8 +11,9 @@ import urllib.request
 import sys
 import subprocess
 import shutil
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info
+from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json
 
 
 class HubTests(unittest.TestCase):
@@ -30,7 +31,7 @@ class HubTests(unittest.TestCase):
         self.backups = self.base / "cloud" / "Snapshots"
         self.backups.parent.mkdir()
         self.hub = Hub({"repos_root": str(self.repos), "backup_root": str(self.backups),
-                        "state_dir": str(self.base / "state")})
+                        "state_dir": str(self.base / "state"), "retention": "latest"})
 
     def tearDown(self):
         self.temp.cleanup()
@@ -95,7 +96,7 @@ class HubTests(unittest.TestCase):
         self.hub.backup()
         self.assertTrue(Path(self.hub.index[key]["archive"]).is_file())
 
-    def test_unchanged_skip_and_changed_retains_old_snapshot(self):
+    def test_unchanged_skip_and_changed_replaces_old_snapshot(self):
         self.hub.backup()
         key = workspace_id("Example")
         first = self.hub.index[key]["archive"]
@@ -104,8 +105,74 @@ class HubTests(unittest.TestCase):
         (self.repo / "work.txt").write_text("newer work")
         self.hub.backup()
         self.assertNotEqual(self.hub.index[key]["archive"], first)
-        self.assertTrue(Path(first).is_file())
-        self.assertEqual(len(list((self.backups / key).glob("*.tar.gz"))), 2)
+        self.assertFalse(Path(first).exists())
+        self.assertEqual(len(list((self.backups / key).glob("*.tar.gz"))), 1)
+        with tarfile.open(self.hub.index[key]["archive"]) as archive:
+            self.assertEqual(archive.extractfile("Example/work.txt").read(), b"newer work")
+            self.assertIn("Example/.git/marker", archive.getnames())
+            self.assertIn("Example/ignored/cache.txt", archive.getnames())
+
+    def test_failed_replacement_preserves_previous_copy(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        previous = self.hub.index[key].copy()
+        (self.repo / "work.txt").write_text("new work")
+        with patch("repohub.snapshot", side_effect=RuntimeError("copy failed")):
+            self.hub.backup()
+        self.assertEqual(self.hub.index[key], previous)
+        self.assertTrue(Path(previous["archive"]).is_file())
+        self.assertTrue(self.hub.status["backup"]["errors"])
+
+    def test_cleanup_on_unchanged_checks_current_and_preserves_unknown_files(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        current = Path(self.hub.index[key]["archive"])
+        older = current.parent / "2000-01-01T00-00-00.000000Z.tar.gz"
+        shutil.copy2(current, older)
+        unknown = current.parent / "manual-backup.tar.gz"
+        unknown.write_text("unmanaged")
+        current.write_bytes(b"corrupt")
+        self.hub.backup()
+        self.assertTrue(older.is_file())
+        self.assertTrue(unknown.is_file())
+        self.assertTrue(self.hub.status["backup"]["errors"])
+        shutil.copy2(older, current)
+        self.hub.backup()
+        self.assertFalse(older.exists())
+        self.assertTrue(unknown.is_file())
+        self.assertFalse(self.hub.status["backup"]["errors"])
+
+    def test_cleanup_refuses_external_archive_and_symlink_directory(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        result = self.hub.index[key].copy()
+        result["archive"] = str(self.base / "outside.tar.gz")
+        with self.assertRaises(ValueError):
+            self.hub.retain_current(key, result)
+        destination = self.backups / key
+        moved = self.base / "outside"
+        destination.rename(moved)
+        destination.symlink_to(moved, target_is_directory=True)
+        with self.assertRaises(ValueError):
+            self.hub.retain_current(key, self.hub.index[key])
+
+    def test_index_publication_failure_keeps_old_copy_and_retries_cleanup(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        previous = Path(self.hub.index[key]["archive"])
+        (self.repo / "work.txt").write_text("newer work")
+        def fail_cloud_index(path, value):
+            if Path(path) == self.hub.backups / "index.json":
+                raise OSError("index publication failed")
+            atomic_json(path, value)
+        with patch("repohub.atomic_json", side_effect=fail_cloud_index):
+            self.hub.backup()
+        self.assertTrue(previous.is_file())
+        self.assertEqual(len(list(previous.parent.glob("*.tar.gz"))), 2)
+        self.hub.backup()
+        self.assertFalse(previous.exists())
+        self.assertEqual(len(list(previous.parent.glob("*.tar.gz"))), 1)
+        self.assertFalse(self.hub.status["backup"]["errors"])
 
     def test_data_and_views_cannot_escape(self):
         key = workspace_id("Example")

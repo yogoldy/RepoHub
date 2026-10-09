@@ -1,12 +1,13 @@
 # Verification — 2026-10-09
 
-- Eight synthetic unittest checks passed: complete archives including hidden/ignored files and symlinks; source-change rejection; unchanged skip and retained versions; Finder-metadata display filtering without backup exclusion; distinct staged/unstaged/untracked counts; missing archive detection and recreation; scoped view/data paths; HTTP origin/Host checks, JSON revisions/conflicts, view injection and app-data snapshot.
-- Native Swift app compiled for arm64-apple-macos13.0; Mach-O minimum OS and Info.plist both declare 13.0. The installed app launches successfully on this Mac. This corrects the earlier inferred macOS 28 minimum.
-- Installed native dashboard showed 11/11 matching snapshots. Advanced was visibly off, then on with separate worktree counts, then off again.
-- Synthetic HTML notes view saved JSON through the scoped bridge and retained it after reloading the page.
-- Initial full run published checksum-verified snapshots for all eleven repo folders plus saved app data. Previous repo mirror retained with matching file/byte/symlink inventory; older versions remained in place.
-- Helper and frontend login LaunchAgents were loaded and running. The former cloud-Desktop backup job was unloaded and its script retargeted to Repository Backups. Cloud Desktop contents moved to Trash after preserving the repo mirror; a subsequent empty cloud Desktop folder was removed but returned again empty. Its recreation source remains unconfirmed; no repo mirror is being written there by the retired job.
+## Current behavior
 
-## Deliberate skips and limits
+- Twelve synthetic unittest checks pass. Retention checks cover verified replacement, unchanged skip, failure preserving the older copy, corrupt retained archives preventing cleanup, index-publication failure/retry, and cleanup confinement to app-managed archive names and folders. Archive checks include Git internals, ignored files, symlinks, source-change rejection, and metadata-display filtering. Existing JSON persistence, conflict checks, scoped paths, origin/Host checks, and app-data backup are also exercised.
+- The installed native app opens directly to the status list: no sidebar, navigation, notes editor, or Repo views screen. Advanced is off by default; it retains staged/unstaged/untracked counts and archive details.
+- Installed configuration is `retention: latest`. A successful live run retained exactly one archive in each of the eleven repo snapshot folders and one for saved helper data; all eleven repos matched with no backup errors. Both helper and menu-bar login jobs remain installed.
+- Replacement copies include Git history and ignored/uncommitted files. Copy/checksum/index-publication failure preserves older archives. Superseded managed archives are removed only after verifying the retained copy.
+- The native binary and app packaging retain the previously verified macOS 13 minimum. No Swift or packaging code changed in this task.
 
-No real logout/reboot was performed. The menu-bar dropdown was not inspected through the UI; its app compiled and is running. iCloud server-side upload completion was not verified. Metadata comparison is not a repeated byte-by-byte source audit; see README for detection and live-copy consistency limits. Existing source repos were not edited, cleaned or committed. No backup retention deletion was introduced.
+## Preserved data and limits
+
+Legacy Current repos and Desktop repos Previous Versions were deliberately left intact. Existing saved JSON and backend view/data APIs were preserved despite removal of their UI. Source repos other than RepoHub were not edited, cleaned, or committed. Native recompilation and another HTML-notes UI round trip were skipped because neither is part of the current change; JSON APIs were tested. No logout/reboot or iCloud server-side upload check was performed. Matching uses source metadata and a locally verified archive; see README for live-copy and metadata-detection limits. Older uncommitted/ignored-file versions disappear when their superseded managed snapshot is removed.

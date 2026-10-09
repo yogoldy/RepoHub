@@ -1,6 +1,6 @@
 # Repo Hub
 
-A local Mac foundation for HTML views across Leo's repos. Repo status and backups are the first modules; the shared JSON helper supports future repo-specific views.
+A simple local Mac app showing whether the latest iCloud-folder backups match the repos on Leo's Desktop. One status page, an optional Advanced toggle, and a menu-bar item. The scoped JSON helper remains available as a foundation for future tools.
 
 ## Pieces
 
@@ -13,26 +13,21 @@ A local Mac foundation for HTML views across Leo's repos. Repo status and backup
 
 Every folder immediately under `~/Desktop/repos` is a workspace, including folders without Git. Backups include `.git`, uncommitted files, ignored files, dependencies, and empty folders. Symlinks are preserved as links; their outside targets are not copied. The app never changes the source repos.
 
-Changed workspaces get dated full `.tar.gz` archives in `iCloud Drive/Repository Backups/Snapshots/<workspace-id>/`. The helper compares path, size, mode, symlink target, and nanosecond modification time to skip unchanged workspaces. A file changed while deliberately retaining all those metadata values will not trigger a new backup. The helper verifies the archive SHA-256 after publication and rejects a snapshot if source metadata changes during its creation. This is a checked live-file copy, not an atomic filesystem or database snapshot; close active database/workbook writers for a fully consistent restore.
+Changed workspaces replace their current full `.tar.gz` archive with a newly dated copy in `iCloud Drive/Repository Backups/Snapshots/<workspace-id>/`. The helper compares path, size, mode, symlink target, and nanosecond modification time to skip unchanged workspaces. A file changed while deliberately retaining all those metadata values will not trigger a new backup. The helper verifies the archive SHA-256 after publication and rejects a snapshot if source metadata changes during its creation. This is a checked live-file copy, not an atomic filesystem or database snapshot; close active database/workbook writers for a fully consistent restore.
 
-The saved view JSON, registry, and prior JSON revisions also receive a full snapshot under `Snapshots/repohub-data/`. No old archives or JSON revisions are automatically deleted. Full archives of frequently changing large repos can consume substantial iCloud space. Archive verification confirms local bytes; macOS separately uploads them to iCloud. The UI does not claim upload completion.
+Only one managed archive is retained per workspace. The replacement is completed and checksum verified, both backup indexes are saved, and the retained archive is reverified before superseded managed archives are deleted. A failed copy, index write, or verification preserves older copies; a later run retries cleanup. On unchanged repos, older managed duplicates are also removed only after verifying the current archive. Files outside the managed workspace folders, unrecognized filenames, symlinks, and existing legacy backups are excluded from cleanup.
+
+The saved JSON, registry, and prior JSON revisions still receive one current full snapshot under `Snapshots/repohub-data/`; JSON revision history itself is preserved. Git history is inside `.git` for ordinary repos, but replacing backups loses older uncommitted and ignored-file versions. Archive verification confirms local bytes; macOS separately uploads them to iCloud. The UI does not claim upload completion.
 
 Installation preserves the previous mirror under `Repository Backups/Legacy Current repos` and all `Desktop repos Previous Versions` history. It disables the old hourly job that wrote to `iCloud Drive/Desktop/repos`, changes that old script's destination to the preserved mirror location, and replaces its schedule with the hub. The obsolete cloud Desktop folder goes to the Mac's Trash after the repo mirror is preserved. Local Desktop is unaffected.
 
-## HTML view contract
+## Status and retained helper API
 
 The default Repos view is a simple list with a checkmark, pending/issue status, and snapshot time. Advanced is off by default and reveals Git branch, staged/unstaged/untracked file counts, last file modification, and archive details. A checkmark compares the current source metadata with the last verified snapshot, checks that the archive still exists, and includes all uncommitted files; it does not mean the working tree equals a Git commit or that iCloud upload has completed.
 
-Register an existing `.html` file using Repo views → Add an HTML view. Paths are relative to the chosen repo. The hub injects `view-client.js`; original files remain unchanged. Use relative local asset paths. Current assets support HTML, JS, CSS, images and web fonts. Remote network calls and nested frames are blocked.
+The sidebar and Repo views screen have been removed. Existing saved JSON and the scoped JSON/view endpoints remain intact for future integrations; the status page does not expose view registration or a notes editor.
 
-```js
-const saved = await RepoHub.getJSON('project-settings'); // null on first load
-await RepoHub.saveJSON('project-settings', { theme: 'light' });
-```
-
-Load a named JSON before saving it. Saves compare its revision and reject conflicting edits; successful replacements preserve the previous JSON. Names use letters, digits, hyphens and underscores. JSON is stored in the app's workspace folder, not added to source repos. Repo writes or other folder access would require a separately scoped adapter.
-
-HTML views run in opaque-origin sandboxed iframes. The trusted shell brokers JSON requests only for the selected workspace. HTTP writes require an exact loopback Host, same Origin, and a per-process token. There is no arbitrary filesystem-write endpoint or public listener. View asset paths resolve inside their repo, including symlink checks; hidden paths and unsupported file types are blocked.
+HTTP writes require an exact loopback Host, same Origin, and a per-process token. There is no arbitrary filesystem-write endpoint or public listener. View asset paths resolve inside their repo, including symlink checks; hidden paths and unsupported file types are blocked.
 
 ## Development and validation
 
@@ -41,8 +36,10 @@ python3 -m unittest discover -s tests -v
 python3 repohub.py --config /path/to/config.json
 ```
 
-See `install.py` for installed paths and migration. Tests use temporary synthetic repos and a temporary HTTP server. They verify archive contents, symlinks, changing-source rejection, unchanged skip, retained snapshots, JSON persistence/conflicts/revisions, request origin and Host checks, view traversal boundaries, and JSON-data backup.
+See `install.py` for installed paths and migration. Tests use temporary synthetic repos and a temporary HTTP server. They verify archive contents, symlinks, changing-source rejection, unchanged skip, verified replacement and cleanup failure recovery, JSON persistence/conflicts/revisions, request origin and Host checks, view traversal boundaries, and JSON-data backup.
 
 To restore, list an archive with `tar -tzf SNAPSHOT.tar.gz`, then extract it into a new empty folder outside the active repos. Do not overwrite an active repo or Office workbook during restoration.
 
 The last-file-change display excludes Git internals, `.DS_Store`, and AppleDouble metadata; those files are still included in backups. The menu bar shows backup progress, pending changes, and the newest snapshot time.
+
+Installed configuration sets `retention` to `latest`. Older/custom configurations that omit this field retain all archives until explicitly migrated.

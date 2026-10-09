@@ -96,7 +96,7 @@ def main():
     shutil.copytree(SOURCE / "web", runtime / "web", dirs_exist_ok=True)
     config = {"repos_root": str(HOME_DIR / "Desktop/repos"),
               "backup_root": str(backup_root / "Snapshots"), "state_dir": str(STATE),
-              "port": 8767, "scan_seconds": 30, "backup_seconds": 3600}
+              "port": 8767, "scan_seconds": 30, "backup_seconds": 3600, "retention": "latest"}
     (STATE / "config.json").write_text(json.dumps(config, indent=2) + "\n")
     os.chmod(STATE / "config.json", 0o600)
 

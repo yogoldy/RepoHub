@@ -22,6 +22,7 @@ from urllib.parse import unquote, urlparse
 
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
+ARCHIVE_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{6}Z\.tar\.gz$")
 
 
 def utc_now():
@@ -148,6 +149,9 @@ def snapshot(root, destination, staging, expected=None, after_archive=None):
 class Hub:
     def __init__(self, config):
         self.config = config
+        self.retention = config.get("retention", "all")
+        if self.retention not in {"all", "latest"}:
+            raise ValueError("Unknown backup retention policy")
         self.root = Path(config["repos_root"]).resolve()
         self.backups = Path(config["backup_root"]).resolve()
         self.state_dir = Path(config["state_dir"]).resolve()
@@ -213,6 +217,25 @@ class Hub:
             result["views"] = self.views
             return result
 
+    def retain_current(self, key, current):
+        """Remove only managed superseded archives after verifying the retained copy."""
+        if self.retention != "latest":
+            return
+        destination = self.backups / key
+        retained = Path(current["archive"])
+        if (destination.is_symlink() or destination.resolve().parent != self.backups
+                or retained.parent != destination or retained.is_symlink()
+                or not ARCHIVE_NAME.fullmatch(retained.name)):
+            raise ValueError("Refusing cleanup outside the managed snapshot folder")
+        obsolete = [p for p in destination.iterdir() if p != retained
+                    and ARCHIVE_NAME.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
+        if not obsolete:
+            return
+        if sha256(retained) != current["sha256"]:
+            raise RuntimeError("Current archive failed verification; older backups were kept")
+        for path in obsolete:
+            path.unlink()
+
     def backup(self):
         if not self.backup_lock.acquire(blocking=False):
             return False
@@ -233,7 +256,10 @@ class Hub:
                     signature = fingerprint(entries)
                     with self.lock:
                         previous = self.index.get(key)
-                    if previous and previous["signature"] == signature and Path(previous["archive"]).exists():
+                    if previous and previous["signature"] == signature and Path(previous["archive"]).is_file():
+                        # Finish an interrupted publication/cleanup without making another copy.
+                        atomic_json(self.backups / "index.json", self.index)
+                        self.retain_current(key, previous)
                         continue
                     result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature)
                     result["name"] = root.name
@@ -243,6 +269,7 @@ class Hub:
                         atomic_json(self.backups / "index.json", self.index)
                         if key == "repohub-data":
                             self.status["data_backup"] = result
+                    self.retain_current(key, result)
                 except Exception as e:
                     failures.append({"repo": root.name, "error": str(e)})
             with self.lock:
