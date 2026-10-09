@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -57,7 +58,8 @@ def main():
     legacy.mkdir(exist_ok=True)
     old_plist = AGENTS / (OLD_LABEL + ".plist")
     original_script = HOME_DIR / "Library/Scripts/desktop-repos-backup/backup_to_icloud.sh"
-    migration = {}
+    migration_file = legacy / "migration.json"
+    migration = json.loads(migration_file.read_text()) if migration_file.exists() else {}
     if old_plist.exists():
         if not (legacy / old_plist.name).exists():
             shutil.copy2(old_plist, legacy / old_plist.name)
@@ -85,7 +87,7 @@ def main():
         removed = trash / ("iCloud Desktop removed " + datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
         os.rename(old_desktop, removed)
         migration["old_cloud_desktop_in_trash"] = str(removed)
-    (legacy / "migration.json").write_text(json.dumps(migration, indent=2) + "\n")
+    migration_file.write_text(json.dumps(migration, indent=2) + "\n")
     print("MIGRATION", json.dumps(migration), flush=True)
 
     runtime = STATE / "runtime"
@@ -100,12 +102,14 @@ def main():
 
     app_binary = Path("/private/tmp/repohub-native-build")
     run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), "-o", str(app_binary),
-        "-module-cache-path", "/private/tmp/repohub-swift-cache", "-framework", "AppKit", "-framework", "WebKit")
+        "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0",
+        "-framework", "AppKit", "-framework", "WebKit")
     (APP / "Contents/MacOS").mkdir(parents=True, exist_ok=True)
     shutil.copy2(app_binary, APP / "Contents/MacOS/RepoHub")
     info = {"CFBundleIdentifier": "com.leogoldberg.repohub", "CFBundleName": "Repo Hub",
             "CFBundleDisplayName": "Repo Hub", "CFBundleExecutable": "RepoHub", "CFBundlePackageType": "APPL",
             "CFBundleShortVersionString": "0.1.0", "CFBundleVersion": "1", "LSUIElement": True,
+            "LSMinimumSystemVersion": "13.0", "CFBundleSupportedPlatforms": ["MacOSX"],
             "NSHighResolutionCapable": True, "NSAppTransportSecurity": {"NSAllowsLocalNetworking": True}}
     with (APP / "Contents/Info.plist").open("wb") as f:
         plistlib.dump(info, f)

@@ -15,6 +15,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         NSApp.setActivationPolicy(.accessory)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Repo Hub")
+        statusItem.button?.setAccessibilityLabel("Repo Hub backup status")
         let menu = NSMenu()
         menu.autoenablesItems = false
         summaryItem = NSMenuItem(title: "Checking backups…", action: nil, keyEquivalent: "")
@@ -60,7 +61,12 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 self.summaryItem.title = running ? "Backing up: \(backup["current_repo"] as? String ?? "repos")" :
                     !errors.isEmpty ? "\(errors.count) backup issue(s) — check hub" :
                     pending > 0 ? "\(pending) repo(s) changed since backup" : "All \(repos.count) repos have current snapshots"
-                self.detailItem.title = "\(count)/\(repos.count) backed up · Checked every 20 seconds"
+                let parser = ISO8601DateFormatter()
+                parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                let newest = repos.compactMap { ($0["last_backup"] as? [String: Any])?["completed_at"] as? String }
+                    .compactMap { parser.date(from: $0) }.max()
+                let last = newest.map { DateFormatter.localizedString(from: $0, dateStyle: .short, timeStyle: .short) }
+                self.detailItem.title = "\(count)/\(repos.count) backed up" + (last.map { " · Latest \($0)" } ?? "")
                 self.statusItem.button?.title = running ? " ↻" : !errors.isEmpty ? " !" : pending > 0 ? " \(pending)" : ""
                 self.statusItem.button?.toolTip = "Repo Hub: " + self.summaryItem.title
                 self.backupItem.isEnabled = !running

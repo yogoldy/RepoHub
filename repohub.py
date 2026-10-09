@@ -88,12 +88,23 @@ def git_info(root):
                                 timeout=12, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
         if result.returncode:
             return None
-        return result.stdout.decode("utf-8", "replace").strip()
+        return result.stdout.decode("utf-8", "replace").rstrip("\n")
     if run("rev-parse", "--is-inside-work-tree") != "true":
         return {"is_git": False, "branch": None, "changed_files": None, "last_commit": None}
-    status = run("status", "--porcelain=v1", "--untracked-files=all")
+    status = run("status", "--porcelain=v1", "-z", "--untracked-files=all")
+    changes = []
+    records = iter(status.split("\0") if status is not None else [])
+    for record in records:
+        if not record:
+            continue
+        changes.append(record[:2])
+        if record[0] in "RC" or record[1] in "RC":
+            next(records, None)  # Rename/copy records have a second pathname.
     return {"is_git": True, "branch": run("branch", "--show-current") or "detached HEAD",
-            "changed_files": len(status.splitlines()) if status is not None else None,
+            "changed_files": len(changes) if status is not None else None,
+            "staged_files": sum(c[0] not in " ?" for c in changes) if status is not None else None,
+            "unstaged_files": sum(c[1] not in " ?" for c in changes) if status is not None else None,
+            "untracked_files": changes.count("??") if status is not None else None,
             "last_commit": run("log", "-1", "--format=%cI")}
 
 
@@ -168,7 +179,10 @@ class Hub:
                 row = {"id": key, "name": root.name, "path": str(root)}
                 try:
                     entries = tree_entries(root)
-                    actual = [e for e in entries if stat.S_ISREG(e[1]) and not e[0].startswith(".git/")]
+                    actual = [e for e in entries if stat.S_ISREG(e[1])
+                              and ".git" not in Path(e[0]).parts
+                              and Path(e[0]).name != ".DS_Store"
+                              and not Path(e[0]).name.startswith("._")]
                     latest = max(actual, key=lambda e: e[3], default=None)
                     row.update(git_info(root))
                     row.update({"last_file_change": datetime.fromtimestamp(latest[3] / 1e9, timezone.utc).isoformat() if latest else None,
@@ -180,7 +194,9 @@ class Hub:
                     row["error"] = str(e)
                 with self.lock:
                     row["last_backup"] = self.index.get(key)
-                    row["needs_backup"] = not row.get("last_backup") or row.get("signature") != row["last_backup"].get("signature")
+                    row["needs_backup"] = (not row.get("last_backup")
+                                           or row.get("signature") != row["last_backup"].get("signature")
+                                           or not Path(row["last_backup"]["archive"]).is_file())
                 rows.append(row)
             with self.lock:
                 self.status.update({"scanned_at": utc_now(), "repos": rows})

@@ -9,8 +9,10 @@ import unittest
 import urllib.error
 import urllib.request
 import sys
+import subprocess
+import shutil
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id
+from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info
 
 
 class HubTests(unittest.TestCase):
@@ -48,6 +50,19 @@ class HubTests(unittest.TestCase):
             self.assertTrue(archive.getmember("Example/external-link").issym())
             self.assertNotIn("Example/external-link/secret.txt", names)
 
+    def test_finder_metadata_does_not_hide_last_work_change_but_is_backed_up(self):
+        work = self.repo / "work.txt"
+        os.utime(work, (1000, 1000))
+        os.utime(self.repo / "ignored/cache.txt", (999, 999))
+        (self.repo / ".DS_Store").write_bytes(b"finder metadata")
+        (self.repo / "._work.txt").write_bytes(b"metadata")
+        self.hub.scan()
+        self.assertEqual(self.hub.status["repos"][0]["last_changed_file"], "work.txt")
+        result = snapshot(self.repo, self.backups, self.base / "stage")
+        with tarfile.open(result["archive"]) as archive:
+            self.assertIn("Example/.DS_Store", archive.getnames())
+            self.assertIn("Example/._work.txt", archive.getnames())
+
     def test_change_during_backup_does_not_publish(self):
         def change():
             (self.repo / "work.txt").write_text("changed during archive")
@@ -55,6 +70,30 @@ class HubTests(unittest.TestCase):
             snapshot(self.repo, self.backups, self.base / "stage", after_archive=change)
         self.assertFalse(list(self.backups.glob("*.tar.gz")))
         self.assertFalse(list((self.base / "stage").glob("*.tar.gz")))
+
+    def test_advanced_git_distinguishes_staged_unstaged_and_untracked(self):
+        shutil.rmtree(self.repo / ".git")
+        def git(*args):
+            subprocess.run(["git", "-C", str(self.repo), *args], check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        git("init", "-b", "main")
+        git("add", ".")
+        git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Fixture")
+        (self.repo / "work.txt").write_text("unstaged")
+        (self.repo / "staged.txt").write_text("staged")
+        git("add", "staged.txt")
+        (self.repo / "untracked.txt").write_text("untracked")
+        info = git_info(self.repo)
+        self.assertEqual((info["staged_files"], info["unstaged_files"], info["untracked_files"]), (1, 1, 1))
+
+    def test_deleted_archive_is_pending_and_can_be_recreated(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        Path(self.hub.index[key]["archive"]).unlink()
+        self.hub.scan()
+        self.assertTrue(self.hub.status["repos"][0]["needs_backup"])
+        self.hub.backup()
+        self.assertTrue(Path(self.hub.index[key]["archive"]).is_file())
 
     def test_unchanged_skip_and_changed_retains_old_snapshot(self):
         self.hub.backup()
