@@ -75,6 +75,37 @@ class PolicyTests(unittest.TestCase):
         self.assertIsNone(self.scheduler.plan(self.settings, 'battery', self.rows[:1], 550))
         self.assertNotIn('two', self.scheduler.changes)
 
+    def test_repo_frequency_does_not_reset_slower_default_cadence(self):
+        custom = copy.deepcopy(self.settings)
+        custom['adapter']['frequency_minutes'] = 15
+        overrides = {'one': custom}
+        plan = self.scheduler.plan(self.settings, 'adapter', self.rows, 900, overrides)
+        self.assertEqual(plan['keys'], ['one'])
+        self.scheduler.completed(plan, self.rows, 900)
+        self.assertIsNone(self.scheduler.plan(self.settings, 'adapter', self.rows, 1000, overrides))
+        self.assertEqual(self.scheduler.plan(self.settings, 'adapter', self.rows, 1800, overrides)['keys'], ['one'])
+        self.assertEqual(self.scheduler.plan(self.settings, 'adapter', self.rows, 3600, overrides)['periodic_keys'], ['one', 'two'])
+
+    def test_repo_pause_and_edit_delay_are_independent_of_defaults(self):
+        custom = copy.deepcopy(self.settings)
+        custom['battery'].update(frequency_minutes=0, after_edits=False)
+        overrides = {'one': custom}
+        self.assertEqual(self.scheduler.plan(self.settings, 'battery', self.rows, 4000, overrides)['keys'], ['two'])
+        custom['battery'].update(after_edits=True, edit_delay_minutes=10)
+        self.assertEqual(self.scheduler.plan(self.settings, 'battery', self.rows, 301, overrides)['keys'], ['two'])
+        self.assertEqual(self.scheduler.plan(self.settings, 'battery', self.rows, 601, overrides)['keys'], ['one', 'two'])
+        self.assertIsNone(self.scheduler.plan(self.settings, 'unknown', self.rows, 4000, overrides))
+
+    def test_combines_timed_repo_and_different_repo_after_edits(self):
+        custom = copy.deepcopy(self.settings)
+        custom['battery'].update(frequency_minutes=15, after_edits=False)
+        plan = self.scheduler.plan(self.settings, 'battery', self.rows, 900, {'one': custom})
+        self.assertEqual(plan['keys'], ['one', 'two'])
+        self.assertEqual(plan['periodic_keys'], ['one'])
+        self.scheduler.completed(plan, self.rows, 901)
+        self.assertEqual(self.scheduler.periodic, {'one': 901})
+        self.assertEqual(self.scheduler.attempts, {'one': 901, 'two': 901})
+
     def test_validation_rejects_arbitrary_values_paths_booleans_and_missing_fields(self):
         self.assertEqual(validate_settings(self.settings), self.settings)
         for key, value in [('frequency_minutes', True), ('frequency_minutes', 1),
@@ -228,6 +259,92 @@ class SettingsHTTPTests(unittest.TestCase):
         caught.exception.close()
         self.assertEqual(self.request()['revision'], current['revision'])
 
+    def repo_request(self, key, payload=None, origin=None):
+        req = urllib.request.Request(self.origin+'/api/repo-settings/'+key,
+            data=None if payload is None else json.dumps(payload).encode(),
+            headers={'Origin': origin or self.origin, 'X-RepoHub-Token': self.hub.csrf, 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req) as response:
+            return json.load(response)
+
+    def test_repo_override_persists_and_default_changes_do_not_replace_it(self):
+        key = workspace_id('Example')
+        current = self.repo_request(key)
+        self.assertFalse(current['override'])
+        payload = {field: current[field] for field in ['settings', 'revision', 'defaults_revision']}
+        payload['settings']['adapter']['frequency_minutes'] = 15
+        self.repo_request(key, payload)
+        reloaded = Hub(self.config)
+        self.assertEqual(reloaded.repo_settings[key]['adapter']['frequency_minutes'], 15)
+        defaults = self.request()
+        defaults['settings']['adapter']['frequency_minutes'] = 30
+        self.request({'settings': defaults['settings'], 'revision': defaults['revision']})
+        self.assertEqual(self.repo_request(key)['settings']['adapter']['frequency_minutes'], 15)
+        row = self.hub.public_status()['repos'][0]
+        self.assertTrue(row['schedule_override'])
+        self.assertEqual(row['backup_settings']['adapter']['frequency_minutes'], 15)
+        current = self.repo_request(key)
+        self.repo_request(key, {'settings': None, 'revision': current['revision'], 'defaults_revision': current['defaults_revision']})
+        self.assertFalse(self.repo_request(key)['override'])
+        self.assertEqual(self.repo_request(key)['settings']['adapter']['frequency_minutes'], 30)
+        self.assertFalse(Hub(self.config).repo_settings)
+
+    def test_repo_write_rejects_stale_defaults_unknown_id_and_bad_origin(self):
+        key = workspace_id('Example')
+        current = self.repo_request(key)
+        payload = {field: current[field] for field in ['settings', 'revision', 'defaults_revision']}
+        defaults = self.request()
+        defaults['settings']['adapter']['frequency_minutes'] = 30
+        self.request({'settings': defaults['settings'], 'revision': defaults['revision']})
+        for repo_id, body, origin, code in [
+            (key, payload, None, 409), (key, payload, 'https://evil.example', 403),
+            ('missing', payload, None, 400), ('..%2Foutside', payload, None, 400)]:
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                self.repo_request(repo_id, body, origin)
+            self.assertEqual(caught.exception.code, code)
+            caught.exception.close()
+        self.assertFalse(self.hub.repo_settings)
+
+    def test_repo_write_rejects_invalid_schema_and_overlapping_revision(self):
+        key = workspace_id('Example')
+        current = self.repo_request(key)
+        payload = {field: current[field] for field in ['settings', 'revision', 'defaults_revision']}
+        bad = copy.deepcopy(payload)
+        bad['settings']['adapter']['frequency_minutes'] = True
+        for body in [bad, dict(payload, path='/outside'), {'settings': None}]:
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                self.repo_request(key, body)
+            self.assertEqual(caught.exception.code, 400)
+            caught.exception.close()
+        self.repo_request(key, payload)
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            self.repo_request(key, payload)
+        self.assertEqual(caught.exception.code, 409)
+        caught.exception.close()
+
+    def test_repo_cadence_survives_restart_and_only_backs_up_due_repo(self):
+        other = Path(self.config['repos_root'])/'Other'
+        other.mkdir()
+        (other/'file').write_text('other')
+        self.hub.scan()
+        self.hub.backup()
+        key, other_key = workspace_id('Example'), workspace_id('Other')
+        self.hub.repo_settings[key] = default_settings()
+        self.hub.repo_settings[key]['adapter']['frequency_minutes'] = 15
+        self.hub.repo_settings[other_key] = default_settings()
+        self.hub.repo_settings[other_key]['adapter']['frequency_minutes'] = 240
+        self.hub.last_periodic_at -= 901
+        before = self.hub.index[other_key]['completed_at']
+        with patch('repohub.power_source', return_value='adapter'):
+            self.hub.automatic_tick()
+        self.assertEqual(self.hub.index[other_key]['completed_at'], before)
+        self.assertEqual(set(self.hub.repo_periodic_at), {key})
+        reloaded = Hub(self.config)
+        self.assertEqual(reloaded.repo_periodic_at, self.hub.repo_periodic_at)
+        with patch('repohub.power_source', return_value='adapter'), patch.object(reloaded, 'backup') as backup:
+            # Saved cadence keeps Example quiet; the default hourly cadence is not yet due either.
+            reloaded.automatic_tick()
+            backup.assert_not_called()
+
     def test_automatic_start_rechecks_power_but_manual_always_runs(self):
         with patch('repohub.power_source', return_value='adapter'):
             self.assertFalse(self.hub.backup(expected_power='battery'))
@@ -244,6 +361,17 @@ class SettingsHTTPTests(unittest.TestCase):
         self.assertIn(workspace_id('Example'), self.hub.index)
         self.assertNotIn(workspace_id('Other'), self.hub.index)
         self.assertNotIn('repohub-data', self.hub.index)
+
+    def test_partial_automatic_run_does_not_advance_unattempted_repo_clock(self):
+        other = Path(self.config['repos_root'])/'Other'
+        other.mkdir()
+        (other/'file').write_text('other')
+        self.hub.scan()
+        self.hub.last_periodic_at = 0
+        with patch('repohub.power_source', side_effect=['adapter', 'adapter', 'adapter', 'battery']):
+            self.hub.automatic_tick()
+        self.assertEqual(set(self.hub.repo_periodic_at), {workspace_id('Example')})
+        self.assertNotIn(workspace_id('Other'), self.hub.scheduler.attempts)
 
     def test_stale_upload_receipt_keeps_previous_backup(self):
         self.hub.config['retention'] = 'latest'

@@ -28,3 +28,7 @@ select{background:#202734;color:var(--text);border:1px solid var(--line);border-
 .upload-state.stale{color:var(--gold)}@media(max-width:580px){.power-settings{grid-template-columns:1fr}.actions{flex-wrap:wrap}dialog{padding:20px}}
 
 @media(max-width:800px){header{position:relative}header>div:first-child{padding-right:50px}.gear{position:absolute;right:0;top:0}}
+
+.gear{display:grid;place-items:center;width:42px;height:42px;padding:9px;flex-shrink:0}.gear svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round}.match-icon svg{width:23px;height:23px}.status-key{color:var(--muted);font-size:13px;margin:18px 0}.status-key summary{cursor:pointer}.status-legend{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:12px}.status-legend span{display:flex;align-items:center;gap:7px}.status-legend svg{width:18px;height:18px;color:var(--gold);flex:none}.status-legend span:first-child svg{color:#91d9b1}.status-legend span:nth-child(8) svg{color:#f3a5b1}
+
+.status-key button{color:var(--muted);padding:0;border:0;background:transparent;font-size:13px}.status-key button::before{content:'›';display:inline-block;margin-right:8px}.status-key button[aria-expanded=true]::before{transform:rotate(90deg)}.status-legend[hidden]{display:none}

@@ -294,9 +294,15 @@ class Hub:
         self.settings = validate_settings(load_json(self.settings_path, default_settings()))
         if not self.settings_path.exists():
             atomic_json(self.settings_path, self.settings)
+        self.repo_settings_path = self.data_dir / "repo-settings.json"
+        self.repo_settings = {key: validate_settings(value) for key, value in
+                              load_json(self.repo_settings_path, {}).items()}
+        if not self.repo_settings_path.exists():
+            atomic_json(self.repo_settings_path, self.repo_settings)
         saved_clock = load_json(self.state_dir / "schedule-clock.json", {})
         previous_times = [datetime.fromisoformat(item["completed_at"]).timestamp() for item in self.index.values()]
         self.last_periodic_at = saved_clock.get("last_periodic_at", max(previous_times, default=0))
+        self.repo_periodic_at = saved_clock.get("repos", {})
         self.scheduler = BackupScheduler(time.monotonic() - max(0, time.time() - self.last_periodic_at))
         self.problem_tracker = ProblemTracker(load_json(self.state_dir / "problem-episodes.json", {}))
         self.power = "unknown"
@@ -381,6 +387,9 @@ class Hub:
             result["views"] = self.views
             result["notifications"] = load_json(self.state_dir / "notifications.json", {"permission": "unknown"})
             result["settings"] = self.settings
+            for row in result["repos"]:
+                row["schedule_override"] = row["id"] in self.repo_settings
+                row["backup_settings"] = self.repo_settings.get(row["id"], self.settings)
             result["power_source"] = self.power
             result["observed_at"] = utc_now()
             annotate_health(result, self.config, time.time())
@@ -404,6 +413,34 @@ class Hub:
             self.settings = value
             return self.settings_status()
 
+    def repo_settings_status(self, key):
+        with self.lock:
+            if key not in self.repositories():
+                raise ValueError("Unknown repository")
+            return {"settings": json.loads(json.dumps(self.repo_settings.get(key, self.settings))),
+                    "defaults": json.loads(json.dumps(self.settings)),
+                    "override": key in self.repo_settings,
+                    "revision": sha256(self.repo_settings_path),
+                    "defaults_revision": sha256(self.settings_path), "power_source": self.power}
+
+    def save_repo_settings(self, key, payload):
+        if set(payload) != {"settings", "revision", "defaults_revision"}:
+            raise ValueError("Invalid repository settings request")
+        value = None if payload["settings"] is None else validate_settings(payload["settings"])
+        with self.lock:
+            self.repo_settings_status(key)  # Validate the exact current workspace ID.
+            if (payload["revision"] != sha256(self.repo_settings_path)
+                    or payload["defaults_revision"] != sha256(self.settings_path)):
+                raise FileExistsError("Settings changed. Reopen this schedule before saving.")
+            updated = dict(self.repo_settings)
+            if value is None:
+                updated.pop(key, None)
+            else:
+                updated[key] = value
+            atomic_json(self.repo_settings_path, updated)
+            self.repo_settings = updated
+            return self.repo_settings_status(key)
+
     def automatic_tick(self):
         source = power_source()
         with self.lock:
@@ -411,19 +448,33 @@ class Hub:
             rows = json.loads(json.dumps(self.status["repos"]))
             # Wall-clock cadence survives sleep/restarts; edit quiet periods use monotonic time.
             self.scheduler.last_periodic = time.monotonic() - max(0, time.time() - self.last_periodic_at)
-            plan = self.scheduler.plan(self.settings, source, rows, time.monotonic())
-            policy = self.settings.get(source)
-            self.status["schedule"] = {"paused": source == "unknown" or not policy or
-                                       (not policy["frequency_minutes"] and not policy["after_edits"])}
-        if plan and self.backup(keys=plan["keys"], reason=plan["reason"], expected_power=source):
+            self.scheduler.periodic = {key: time.monotonic() - max(0, time.time() - timestamp)
+                                       for key, timestamp in self.repo_periodic_at.items()}
+            plan = self.scheduler.plan(self.settings, source, rows, time.monotonic(), self.repo_settings)
+            policies = [self.repo_settings.get(row["id"], self.settings).get(source) for row in rows]
+            self.status["schedule"] = {"paused": source == "unknown" or not any(
+                policy and (policy["frequency_minutes"] or policy["after_edits"]) for policy in policies)}
+        attempted = []
+        if plan and self.backup(keys=plan["keys"], reason=plan["reason"], expected_power=source,
+                                attempted_keys=attempted):
             with self.lock:
-                self.scheduler.completed(plan, rows, time.monotonic())
-                if plan["reason"] == "scheduled":
-                    self.record_periodic_clock()
+                completed = dict(plan)
+                completed["keys"] = attempted
+                completed["periodic_keys"] = [key for key in plan.get("periodic_keys", []) if key in attempted]
+                self.scheduler.completed(completed, rows, time.monotonic())
+                if completed["periodic_keys"]:
+                    self.record_periodic_clock(completed["periodic_keys"])
 
-    def record_periodic_clock(self):
-        self.last_periodic_at = time.time()
-        atomic_json(self.state_dir / "schedule-clock.json", {"last_periodic_at": self.last_periodic_at})
+    def record_periodic_clock(self, keys=None):
+        now = time.time()
+        if keys is None:
+            self.last_periodic_at = now
+            self.repo_periodic_at = {}
+        else:
+            for key in keys:
+                self.repo_periodic_at[key] = now
+        atomic_json(self.state_dir / "schedule-clock.json",
+                    {"last_periodic_at": self.last_periodic_at, "repos": self.repo_periodic_at})
 
     def cloud_for(self, key, current):
         observed = self.cloud_states.get(key, {})
@@ -501,7 +552,7 @@ class Hub:
         for path in obsolete:
             path.unlink()
 
-    def backup(self, keys=None, reason="manual", expected_power=None):
+    def backup(self, keys=None, reason="manual", expected_power=None, attempted_keys=None):
         if expected_power is not None and power_source() != expected_power:
             return False
         if not self.backup_lock.acquire(blocking=False):
@@ -520,6 +571,8 @@ class Hub:
                 if expected_power is not None and power_source() != expected_power:
                     break  # Finish an in-flight archive, then respect the new power source.
 
+                if attempted_keys is not None and key != "repohub-data":
+                    attempted_keys.append(key)
                 with self.lock:
                     self.status["backup"]["current_repo"] = root.name
                     self.persist_status()
@@ -631,6 +684,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send({"error": "Invalid host"}, 403)
         path = unquote(urlparse(self.path).path)
         try:
+            if path.startswith("/api/repo-settings/"):
+                return self.send(self.hub.repo_settings_status(path.removeprefix("/api/repo-settings/")))
             if path == "/api/settings":
                 return self.send(self.hub.settings_status())
             if path == "/api/status":
@@ -700,6 +755,11 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict):
                 raise ValueError("Request must be an object")
             path = unquote(urlparse(self.path).path)
+            if path.startswith("/api/repo-settings/"):
+                try:
+                    return self.send(self.hub.save_repo_settings(path.removeprefix("/api/repo-settings/"), payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
             if path == "/api/settings":
                 try:
                     return self.send(self.hub.save_settings(payload))

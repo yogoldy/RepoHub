@@ -22,13 +22,13 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         statusItem.button?.action = #selector(togglePopover)
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(self, name: "repoHub")
-        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 580, height: 580), configuration: configuration)
+        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 580, height: 640), configuration: configuration)
         view.navigationDelegate = self
         view.underPageBackgroundColor = NSColor(calibratedRed: 0.063, green: 0.082, blue: 0.114, alpha: 1)
         let controller = NSViewController()
         controller.view = view
         popover.contentViewController = controller
-        popover.contentSize = NSSize(width: 580, height: 580)
+        popover.contentSize = NSSize(width: 580, height: 640)
         popover.appearance = NSAppearance(named: .darkAqua)
         popover.behavior = .transient
         popoverWebView = view

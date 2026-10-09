@@ -15,5 +15,18 @@
     if(cloud.state==='pending')return {phase:'pending',label:'Waiting for iCloud',detail:'Hashes verified · upload not yet confirmed',ready:false,percent};
     return {phase:'unknown',label:'Awaiting confirmation',detail:'Hashes verified · iCloud status unknown',ready:false,percent:null};
   }
-  const policy={view};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const paths={
+    ready:'<path d="m5 12 4 4L19 6"/>',
+    pending:'<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
+    unknown:'<circle cx="12" cy="12" r="8"/><path d="M10 9a2 2 0 0 1 4 0c0 2-2 2-2 4m0 3h.01"/>',
+    stale:'<circle cx="12" cy="12" r="8"/><path d="M12 7v5m0 4h.01"/>',
+    uploading:'<path d="M12 17V5m-5 5 5-5 5 5M5 17v3h14v-3"/>',
+    copying:'<path d="M20 8a8 8 0 1 0 0 8m0-13v5h-5"/>',
+    verifying:'<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5m-13-10 2 2 4-4"/>',
+    changed:'<path d="m5 15 10-10 4 4L9 19H5zm8-8 4 4"/>',
+    error:'<path d="m12 3 10 18H2zm0 6v5m0 3h.01"/>'
+  };
+  function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
+  function legend(){return '<span>'+icon('ready')+' Verified + uploaded</span><span>'+icon('pending')+' Waiting for iCloud</span><span>'+icon('changed')+' New edits</span><span>'+icon('uploading')+' Uploading</span><span>'+icon('copying')+' Backing up</span><span>'+icon('verifying')+' Checking hashes</span><span>'+icon('stale')+' Status outdated</span><span>'+icon('error')+' Needs attention</span><span>'+icon('unknown')+' Unconfirmed</span>';}
+  const policy={view,icon,legend};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

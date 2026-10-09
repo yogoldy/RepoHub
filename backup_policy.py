@@ -45,6 +45,7 @@ class BackupScheduler:
     """Per-repo quiet periods; failed copies retry at most every five minutes."""
     def __init__(self, now):
         self.last_periodic = now
+        self.periodic = {}
         self.changes = {}
         self.attempts = {}
 
@@ -59,28 +60,41 @@ class BackupScheduler:
             if not row.get("needs_backup", True):
                 self.attempts.pop(key, None)
 
-    def plan(self, settings, source, rows, now):
+    def plan(self, settings, source, rows, now, overrides=None):
         if source not in settings:
             return None
-        policy = settings[source]
-        frequency = policy["frequency_minutes"] * 60
-        if frequency and now - self.last_periodic >= frequency:
-            return {"reason": "scheduled", "keys": None, "power": source}
-        if policy["after_edits"]:
+        overrides = overrides or {}
+        periodic, edited = [], []
+        for row in rows:
+            key = row["id"]
+            policy = overrides.get(key, settings)[source]
+            frequency = policy["frequency_minutes"] * 60
+            if frequency and now - self.periodic.get(key, self.last_periodic) >= frequency:
+                periodic.append(key)
+                continue
             delay = policy["edit_delay_minutes"] * 60
-            due = [row["id"] for row in rows if row.get("needs_backup") and not row.get("error")
-                   and row["id"] in self.changes and now - self.changes[row["id"]][1] >= delay
-                   and now - self.attempts.get(row["id"], float("-inf")) >= 300]
-            if due:
-                return {"reason": "after_edits", "keys": due, "power": source}
+            if (policy["after_edits"] and row.get("needs_backup") and not row.get("error")
+                    and key in self.changes and now - self.changes[key][1] >= delay
+                    and now - self.attempts.get(key, float("-inf")) >= 300):
+                edited.append(key)
+        if periodic:
+            keys = periodic + edited
+            return {"reason": "scheduled", "keys": None if len(periodic) == len(rows) else keys,
+                    "periodic_keys": periodic, "power": source}
+        if edited:
+            return {"reason": "after_edits", "keys": edited, "power": source}
         return None
 
     def completed(self, plan, rows, now):
         if plan["reason"] == "scheduled":
-            self.last_periodic = now
+            for key in plan.get("periodic_keys", [row["id"] for row in rows]):
+                self.periodic[key] = now
+            if plan["keys"] is None:
+                self.last_periodic = now
         for row in rows:
             if plan["keys"] is None or row["id"] in plan["keys"]:
                 self.attempts[row["id"]] = now
 
     def manual_completed(self, now):
         self.last_periodic = now
+        self.periodic = {}
