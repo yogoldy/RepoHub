@@ -26,6 +26,7 @@ from diagnostics import DiagnosticLog, diagnostic_ref
 from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
+from report_preview import preview_report
 
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
@@ -867,7 +868,7 @@ class Handler(BaseHTTPRequestHandler):
             routes = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                       "/view-client.js": "view-client.js", "/notes.html": "notes.html",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
-                      "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
+                      "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:
                 return self.send({"error": "Not found"}, 404)
             target = WEB / routes[path]
@@ -931,6 +932,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(self.hub.evidence.presentation(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
+            if path == "/api/reports/preview":
+                return self.send(preview_report(self.hub.state_dir, self.hub.diagnostics.directory, payload), 201)
             if path == "/api/backup":
                 threading.Thread(target=self.hub.backup, daemon=True).start()
                 return self.send({"accepted": True}, 202)
