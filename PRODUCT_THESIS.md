@@ -15,7 +15,7 @@ This document is the product roadmap and completion checklist. Unchecked items a
 - [x] Distinguish Finder metadata, Git data and repo-file changes; avoid timestamp-only replacement backups after hashes match.
 - [x] Ignore ordinary `.DS_Store`-only changes as backup triggers; isolate replacement archives to changed/new/damaged repos and avoid unchanged iCloud-index rewrites.
 
-The first six items are on main at `cb01813`. The change-detection fix is committed at `6f83b04` on `codex/backup-change-detection` and installed locally; its merge into main remains separate. Green status currently requires a matching archive plus fresh macOS iCloud upload confirmation. That is not yet an independent remote restore test.
+The first six items are on main at `cb01813`. The change-detection fix is committed at `6f83b04` on `codex/backup-change-detection` and installed locally; its merge into main remains separate. Green status currently requires a matching archive plus fresh macOS iCloud upload confirmation. The Air staging pilot now includes independent cross-device iCloud reception and restore verification; broader failure and UI coverage remains incomplete.
 
 ## Tier 0 — Publish the direction
 
@@ -121,3 +121,5 @@ Menu/app presentation receipts now link to those run/archive identities. Backend
 
 
 **5C pilot preparation — Controlled receive-and-restore audit:** `restore_audit.py` and [the cloud handoff](docs/CLOUD_RESTORE_HANDOFF.md) prepare a private offline test. The receiving cloud agent does not need iCloud access. Expected file/Git facts are independently captured from the matching live source, not derived from the test archive. Verification checks supplied identities, safe extraction, every manifest entry, Git integrity/history and input immutability, with stage logs and explicit unsupported cases. This prepares the experiment; Tier 5C stays unchecked until actual private iCloud-downloaded inputs are independently restored. Direct authenticated cloud retrieval and application execution remain outside this pilot.
+
+**5C Air staging pilot — Real two-Mac evidence:** See [the controlled Air experiment](docs/AIR_STAGING_TEST.md). A full-history public fixture passed 34 live staging assertions, real after-edit scheduling, upload observations, and an independent restore of the iCloud-received copy on the main Mac. The experiment exposed and corrected symlink-mode preservation in the restore checker. Tier 5C remains unchecked for its broader coverage, including unusual Git layouts and failure cases. Next diagnostic acceptance gap: actual rendered progress percentages, visibility and selected-repo detail must be correlated with backend observations; current receipts cover icons/labels only.
