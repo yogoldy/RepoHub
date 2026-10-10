@@ -19,6 +19,12 @@ enum MenuBridge {
         return action
     }
 
+    static func isReportIssueURL(_ url: URL) -> Bool {
+        url.scheme == "https" && url.host == "github.com" && url.port == nil && url.user == nil && url.password == nil
+            && url.query == nil && url.fragment == nil
+            && url.path.range(of: "^/yogoldy/RepoHub/issues/[1-9][0-9]*$", options: .regularExpression) != nil
+    }
+
     static func repositoryURL(id: String, status: [String: Any]) -> URL? {
         guard let rootPath = status["repos_root"] as? String, rootPath.hasPrefix("/"),
               let repos = status["repos"] as? [[String: Any]],

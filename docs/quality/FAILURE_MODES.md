@@ -280,3 +280,19 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 - `test_report_delivery.ReportDeliveryTests.test_failed_durable_intent_flush_cannot_start_a_post`
 
 **Remaining exposure:** GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. Native Keychain prompts and installed two-Mac connection setup need live acceptance. Owner categorization workflow activates only after merge to main.
+
+### GR14 — Reporting must be reachable in the menu bar
+
+**Susceptible boundary:** Backend/syntax tests pass while the primary menu-bar UI omits reporting controls.
+
+**Cause / solution:** The main app had reporting controls and the menu only had connection setup. Both shipped pages now load the same report controller and styles, with reporting controls in settings.
+
+**Required behavior:** Bug and feature entry points, separate drafts, exact previews and explicit sends work on both surfaces. An absent or duplicate controller element fails the regression.
+
+**Diagnostic trail:** `report_delivery`. Compose and preview remain local; no event is proof of an actual GitHub acceptance.
+
+**Regression tests:**
+
+- `test_report_entry.ReportEntryTests.test_both_surfaces_support_report_compose_preview_and_explicit_send`
+
+**Remaining exposure:** The automated DOM/API harness does not prove native WebKit layout, modal focus, token onboarding or live GitHub behavior. Verify the installed menu with computer use.

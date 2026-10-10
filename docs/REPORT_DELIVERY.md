@@ -41,3 +41,7 @@ Regressions cover exact receipts, lost response, crash, ambiguous absence, expli
 An isolated browser harness simulates Send to exercise timeout → Check delivery → confirmed receipt and reopening after page reload; its banner explicitly says no issue is posted. Real API acceptance uses a private disposable tracker and synthetic prose/diagnostics, verifies exact returned bodies/labels and one issue per report after repeat Send. GitHub's issue list can lag its creation response; the harness polls reads without retrying POST. No fake report is sent to the public product tracker. Concrete test receipts stay outside Git.
 
 Native builds/bridge tests validate compilation and fixed-action origin restrictions. Real user credential entry, Keychain access prompts and installed connection setup on both Macs still require live acceptance. Credentials were not automatically migrated from the developer CLI into the app. Deployment, OAuth onboarding and maintainer review automation are separate work.
+
+### Primary menu-bar reporting surface
+
+The menu-bar gear includes Report a glitch and Request a feature, using the same compose/preview/delivery controller as the main app. Its report preview offers native Keychain connection setup directly. Confirmed links open externally only for exact HTTPS product-tracker issue URLs, without query strings, fragments or embedded credentials. GR14 exercises both shipped entry points; native bridge checks validate the external-link allowlist. Installed WebKit layout and focus still need computer-use acceptance.

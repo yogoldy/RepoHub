@@ -267,6 +267,20 @@
         "test_report_delivery.ReportDeliveryTests.test_failed_durable_intent_flush_cannot_start_a_post"
       ],
       "remaining_gap": "GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. Native Keychain prompts and installed two-Mac connection setup need live acceptance. Owner categorization workflow activates only after merge to main."
+    },
+    {
+      "id": "GR14",
+      "title": "Reporting is reachable from the primary menu-bar surface",
+      "breakpoint": "Backend and syntax checks pass while the shipped menu has no reporting entry point.",
+      "cause_and_solution": "Load the same report controller and stylesheet in both shipped surfaces; check actual required controls and run compose, preview and explicit-send behavior for each HTML entry point.",
+      "required_behavior": "Both surfaces offer bug and feature reports, preserve separate in-memory drafts, show the exact preview, and post only after explicit Send.",
+      "diagnostic_events": [
+        "report_delivery"
+      ],
+      "test_ids": [
+        "test_report_entry.ReportEntryTests.test_both_surfaces_support_report_compose_preview_and_explicit_send"
+      ],
+      "remaining_gap": "A mocked DOM/API regression proves controller wiring, not native WebKit layout, modal focus, secure token onboarding or live GitHub response. Computer-use checks on the installed menu and a narrow viewport remain required."
     }
   ]
 }

@@ -45,6 +45,8 @@
     for(const file of result.files){const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent=file.name+' · '+bytes(file.bytes);pre.textContent=file.content;details.append(summary,pre);files.append(details);}
     el('report-compose').hidden=true;el('report-preview').hidden=false;el('report-back').hidden=false;el('report-review').hidden=true;el('report-send').hidden=false;updateDelivery();
   }
+  el('report-setup').hidden=!window.webkit?.messageHandlers?.repoHub;
+  el('report-setup').onclick=()=>{if(typeof nativeAction==='function')nativeAction('connectGitHub');};
   el('report-bug').onclick=()=>open('bug');el('report-feature').onclick=()=>open('feature');
   el('report-close').onclick=close;el('report-cancel').onclick=close;
   el('report-dialog').addEventListener('cancel',event=>{if(busy)event.preventDefault();saveFields();});

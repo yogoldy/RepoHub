@@ -4,6 +4,13 @@ import Foundation
     static func main() {
         let url = URL(string: "http://127.0.0.1:8767/menu.html")!
         var count = 0
+        precondition(MenuBridge.isReportIssueURL(URL(string:"https://github.com/yogoldy/RepoHub/issues/12")!))
+        for bad in ["http://github.com/yogoldy/RepoHub/issues/12", "https://github.com/other/RepoHub/issues/12",
+                    "https://github.com/yogoldy/RepoHub/pull/12", "https://evil.example/yogoldy/RepoHub/issues/12",
+                    "https://github.com/yogoldy/RepoHub/issues/12?secret=value", "https://github.com/yogoldy/RepoHub/issues/12#fragment",
+                    "https://user@github.com/yogoldy/RepoHub/issues/12", "https://github.com:443/yogoldy/RepoHub/issues/12"] {
+            precondition(!MenuBridge.isReportIssueURL(URL(string:bad)!)); count += 1
+        }
         for action in ["openBackups", "toggleNotifications", "connectGitHub", "quit"] {
             precondition(MenuBridge.action(body: ["action":action], frameURL: url, isMainFrame: true)?.rawValue == action)
             count += 1

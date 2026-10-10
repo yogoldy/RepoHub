@@ -209,6 +209,11 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        if navigationAction.navigationType == .linkActivated && MenuBridge.isReportIssueURL(url) {
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
         decisionHandler(url.scheme == "http" && url.host == "127.0.0.1" && url.port == 8767 && url.path == "/menu.html" ? .allow : .cancel)
     }
 
