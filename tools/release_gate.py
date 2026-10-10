@@ -175,7 +175,7 @@ def main():
             if platform.system()!='Darwin':
                 raise ValueError('macOS profile requires macOS; native checks may not be silently skipped')
             swift=['/usr/bin/xcrun','swiftc','-module-cache-path',str(evidence/'swift-cache'),'-target',platform.machine()+'-apple-macos13.0']
-            command('native-app-build',swift+[str(ROOT/'native'/name) for name in ['RepoHub.swift','BackupReadiness.swift','ProblemAlerts.swift','MenuBridge.swift']]+['-o',str(evidence/'RepoHub'),'-framework','AppKit','-framework','WebKit','-framework','UserNotifications'])
+            command('native-app-build',swift+[str(ROOT/'native'/name) for name in ['RepoHub.swift','BackupReadiness.swift','ProblemAlerts.swift','MenuBridge.swift','GitHubConnection.swift']]+['-o',str(evidence/'RepoHub'),'-framework','AppKit','-framework','WebKit','-framework','UserNotifications'])
             command('cloud-helper-build',swift+[str(ROOT/'native/CloudStatus.swift'),'-o',str(evidence/'cloud-status')])
             command('readiness-build',swift+[str(ROOT/'native/BackupReadiness.swift'),str(ROOT/'native/ProblemAlerts.swift'),str(ROOT/'tests/readiness.swift'),'-o',str(evidence/'readiness')])
             command('readiness-checks',[str(evidence/'readiness')])

@@ -8,7 +8,7 @@ from diagnostics import diagnostic_ref
 
 PHASES = {'background', 'stale', 'error', 'copying', 'changed', 'verifying', 'ready', 'uploading', 'pending', 'unknown'}
 LABELS = {'Project files match', 'Status outdated', 'Needs attention', 'Backing up', 'Checking for changes',
-          'First backup pending', 'Files changed', 'Finder metadata changed', 'Git data changed',
+          'Files changing', 'First backup pending', 'Files changed', 'Finder metadata changed', 'Git data changed',
           'Finder / Git data changed', 'Backup needs updating', 'Verifying', 'Backed up',
           'Uploading', 'Waiting for iCloud', 'Awaiting confirmation'}
 
@@ -32,6 +32,8 @@ def change_reason(row, facts):
     state, counts = facts['verification_state'], facts['counts']
     if row.get('error'):
         return 'scan_error'
+    if state == 'changing':
+        return 'source_changed_during_verification'
     if state == 'error':
         return 'verification_error'
     if not row.get('last_backup'):
@@ -65,6 +67,8 @@ def icon_reason(rendered, facts):
         expected, reason = 'stale', 'checks_not_fresh'
     elif facts['has_error'] or facts['cloud_state'] == 'error':
         expected, reason = 'error', 'observed_error'
+    elif facts['verification_state'] == 'changing':
+        expected, reason = 'verifying', 'source_changed_during_verification'
     elif facts['copying']:
         expected, reason = 'copying', 'active_repo_backup'
     elif facts['needs_backup']:

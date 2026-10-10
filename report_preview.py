@@ -1,9 +1,10 @@
-"""Private draft previews. No network submission or credential access."""
+"""Private exact public payload previews; no credential access."""
 import json
 import os
 from pathlib import Path
 import secrets
 from diagnostic_export import export_bundle
+from report_delivery import public_payload, digest
 
 DESTINATION = 'https://github.com/yogoldy/RepoHub/issues'
 
@@ -38,7 +39,7 @@ def preview_report(state_dir, log_dir, payload):
     case.mkdir(mode=0o700)
     files=[]
     if include:
-        bundle=export_bundle(log_dir,case/'diagnostics',hours=hours,max_events=1000,max_bytes=1024*1024)
+        bundle=export_bundle(log_dir,case/'diagnostics',hours=hours,max_events=100,max_bytes=20000)
         for name in ['schema.json','events.jsonl']:
             content=(bundle/'share'/name).read_text()
             files.append({'name':name,'bytes':len(content.encode()),'content':content})
@@ -46,9 +47,16 @@ def preview_report(state_dir, log_dir, payload):
     if kind=='bug':body+='\n\n## What I expected\n'+values['expected']
     body+='\n\nReport ID: '+report_id
     result={'schema_version':1,'report_id':report_id,'type':kind,'state':'draft','destination':DESTINATION,
-            'title':values['title'],'body':body,'labels':['bug' if kind=='bug' else 'enhancement','from-app'],
-            'files':files,'delivery_available':False,
-            'disclosure':'Please don’t send any confidential information. Public GitHub issue. Prose and the listed diagnostic files would be shared. The private alias key is excluded. Nothing has been sent.'}
+            'title':values['title'],'form':{**values,'include_diagnostics':include,'hours':hours},'body':body,'labels':['bug' if kind=='bug' else 'enhancement','from-app'],
+            'files':files,'delivery_available':True,
+            'disclosure':'Please don’t send any confidential information. Public GitHub issue. The exact previewed issue body, including any diagnostic blocks, will be shared. The private alias key is excluded. Nothing has been sent.'}
+    issue = public_payload(result)
+    result.update(github_title=issue['title'], issue_body=issue['body'], preview_digest=digest(issue))
     fd=os.open(case/'draft.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-    with os.fdopen(fd,'w') as target:json.dump(result,target,indent=2)
+    with os.fdopen(fd,'w') as target:
+        json.dump(result,target,indent=2)
+        target.flush(); os.fsync(target.fileno())
+    directory=os.open(case,os.O_RDONLY)
+    try:os.fsync(directory)
+    finally:os.close(directory)
     return result

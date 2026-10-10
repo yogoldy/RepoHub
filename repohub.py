@@ -27,6 +27,7 @@ from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
 from report_preview import preview_report
+from report_delivery import send_report, connection_status, delivery_status, case_path, read_private
 
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
@@ -101,6 +102,10 @@ def sha256(path):
     return h.hexdigest()
 
 
+class SourceChanged(RuntimeError):
+    """The source was unstable; retry without blaming or replacing its backup."""
+
+
 def content_manifest(root, entries=None):
     """Hash every regular file; do not reuse digests based on size or timestamps."""
     root = Path(root)
@@ -114,12 +119,12 @@ def content_manifest(root, entries=None):
             with os.fdopen(fd, "rb") as f:
                 before = os.fstat(f.fileno())
                 if not stat.S_ISREG(before.st_mode):
-                    raise RuntimeError("File type changed during verification")
+                    raise SourceChanged("File type changed during verification")
                 for block in iter(lambda: f.read(8 * 1024 * 1024), b""):
                     h.update(block)
                 after = os.fstat(f.fileno())
                 if (before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns):
-                    raise RuntimeError("File changed during content verification")
+                    raise SourceChanged("File changed during content verification")
             item.update(kind="file", size=before.st_size, sha256=h.hexdigest())
         elif stat.S_ISDIR(mode):
             item.update(kind="directory")
@@ -127,7 +132,7 @@ def content_manifest(root, entries=None):
             item.update(kind="symlink", target=link)
         result[relative] = item
     if entries != tree_entries(root):
-        raise RuntimeError("Repo changed during content verification; retry later")
+        raise SourceChanged("Repo changed during content verification; retry later")
     return result
 
 
@@ -215,8 +220,10 @@ def verify_current(root, current):
             saved = archive_manifest(current["archive"], Path(root).name)
         changes = summarize_changes(source, saved)
         ignored_finder_only = finder_only_difference(source, saved)
-    if entries != tree_entries(root) or stamp != archive_stamp(current["archive"]):
-        raise RuntimeError("Files changed while verifying; retry later")
+    if entries != tree_entries(root):
+        raise SourceChanged("Files changed while verifying; retry later")
+    if stamp != archive_stamp(current["archive"]):
+        raise RuntimeError("Backup archive changed while verifying; retry later")
     return {"state": "matched" if source_digest == stored_digest else "different",
             "checked_at": utc_now(), "signature": fingerprint(entries),
             "archive": current["archive"], "archive_stamp": stamp,
@@ -379,15 +386,32 @@ class Hub:
         return {workspace_id(p.name): p for p in sorted(self.root.iterdir(), key=lambda p: p.name.lower())
                 if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")}
 
-    def scan(self, deep=True, force=False):
+    def retry_check(self, repo_id):
+        if not isinstance(repo_id, str) or repo_id not in self.repositories():
+            raise ValueError("Unknown repo")
         if not self.scan_lock.acquire(blocking=False):
+            raise FileExistsError("A check is already running. We'll check again on the next scan.")
+        self.diagnostics.emit("scan_retry_requested", repo_ref=diagnostic_ref(repo_id), reason="manual")
+        worker = threading.Thread(target=self.scan, kwargs={"force": True, "repo_id": repo_id, "_lock_held": True}, daemon=True)
+        try:
+            worker.start()
+        except BaseException:
+            self.scan_lock.release()
+            raise
+
+    def scan(self, deep=True, force=False, repo_id=None, _lock_held=False):
+        if not _lock_held and not self.scan_lock.acquire(blocking=False):
             return
         scan_id, scan_started = secrets.token_hex(8), time.monotonic()
         scan_complete = False
         self.diagnostics.emit("scan_started", scan_id=scan_id, mode="content" if deep else "metadata", reason="forced" if force else "poll")
         try:
+            previous_rows = {row["id"]: row for row in self.status["repos"]}
             rows = []
             for key, root in self.repositories().items():
+                if repo_id is not None and key != repo_id and key in previous_rows:
+                    rows.append(previous_rows[key])
+                    continue
                 repo_started = time.monotonic()
                 verification_performed = False
                 row = {"id": key, "name": root.name, "path": str(root)}
@@ -430,6 +454,10 @@ class Hub:
                             with self.lock:
                                 self.verifications[key] = cached
                             valid = cached.get("signature") == row.get("signature")
+                    except SourceChanged:
+                        cached = {"state": "changing", "checked_at": utc_now(),
+                                  "reason": "source_changed_during_verification"}
+                        valid = True
                     except Exception as e:
                         cached = {"state": "error", "checked_at": utc_now(), "error": str(e)}
                         valid = True
@@ -447,7 +475,9 @@ class Hub:
                 rows.append(row)
             with self.lock:
                 self.scheduler.observe(rows, time.monotonic())
-                self.status.update({"scanned_at": utc_now(), "scan_id": scan_id, "repos": rows})
+                self.status.update({"scan_id": scan_id, "repos": rows})
+                if repo_id is None:
+                    self.status["scanned_at"] = utc_now()
                 self.status["verifying"] = None
                 self.persist_status()
                 scan_complete = True
@@ -710,6 +740,10 @@ class Hub:
                         try:
                             observe("existing_verification")
                             verified = verify_current(root, previous)
+                        except SourceChanged:
+                            self.lifecycle.emit("verification_deferred", key=key, run_id=run_id,
+                                                stage="existing_verification", reason="source_changed_during_verification", result="deferred")
+                            raise
                         except OSError as error:
                             # A cloud placeholder/read failure is not evidence of corruption.
                             # Keep the current backup and let the normal retry policy try again.
@@ -868,7 +902,7 @@ class Handler(BaseHTTPRequestHandler):
             routes = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                       "/view-client.js": "view-client.js", "/notes.html": "notes.html",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
-                      "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
+                      "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:
                 return self.send({"error": "Not found"}, 404)
             target = WEB / routes[path]
@@ -932,10 +966,39 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(self.hub.evidence.presentation(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
+            if path == "/api/reports/connection":
+                if payload: raise ValueError("Unknown connection field")
+                return self.send(connection_status())
+            if path == "/api/reports/send":
+                return self.send(send_report(self.hub.state_dir, payload, logger=self.hub.diagnostics))
+            if path == "/api/reports/draft":
+                if set(payload) != {"report_id"}: raise ValueError("Invalid draft request")
+                case = case_path(self.hub.state_dir, payload["report_id"])
+                return self.send({"draft":read_private(case / "draft.json"), "delivery":delivery_status(self.hub.state_dir, payload["report_id"])})
+            if path == "/api/reports/list":
+                if payload: raise ValueError("Unknown report field")
+                parent = self.hub.state_dir / "reports"
+                if parent.is_symlink(): raise ValueError("Unsafe report directory")
+                cases = sorted(parent.glob("*/draft.json"), key=lambda p:p.stat().st_mtime, reverse=True)[:25]
+                rows = []
+                for file in cases:
+                    try:
+                        case = case_path(self.hub.state_dir, file.parent.name)
+                        draft = read_private(case / "draft.json")
+                        rows.append({"report_id":draft["report_id"], "title":draft["title"], "type":draft["type"], **delivery_status(self.hub.state_dir, draft["report_id"])})
+                    except (OSError, ValueError, KeyError): continue
+                return self.send({"reports":rows})
             if path == "/api/reports/preview":
                 return self.send(preview_report(self.hub.state_dir, self.hub.diagnostics.directory, payload), 201)
             if path == "/api/backup":
                 threading.Thread(target=self.hub.backup, daemon=True).start()
+                return self.send({"accepted": True}, 202)
+            if path == "/api/retry-check":
+                if set(payload) != {"repo_id"}: raise ValueError("Invalid retry fields")
+                try:
+                    self.hub.retry_check(payload["repo_id"])
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
                 return self.send({"accepted": True}, 202)
             if path == "/api/scan":
                 threading.Thread(target=self.hub.scan, kwargs={"force": True}, daemon=True).start()

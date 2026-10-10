@@ -15,7 +15,7 @@ class ReportPreviewTests(unittest.TestCase):
         return {'type':'bug','title':'Unexpected changed icon','description':'I saw a change without editing.','expected':'An unchanged icon.',**extra}
     def test_bug_has_exact_share_files_and_private_local_draft(self):
         result=preview_report(self.state,self.logs,self.bug())
-        self.assertEqual(result['state'],'draft');self.assertFalse(result['delivery_available'])
+        self.assertEqual(result['state'],'draft');self.assertTrue(result['delivery_available'])
         self.assertEqual(result['labels'],['bug','from-app'])
         self.assertEqual({f['name'] for f in result['files']},{'schema.json','events.jsonl'})
         shared=json.dumps(result)

@@ -13,7 +13,7 @@ import subprocess
 import shutil
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json, cloud_status, archive_manifest, content_manifest, utc_now, tree_entries, verify_current
+from repohub import Hub, Handler, ThreadingHTTPServer, snapshot, sha256, workspace_id, git_info, atomic_json, cloud_status, archive_manifest, content_manifest, utc_now, tree_entries, verify_current, SourceChanged
 
 
 class HubTests(unittest.TestCase):
@@ -35,6 +35,82 @@ class HubTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_source_mutation_is_transient_and_retry_is_scoped(self):
+        second = self.repos / "Other"
+        second.mkdir()
+        (second / "work.txt").write_text("other")
+        self.hub.backup()
+        before = dict(self.hub.index)
+        with patch("repohub.verify_current", side_effect=SourceChanged("unstable")):
+            self.hub.scan(force=True)
+        row = next(r for r in self.hub.status["repos"] if r["name"] == "Example")
+        self.assertEqual(row["verification"]["state"], "changing")
+        self.assertNotIn("error", row["verification"])
+        from status_health import ProblemTracker
+        tracker = ProblemTracker()
+        status = self.hub.public_status()
+        tracker.update(status, 100)
+        self.assertFalse(any("verification" in x["detail"] for x in tracker.update(status, 1000)))
+        scanned_at = self.hub.status["scanned_at"]
+        other_row = next(r for r in self.hub.status["repos"] if r["name"] == "Other")
+        with patch("repohub.verify_current", wraps=verify_current) as verify:
+            self.hub.retry_check(row["id"])
+            self.assertTrue(self.hub.scan_lock.acquire(timeout=5))
+            self.hub.scan_lock.release()
+        self.assertEqual(verify.call_count, 1)
+        self.assertEqual(Path(verify.call_args.args[0]).resolve(), self.repo.resolve())
+        self.assertIs(next(r for r in self.hub.status["repos"] if r["name"] == "Other"), other_row)
+        self.assertEqual(self.hub.status["scanned_at"], scanned_at)
+        self.assertEqual(self.hub.index, before)
+        self.assertEqual(next(r for r in self.hub.status["repos"] if r["name"] == "Example")["verification"]["state"], "matched")
+        self.hub.scan_lock.acquire()
+        try:
+            with self.assertRaises(FileExistsError): self.hub.retry_check(row["id"])
+        finally: self.hub.scan_lock.release()
+        with self.assertRaises(ValueError): self.hub.retry_check("../unknown")
+
+    def test_retry_api_requires_trusted_explicit_repo_and_never_uploads(self):
+        self.hub.backup()
+        key = workspace_id("Example")
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server.hub = self.hub
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        origin = f"http://127.0.0.1:{server.server_port}"
+        def send(body, token=None):
+            request = urllib.request.Request(origin + "/api/retry-check", json.dumps(body).encode(),
+                {"Origin": origin, "Content-Type": "application/json", "X-RepoHub-Token": token or self.hub.csrf})
+            return urllib.request.urlopen(request)
+        try:
+            with self.assertRaises(urllib.error.HTTPError) as caught: send({"repo_id":key}, "bad")
+            self.assertEqual(caught.exception.code, 403)
+            for payload in ({}, {"repo_id":"../unknown"}, {"repo_id":key,"path":"/tmp"}):
+                with self.assertRaises(urllib.error.HTTPError) as caught: send(payload)
+                self.assertEqual(caught.exception.code, 400)
+            with patch.object(self.hub, "backup") as backup:
+                with send({"repo_id":key}) as response: self.assertEqual(response.status, 202)
+                self.assertTrue(self.hub.scan_lock.acquire(timeout=5))
+                self.hub.scan_lock.release()
+                backup.assert_not_called()
+        finally:
+            server.shutdown(); server.server_close()
+
+    def test_archive_mutation_is_not_source_mutation(self):
+        self.hub.backup()
+        saved = next(iter(self.hub.index.values()))
+        original = tree_entries
+        with patch("repohub.tree_entries", side_effect=lambda root: original(root) + [("new", 0, 0, 0, "")]):
+            # A content manifest detecting changed source has a typed retry outcome.
+            with patch("repohub.content_manifest", side_effect=SourceChanged("source moved")):
+                with self.assertRaises(SourceChanged): verify_current(self.repo, saved)
+        with patch("repohub.archive_stamp", side_effect=[(1,), (2,)]):
+            with self.assertRaisesRegex(RuntimeError, "Backup archive changed") as caught:
+                verify_current(self.repo, saved)
+            self.assertNotIsInstance(caught.exception, SourceChanged)
+        Path(saved["archive"]).write_bytes(b"corrupt")
+        with self.assertRaisesRegex(RuntimeError, "checksum failed") as caught:
+            verify_current(self.repo, saved)
+        self.assertNotIsInstance(caught.exception, SourceChanged)
 
     def test_complete_archive_includes_hidden_ignored_and_symlink_without_following(self):
         outside = self.base / "outside"

@@ -1,7 +1,7 @@
 import Foundation
 
 enum MenuAction: String {
-    case openBackups, openRepo, toggleNotifications, quit
+    case openBackups, openRepo, toggleNotifications, connectGitHub, quit
 }
 
 enum MenuBridge {
@@ -17,6 +17,12 @@ enum MenuBridge {
                   id.range(of: "^[a-zA-Z0-9_-]{1,128}$", options: .regularExpression) != nil else { return nil }
         } else if payload.count != 1 { return nil }
         return action
+    }
+
+    static func isReportIssueURL(_ url: URL) -> Bool {
+        url.scheme == "https" && url.host == "github.com" && url.port == nil && url.user == nil && url.password == nil
+            && url.query == nil && url.fragment == nil
+            && url.path.range(of: "^/yogoldy/RepoHub/issues/[1-9][0-9]*$", options: .regularExpression) != nil
     }
 
     static func repositoryURL(id: String, status: [String: Any]) -> URL? {

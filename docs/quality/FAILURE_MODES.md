@@ -42,7 +42,7 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 **Cause / solution:** Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members.
 
-**Required behavior:** Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits.
+**Required behavior:** Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits. Source changes during verification appear as “Files changing,” with another check on the next scan and a scoped menu-bar retry. Archive mutation or corruption remains an error. A scoped retry never creates an archive or refreshes the global scan timestamp.
 
 **Diagnostic trail:** `repo_checked`, `archive_stage`, `repo_backup_failed`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
 
@@ -51,6 +51,8 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 - `test_hub.HubTests.test_same_size_same_mtime_edit_is_detected_and_replaced`
 - `test_hub.HubTests.test_timestamp_only_changes_match_hashes_and_do_not_replace_backup`
 - `test_hub.HubTests.test_metadata_preserving_change_during_snapshot_is_rejected`
+- `test_hub.HubTests.test_source_mutation_is_transient_and_retry_is_scoped`
+- `test_hub.HubTests.test_archive_mutation_is_not_source_mutation`
 - `test_hub.HubTests.test_change_during_backup_does_not_publish`
 
 **Remaining exposure:** Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided.
@@ -252,3 +254,45 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 **Remaining exposure:** Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration.
 
+
+### GR13 — A report sends only its exact consented payload once
+
+**Susceptible boundary:** Timeouts, double-clicks, crashes, account switches or unsafe preview/destination changes can publish the wrong report or duplicate it.
+
+**Cause / solution:** Freeze and hash the exact public preview; require explicit Send/account confirmation; persist sending before POST under a process-safe lock; reconcile ambiguous outcomes against exact authored issue bytes without automatically reposting. Credentials remain in native Keychain/backend memory.
+
+**Required behavior:** Fixed product tracker and approved diagnostic text only. Durable exact-identity receipts, retained drafts, no background sending, no token/prose in operational logs or HTML credential handling.
+
+**Diagnostic trail:** `report_delivery`, with report-local aliases and approved state/reason codes only. No titles, prose, account names, issue URLs or credentials.
+
+**Regression tests:**
+
+- `test_report_delivery.ReportDeliveryTests.test_exact_preview_receipt_and_repeat_send_never_duplicates`
+- `test_report_delivery.ReportDeliveryTests.test_lost_post_response_recovers_existing_issue_without_second_post`
+- `test_report_delivery.ReportDeliveryTests.test_absent_issue_after_ambiguous_send_is_not_permission_to_repost`
+- `test_report_delivery.ReportDeliveryTests.test_process_interruption_leaves_durable_uncertain_identity`
+- `test_report_delivery.ReportDeliveryTests.test_double_click_while_posting_is_serialized`
+- `test_report_delivery.ReportDeliveryTests.test_client_cannot_change_destination_payload_or_consent`
+- `test_report_delivery.ReportDeliveryTests.test_foreign_or_malformed_receipt_never_becomes_sent`
+- `test_report_delivery.ReportDeliveryTests.test_delivery_diagnostics_contain_only_codes_and_aliased_identity`
+- `test_report_delivery.ReportDeliveryTests.test_sender_api_uses_existing_origin_and_token_boundary`
+- `test_report_labels.ReportLabelTests.test_issue_text_never_selects_other_labels_or_commands`
+- `test_report_delivery.ReportDeliveryTests.test_failed_durable_intent_flush_cannot_start_a_post`
+
+**Remaining exposure:** GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. Native Keychain prompts and installed two-Mac connection setup need live acceptance. Owner categorization workflow activates only after merge to main.
+
+### GR14 — Reporting must be reachable in the menu bar
+
+**Susceptible boundary:** Backend/syntax tests pass while the primary menu-bar UI omits reporting controls.
+
+**Cause / solution:** The main app had reporting controls and the menu only had connection setup. Both shipped pages now load the same report controller and styles, with reporting controls in settings.
+
+**Required behavior:** Bug and feature entry points, separate drafts, exact previews and explicit sends work on both surfaces. An absent or duplicate controller element fails the regression.
+
+**Diagnostic trail:** `report_delivery`. Compose and preview remain local; no event is proof of an actual GitHub acceptance.
+
+**Regression tests:**
+
+- `test_report_entry.ReportEntryTests.test_both_surfaces_support_report_compose_preview_and_explicit_send`
+
+**Remaining exposure:** The automated DOM/API harness does not prove native WebKit layout, modal focus, token onboarding or live GitHub behavior. Verify the installed menu with computer use.

@@ -202,12 +202,18 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         case .openRepo:
             if let body = message.body as? [String: Any], let id = body["repo_id"] as? String { openRepository(id) }
         case .toggleNotifications: toggleNotifications()
+        case .connectGitHub: GitHubConnection.configure()
         case .quit: quit()
         }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        if navigationAction.navigationType == .linkActivated && MenuBridge.isReportIssueURL(url) {
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
         decisionHandler(url.scheme == "http" && url.host == "127.0.0.1" && url.port == 8767 && url.path == "/menu.html" ? .allow : .cancel)
     }
 
