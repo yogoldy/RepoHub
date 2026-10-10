@@ -47,10 +47,19 @@ check({...finderIgnored,cloud:{state:'uploading',archive:'/current',percent:49}}
 check({...finderIgnored,cloud:{state:'pending',archive:'/current'}},'pending');
 check({...finderIgnored,cloud:{state:'error',archive:'/current'}},'error');
 check(finderIgnored,'copying',false,{running:true,current_repo:'Example'});
-console.log(count+' menu status checks passed');
 
 const changing={...good,needs_backup:true,verification:{state:'changing'}};
 assert.equal(check(changing,'verifying').label,'Files changing');
 assert.match(view(changing).detail,/next scan/);
 check({...changing,error:'real error'},'error');
 check({...changing,cloud:{state:'error'}},'error');
+
+const namedA={...good,id:'project-a',name:'Project'},namedB={...good,id:'project-b',name:'Project'};
+const activeA={running:true,current_repo:'Project',current_repo_id:'project-a'};
+check(namedA,'copying',false,activeA);
+check(namedB,'ready',true,activeA);
+check(namedA,'ready',true,{...activeA,current_repo_id:null});
+check(namedA,'error',false,{errors:[{repo:'Project',repo_id:'project-a',error:'fixture'}]});
+check(namedB,'ready',true,{errors:[{repo:'Project',repo_id:'project-a',error:'fixture'}]});
+check(namedA,'ready',true,{errors:[{repo:'Project',repo_id:null,error:'fixture'}]});
+console.log(count+' menu status checks passed');

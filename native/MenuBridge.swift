@@ -32,10 +32,12 @@ enum MenuBridge {
               let name = repo["name"] as? String, !name.isEmpty,
               name != ".", name != "..", !name.contains("/") else { return nil }
         let item = URL(fileURLWithPath: path).standardizedFileURL
-        if let sources = status["workspace_sources"] as? [[String: Any]] {
+        if status["workspace_sources"] != nil {
             // Registry-backed status resolves exact approved IDs; arbitrary
             // paths from web messages are still never accepted.
-            guard sources.filter({ $0["id"] as? String == id && $0["path"] as? String == path }).count == 1,
+            guard let sources = status["workspace_sources"] as? [[String: Any]] else { return nil }
+            let approved = sources.filter { $0["id"] as? String == id }
+            guard approved.count == 1, approved[0]["path"] as? String == path,
                   item.resolvingSymlinksInPath() == item else { return nil }
         } else {
             // Compatibility with the installed single-root helper.

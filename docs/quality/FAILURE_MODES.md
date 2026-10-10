@@ -297,6 +297,22 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 **Remaining exposure:** The automated DOM/API harness does not prove native WebKit layout, modal focus, token onboarding or live GitHub behavior. Verify the installed menu with computer use.
 
+### GR15 — Workspace selection preserves identity and copy scope
+
+**Susceptible boundary:** A new source mode changes existing IDs, aliases duplicate a source, missing folders publish empty replacements, or configuration changes race backup source selection.
+
+**Cause / solution:** Persist a canonical source registry with inactive identity records, retain legacy IDs and validate overlaps/protected locations. Saves require a matching revision and idle scan/backup locks. Take the backup source snapshot under that same lock. Check an approved directory's canonical location before scanning/copying it.
+
+**Required behavior:** Migration preserves backups, saved JSON, schedules and per-repo settings. Same-named folders remain distinct. Removal stops monitoring without deleting sources/current archives. Unavailable/retargeted sources fail safely, and saved manual selections no longer depend on the obsolete home setting. Invalid/stale/busy/failed saves retain the old selection.
+
+**Diagnostic trail:** `workspace_configuration`, `repo_checked`, `repo_backup_failed`, `repo_backup_finished`, `status_repo`, `ui_presented`. Successful configuration events contain only mode/result/count; subsequent repo/run/archive aliases explain copy outcomes. Exporting source paths/names is forbidden.
+
+**Controlled counterexample:** The new interleaving regression was run against the parent implementation's backup method and failed because configuration saving was allowed between taking the old source list and acquiring the backup lock. The fixed implementation rejects that concurrent save. The duplicate-name diagnostic regression also fails against the earlier name-based projection: both same-named rows are falsely marked as copying. Backup activity, errors, UI status and problem episodes now use workspace IDs, with legacy-name fallback only when the ID field is absent. The shared JavaScript policy checks that the other same-named card stays ready and receives no unrelated error. These are synthetic findings, not evidence of personal backup incidents. Private reproduction logs remain outside Git.
+
+**Regression tests:** All 16 `test_workspace_registry.WorkspaceTests` methods are required by [golden-rules.json](golden-rules.json), including migration/persistence, alias/collision handling, source availability, revision/lock/write failures, the controlled interleaving, API authorization and sanitized configuration diagnostics. The macOS gate separately runs the native bridge executable's manual-path approval/rejection checks.
+
+**Remaining exposure:** Native URL checks do not prove actual Finder/picker interaction. Separate-volume remounts, inaccessible-volume recovery, concurrent filesystem replacement and source relocation still need live coverage. Destination migration, naming and setup UI remain separate work. See [the configuration contract](../WORKSPACE_CONFIGURATION.md).
+
 ## Reporting access incident — 2026-10-09
 
 The MacBook Pro authenticated the saved token as the tracker owner, while a submission receipt recorded `failed / github_access_denied`. GitHub token settings showed no selected repositories or repository permissions. The generic UI error did not explain that sign-in and permission to create an issue are separate checks. The user later confirmed successful delivery to [issue #3](https://github.com/yogoldy/RepoHub/issues/3), corroborated by the local `sent` receipt and GitHub issue lookup. The intervening permission save was not directly observed; do not claim a captured end-to-end permission-change trace.

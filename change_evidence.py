@@ -138,11 +138,14 @@ class ChangeEvidence:
 
     def observe_status(self, status):
         projection = {}
+        backup = status.get('backup', {})
         for row in status['repos']:
             verification, cloud = row.get('verification', {}), row.get('cloud', {})
+            copying = bool(backup.get('running') and (backup.get('current_repo_id') == row['id']
+                           if 'current_repo_id' in backup else backup.get('current_repo') == row['name']))
             projection[row['id']] = {**repo_facts(row),
                 'change_reason': change_reason(row, repo_facts(row)),
-                'active_run_id': status.get('backup', {}).get('run_id') if status.get('backup', {}).get('running') and status['backup'].get('current_repo') == row['name'] else None,
+                'active_run_id': backup.get('run_id') if copying else None,
                 'verification_archive_ref': diagnostic_ref(verification.get('archive')),
                 'verification_signature': verification.get('signature'),
                 'verification_checked_at': verification.get('checked_at'),
@@ -151,8 +154,9 @@ class ChangeEvidence:
                 'fresh': row.get('health', {}).get('fresh'),
                 'cloud_state': cloud.get('state'), 'cloud_archive_ref': diagnostic_ref(cloud.get('archive')),
                 'percent': cloud.get('percent'), 'has_error': bool(row.get('error') or verification.get('error') or any(
-                    error.get('repo') == row['name'] and error.get('error') for error in status.get('backup', {}).get('errors', []))),
-                'copying': bool(status.get('backup', {}).get('running') and status['backup'].get('current_repo') == row['name'])}
+                    (error.get('repo_id') == row['id'] if 'repo_id' in error else error.get('repo') == row['name'])
+                    and error.get('error') for error in backup.get('errors', []))),
+                'copying': copying}
         identity = hashlib.sha256(json.dumps(projection, sort_keys=True, separators=(',', ':')).encode()).hexdigest()[:24]
         with self.lock:
             if identity not in self.snapshots:

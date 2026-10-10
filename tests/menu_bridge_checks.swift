@@ -75,7 +75,11 @@ import Foundation
         precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
         manual["workspace_sources"] = [["id":"Outside-id", "path":manualPath], ["id":"Outside-id", "path":manualPath]]
         precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
-        count += 4
+        manual["workspace_sources"] = [["id":"Outside-id", "path":manualPath], ["id":"Outside-id", "path":repo.path]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        manual["workspace_sources"] = "invalid"
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        count += 6
         print("\(count) menu bridge checks passed")
     }
 }

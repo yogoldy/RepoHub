@@ -8,7 +8,8 @@ from unittest.mock import patch
 from http.server import ThreadingHTTPServer
 import urllib.request
 import urllib.error
-from repohub import Hub, Handler, atomic_json, content_manifest, archive_manifest, workspace_id
+from repohub import Hub, Handler, atomic_json, content_manifest, archive_manifest, workspace_id, snapshot
+from status_health import ProblemTracker
 from workspace_registry import WorkspaceRegistry
 from diagnostic_export import export_bundle
 
@@ -75,12 +76,18 @@ class WorkspaceTests(unittest.TestCase):
 
     def test_removing_and_readding_preserves_identity_backups_and_scoped_settings(self):
         key=workspace_id('Example');self.hub.backup();archive=self.hub.index[key]['archive']
+        self.hub.repo_settings[key]=copy.deepcopy(self.hub.settings)
+        atomic_json(self.hub.repo_settings_path,self.hub.repo_settings)
+        atomic_json(self.hub.data_path(key,'notes'),{'retained':True})
         self.select({'mode':'manual','paths':[]})
         self.assertEqual(self.hub.repositories(),{})
         self.assertTrue(Path(archive).exists());self.assertTrue((self.repo/'work.txt').exists())
         with self.assertRaises(ValueError):self.hub.data_path(key,'notes')
         self.select({'mode':'manual','paths':[str(self.repo)]})
         self.assertEqual(list(self.hub.repositories()),[key]);self.assertEqual(self.hub.index[key]['archive'],archive)
+        restarted=Hub(self.config)
+        self.assertEqual(restarted.repo_settings[key],self.hub.settings)
+        self.assertEqual(json.loads(restarted.data_path(key,'notes').read_text()),{'retained':True})
 
     def test_missing_folder_cannot_replace_archive_with_empty_backup(self):
         self.hub.backup();key=workspace_id('Example');before=copy.deepcopy(self.hub.index[key])
@@ -106,6 +113,47 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(len(self.hub.repositories()),1)
         a.rename(self.base/'original');a.symlink_to(self.repo,target_is_directory=True)
         self.hub.scan(force=True);self.assertIn('error',self.hub.status['repos'][0])
+
+    def test_backup_activity_and_failures_use_workspace_ids(self):
+        a=self.folder('a/Project');b=self.folder('b/Project')
+        self.select({'mode':'manual','paths':[str(a),str(b)]});self.hub.backup()
+        sources=self.hub.repositories();keys={path:key for key,path in sources.items()}
+        previous=copy.deepcopy(self.hub.index[keys[a]])
+        (a/'work').write_text('changed first');(b/'work').write_text('changed second')
+        seen=[]
+        def controlled_snapshot(root,*args,**kwargs):
+            if root in keys:
+                seen.append(self.hub.status['backup']['current_repo_id'])
+                self.assertEqual(seen[-1],keys[root])
+                if root==a:raise OSError('controlled fixture failure')
+            return snapshot(root,*args,**kwargs)
+        with patch('repohub.snapshot',side_effect=controlled_snapshot):self.hub.backup()
+        self.assertEqual(set(seen),set(sources))
+        self.assertEqual(self.hub.index[keys[a]],previous)
+        self.assertEqual(self.hub.status['backup']['errors'][0]['repo_id'],keys[a])
+        self.assertEqual(archive_manifest(self.hub.index[keys[b]]['archive'],'Project'),content_manifest(b))
+
+    def test_duplicate_names_scope_diagnostics_and_problem_episodes(self):
+        a=self.folder('a/Project');b=self.folder('b/Project')
+        self.select({'mode':'manual','paths':[str(a),str(b)]});self.hub.backup()
+        keys={path:key for key,path in self.hub.repositories().items()}
+        status=self.hub.public_status()
+        status['backup']={'running':True,'current_repo':'Project','current_repo_id':keys[a],'run_id':'fixture-run'}
+        obs=self.hub.evidence.observe_status(status);facts=self.hub.evidence.snapshots[obs]
+        self.assertTrue(facts[keys[a]]['copying']);self.assertFalse(facts[keys[b]]['copying'])
+        self.assertEqual(facts[keys[a]]['active_run_id'],'fixture-run');self.assertIsNone(facts[keys[b]]['active_run_id'])
+        status['backup']={'running':False,'errors':[{'repo':'Project','repo_id':keys[a],'error':'fixture'}]}
+        obs=self.hub.evidence.observe_status(status);facts=self.hub.evidence.snapshots[obs]
+        self.assertTrue(facts[keys[a]]['has_error']);self.assertFalse(facts[keys[b]]['has_error'])
+        tracker=ProblemTracker();tracker.update(status,1000)
+        self.assertIn('backup:'+keys[a],tracker.episodes);self.assertNotIn('backup:'+keys[b],tracker.episodes)
+        status['backup']['errors'].append({'repo':'Project','repo_id':keys[b],'error':'fixture'})
+        tracker.update(status,1001)
+        self.assertIn('backup:'+keys[b],tracker.episodes)
+        status['backup']={'running':True,'current_repo':'Project','current_repo_id':keys[a],'started_at':'fixture'}
+        tracker.update(status,2000);first=tracker.episodes['copy:running']['id']
+        status['backup']['current_repo_id']=keys[b];tracker.update(status,2001)
+        self.assertNotEqual(tracker.episodes['copy:running']['id'],first)
 
     def test_invalid_overlap_missing_and_protected_sources_do_not_mutate_registry(self):
         before=self.hub.registry.path.read_bytes()

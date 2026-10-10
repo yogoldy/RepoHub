@@ -4,7 +4,7 @@ A simple local Mac app showing whether the latest iCloud-folder backups match th
 
 ## Product direction
 
-See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. Bounded local diagnostic storage, scan/display evidence and backup/cloud lifecycle instrumentation are implemented; sanitized export is the next item.
+See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. Continuous diagnostics, constrained exports and explicit GitHub report delivery are implemented. Tier 3A adds [the persisted workspace registry and guarded source-selection API](docs/WORKSPACE_CONFIGURATION.md); native folder-picker setup and destination selection are the next passes.
 
 This is currently Leo's local prototype. `install.py` performs a personal migration of an earlier backup setup; general folder-picker onboarding and a distributable installer remain roadmap work. Public source publication does not upload personal backups or diagnostics.
 
@@ -17,7 +17,7 @@ This is currently Leo's local prototype. `install.py` performs a personal migrat
 
 ## Backups
 
-Every folder immediately under `~/Desktop/repos` is a workspace, including folders without Git. Backups include `.git`, uncommitted files, ignored files, dependencies, and empty folders. Symlinks are preserved as links; their outside targets are not copied. The app never changes the source repos.
+The existing installation monitors immediate folders under `~/Desktop/repos`, including folders without Git. The workspace registry also supports individually selected folders at unrelated locations; its selection UI is not implemented yet. Backups include `.git`, uncommitted files, ignored files, dependencies, and empty folders. Symlinks are preserved as links; their outside targets are not copied. The app never changes the source repos.
 
 Changed workspaces replace their current full `.tar.gz` archive with a newly dated copy in `iCloud Drive/Repository Backups/Snapshots/<workspace-id>/`. The helper hashes every regular source file with SHA-256, including ignored files and Git internals. New copies are checked against the decompressed archive's actual file contents, permissions, directories and link targets, and then against a second source-content pass. Destination archive bytes must also pass SHA-256 verification before the indexes are saved.
 
@@ -78,9 +78,9 @@ A green card requires fresh checks, no content differences or copy errors, and m
 
 Back up now, Repository Backups, Backup notifications, and the settings gear use the same card theme. Settings open inside the popover and save to the same revision-safe settings API; no full app window is needed. There is no Open Repo Hub menu button. A small Quit control stops only the menu-bar app. The original full dashboard remains available at the helper root for development/Advanced inspection.
 
-The native bridge accepts only openBackups, openRepo, toggleNotifications, and quit from this popover's exact top-level http://127.0.0.1:8767/menu.html document. Other origins, ports, paths, subframes, extra fields and arbitrary path/command requests are rejected. openRepo accepts only a workspace ID and resolves its path from fresh helper status, requiring an existing non-symlink directory immediately inside the configured repo root. HTML views never receive this bridge. Backups and settings still go through authenticated loopback POST endpoints, obtaining the current process token for each write so a helper restart does not strand the panel with an old token. Browser-only previews disable the three native controls.
+The native bridge accepts only openBackups, openRepo, toggleNotifications, connectGitHub, and quit from this popover's exact top-level http://127.0.0.1:8767/menu.html document. Other origins, ports, paths, subframes, extra fields and arbitrary path/command requests are rejected. openRepo accepts only a workspace ID and resolves its path from fresh helper status and the registry's exact approved ID/path pair, requiring an existing canonical non-symlink directory. Older single-root helper status retains its immediate-child check. HTML views never receive this bridge. Backups and settings still go through authenticated loopback POST endpoints, obtaining the current process token for each write so a helper restart does not strand the panel with an old token. Browser-only previews disable the three native controls.
 
-Menu checks: `node tests/menu-status.cjs`; compile `native/MenuBridge.swift` with `tests/menu_bridge_checks.swift` and run the executable. Existing Python security/backup and Swift notification-readiness checks still apply. This branch starts from 9f442b8 and adds the menu-bar presentation, its fixed adapter and per-repo schedules; cloud restore verification remains a separate future pass.
+Menu checks: `node tests/menu-status.cjs`; compile `native/MenuBridge.swift` with `tests/menu_bridge_checks.swift` and run the executable. Existing Python security/backup and Swift notification-readiness checks still apply. The menu-bar foundation started from 9f442b8; its fixed adapter and per-repo schedules remain in the current app. Broader independent cloud restore coverage remains a separate pass.
 
 ## Individual repo schedules and status icons
 
@@ -102,7 +102,7 @@ Change detection compares full content hashes, paths, permissions and symlink ta
 
 ## Local diagnostics
 
-The helper writes structured events under `~/Library/Application Support/RepoHub/diagnostics/` while it runs, including startup and a per-minute heartbeat. Logging continues with the menu panel closed. Gaps are recorded as unobserved intervals; sleep/offline time is not falsely presented as monitored. Files rotate at 10 MiB, with seven-day/100 MiB total retention, owner-only permissions and recovery from failed/partial writes. Diagnostic files are outside monitored repos and helper-data archives. The status API reports recording failures without interrupting backups. Reports remain local; bug submission and sanitized export are roadmap work.
+The helper writes structured events under `~/Library/Application Support/RepoHub/diagnostics/` while it runs, including startup and a per-minute heartbeat. Logging continues with the menu panel closed. Gaps are recorded as unobserved intervals; sleep/offline time is not falsely presented as monitored. Files rotate at 10 MiB, with seven-day/100 MiB total retention, owner-only permissions and recovery from failed/partial writes. Diagnostic files are outside monitored repos and helper-data archives. The status API reports recording failures without interrupting backups. Reports remain local until an explicit Send posts the exact preview to GitHub. Diagnostic export is constrained by the typed sharing contract; no background telemetry is enabled.
 
 
 Scan events capture signature transitions, hash freshness, duration and counts of Finder metadata, Git data and repo-file differences. Repo/path references are hashed identifiers; events exclude raw repo names, file contents, exception prose and credentials. When a view is rendered, the native menu and full dashboard report their actual label and readiness against the same backend observation ID. Recording failures never change backup decisions, and missing view receipts never establish agreement.
@@ -113,7 +113,7 @@ Read a local diagnostic summary with:
 python3 diagnostics_report.py --log-dir "$HOME/Library/Application Support/RepoHub/diagnostics"
 ```
 
-The reader skips malformed records and unsafe file types. An optional `--output` writes a new owner-only JSON file and refuses to overwrite an existing one. These summaries are local investigation tools; shareable redacted export and GitHub submission remain unfinished. Manually saved case reports live separately from the automatic seven-day log retention.
+The reader skips malformed records and unsafe file types. An optional `--output` writes a new owner-only JSON file and refuses to overwrite an existing one. These summaries are local investigation tools; [constrained sharing bundles](docs/DIAGNOSTIC_EXPORT.md) and [explicit GitHub delivery](docs/REPORT_DELIVERY.md) are separate reviewed flows. Manually saved case reports live separately from the automatic seven-day log retention.
 
 
 ## Finder-only changes and repo-scoped replacements

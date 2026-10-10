@@ -736,7 +736,7 @@ class Hub:
                             reason=reason, mode="all" if keys is None else "selected")
         try:
             with self.lock:
-                self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "reason": reason, "run_id": run_id}
+                self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "current_repo_id": None, "reason": reason, "run_id": run_id}
                 self.persist_status()
             if not self.backups.parent.is_dir():
                 raise RuntimeError("iCloud Repository Backups folder is unavailable")
@@ -752,6 +752,7 @@ class Hub:
                     attempted_keys.append(key)
                 with self.lock:
                     self.status["backup"]["current_repo"] = root.name
+                    self.status["backup"]["current_repo_id"] = key
                     self.persist_status()
                 current_archive = None
                 stage = "source_inspection"
@@ -835,7 +836,7 @@ class Hub:
                     self.lifecycle.emit("repo_backup_failed", key=key, run_id=run_id, stage=stage, archive_ref=diagnostic_ref(current_archive),
                                         severity="error", result="failed", error_type=type(e).__name__,
                                         duration_ms=(time.monotonic()-repo_started)*1000)
-                    failures.append({"repo": root.name, "error": str(e)})
+                    failures.append({"repo": root.name, "repo_id": key, "error": str(e)})
             with self.lock:
                 self.status["backup"] = {"running": False, "finished_at": utc_now(), "run_id": run_id, "errors": failures,
                                          "note": "Archives verified locally. macOS manages iCloud upload."}

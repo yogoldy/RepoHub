@@ -282,6 +282,40 @@
         "test_report_entry.ReportEntryTests.test_both_surfaces_support_report_compose_preview_and_explicit_send"
       ],
       "remaining_gap": "A mocked DOM/API regression proves controller wiring, not native WebKit layout, modal focus, secure token onboarding or live GitHub response. Computer-use checks on the installed menu and a narrow viewport remain required."
+    },
+    {
+      "id": "GR15",
+      "title": "Workspace selection preserves identity and copy scope",
+      "breakpoint": "A new source mode changes existing IDs, aliases duplicate a source, missing folders replace good archives with empty copies, or configuration changes race backup source selection.",
+      "diagnostic_events": [
+        "workspace_configuration",
+        "repo_checked",
+        "repo_backup_failed",
+        "repo_backup_finished",
+        "status_repo",
+        "ui_presented"
+      ],
+      "cause_and_solution": "Persist a validated canonical registry with retained inactive identities; preserve legacy IDs; reject overlaps and changed locations; bind revision-safe configuration saves and backup source selection to the same lock.",
+      "required_behavior": "Migration preserves backups, scoped JSON and schedules; only active approved sources can be copied; source removal preserves current archives; unavailable/retargeted sources fail without empty replacements; configuration events export no paths. Copy activity, error attribution, diagnostic projections and problem episodes use workspace IDs so duplicate names cannot share status.",
+      "test_ids": [
+        "test_workspace_registry.WorkspaceTests.test_migration_preserves_ids_archives_json_and_overrides",
+        "test_workspace_registry.WorkspaceTests.test_same_named_manual_folders_have_independent_identity_and_complete_archives",
+        "test_workspace_registry.WorkspaceTests.test_initial_manual_configuration_needs_no_repo_home",
+        "test_workspace_registry.WorkspaceTests.test_saved_manual_selection_is_authoritative_over_legacy_home",
+        "test_workspace_registry.WorkspaceTests.test_removing_and_readding_preserves_identity_backups_and_scoped_settings",
+        "test_workspace_registry.WorkspaceTests.test_missing_folder_cannot_replace_archive_with_empty_backup",
+        "test_workspace_registry.WorkspaceTests.test_dynamic_children_exclude_hidden_symlinks_and_keep_missing_identity",
+        "test_workspace_registry.WorkspaceTests.test_deduplicated_alias_and_retargeted_source_never_change_identity",
+        "test_workspace_registry.WorkspaceTests.test_invalid_overlap_missing_and_protected_sources_do_not_mutate_registry",
+        "test_workspace_registry.WorkspaceTests.test_revision_busy_and_write_failure_leave_prior_selection_intact",
+        "test_workspace_registry.WorkspaceTests.test_backup_source_selection_is_serialized_with_configuration_changes",
+        "test_workspace_registry.WorkspaceTests.test_invalid_saved_registry_fails_closed_without_resetting",
+        "test_workspace_registry.WorkspaceTests.test_configuration_diagnostics_export_no_paths",
+        "test_workspace_registry.WorkspaceTests.test_workspace_api_requires_host_origin_token_and_revision",
+        "test_workspace_registry.WorkspaceTests.test_backup_activity_and_failures_use_workspace_ids",
+        "test_workspace_registry.WorkspaceTests.test_duplicate_names_scope_diagnostics_and_problem_episodes"
+      ],
+      "remaining_gap": "Native URL checks do not prove actual Finder/picker interaction. Separate-volume remounts, inaccessible-volume recovery, concurrent filesystem replacement, source relocation and destination/naming migration need independent live coverage. Setup UI and provider-aware destinations remain unimplemented."
     }
   ]
 }
