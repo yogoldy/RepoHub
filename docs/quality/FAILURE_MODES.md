@@ -348,3 +348,12 @@ Settings shows helper-probed source/destination access, actual notification auth
 Volume checking initially used repeated diskutil subprocesses, making the full regression run unacceptably slow. The helper now reads Apple's persistent volume UUID directly with Core Foundation using a fresh URL for each check, retaining remount/substitution protection without process startup. The slow gate was deliberately interrupted and is not accepted as a pass.
 
 Freshness delivery retains at most one unavailable frame in memory and retries it after reconnect before the current frame. Expired backend observations remain unobserved gaps. Server event timestamps are receipt times, including deferred delivery; they are not proof of the moment pixels changed. Both request timeouts and cache expiry have explicit typed contexts.
+
+### Native picker pathname aliases (reliability acceptance)
+
+The simultaneous-folder picker returned `/tmp/...` for a previously stored
+`/private/tmp/...` folder. The draft deduplicated strings, so both appeared before
+review despite referring to the same directory. Native picker results now use
+POSIX realpath, matching helper canonicalization. Finder resolution uses the same
+comparison for approved registry paths. Native bridge checks cover both aliases
+and a directory symlink; the real multi-selection repeat remains required.

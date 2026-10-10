@@ -75,10 +75,16 @@ import Foundation
         }
         precondition(MenuBridge.repositoryURL(id:"missing",status:status("Example",repo.path)) == nil)
         count += 1
-        let manualPath = outside.resolvingSymlinksInPath().path
+        let manualPath = MenuBridge.canonicalSourcePath(outside)
+        precondition(MenuBridge.canonicalSourcePath(linked) == manualPath)
+        let aliasRoot = URL(fileURLWithPath: "/tmp").appendingPathComponent("repohub-picker-" + UUID().uuidString)
+        try! files.createDirectory(at: aliasRoot, withIntermediateDirectories: true)
+        defer { try? files.removeItem(at: aliasRoot) }
+        precondition(MenuBridge.canonicalSourcePath(aliasRoot) == "/private" + aliasRoot.path)
+        count += 2
         var manual: [String: Any] = ["source_mode":"manual", "repos":[["id":"Outside-id", "name":"Outside", "path":manualPath]],
                                     "workspace_sources":[["id":"Outside-id", "path":manualPath]]]
-        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual)?.path == manualPath)
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual).map(MenuBridge.canonicalSourcePath) == manualPath)
         manual["workspace_sources"] = [["id":"Other-id", "path":manualPath]]
         precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
         manual["workspace_sources"] = [["id":"Outside-id", "path":repo.path]]

@@ -326,7 +326,7 @@
         "workspace_review",
         "workspace_configuration"
       ],
-      "cause_and_solution": "Keep folder choice local until backend validation, bind the review to the current registry and candidate inventory, and correlate native picker results to a single request.",
+      "cause_and_solution": "Keep folder choice local until backend validation, bind the review to the current registry and candidate inventory, and correlate native picker results to a single request. Canonicalize native selections with POSIX realpath so macOS pathname aliases do not duplicate draft entries.",
       "required_behavior": "Review lists exact canonical paths and removals; stale review is rejected; cancel and failed review never save; picker accepts only exact main menu frame and typed request IDs.",
       "test_ids": [
         "test_workspace_registry.WorkspaceTests.test_review_is_read_only_and_requires_same_discovered_folder_list",

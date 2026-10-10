@@ -259,7 +259,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         panel.begin { [weak self] response in
             guard let self = self else { return }
             let detail: [String: Any] = ["request_id": requestID, "cancelled": response != .OK,
-                                        "paths": response == .OK ? panel.urls.map { $0.resolvingSymlinksInPath().path } : []]
+                                        "paths": response == .OK ? panel.urls.map { MenuBridge.canonicalSourcePath($0) } : []]
             self.sourcePicker = nil
             self.popover.behavior = .transient
             self.showPopover()
