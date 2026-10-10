@@ -3,9 +3,9 @@
   function create(surface,{native=false,fetcher=root.fetch.bind(root),clock=Date.now,clientId}={}){
     if(!clientId){const bytes=new Uint8Array(12);root.crypto.getRandomValues(bytes);clientId=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');}
     let last='',lastAt=0,pending=false;
-    async function observe(status,rows){
+    async function observe(status,rows,clientFreshness="current"){
       if(!status?.diagnostic_observation_id||pending)return false;
-      const body={surface,native,client_id:clientId,observation_id:status.diagnostic_observation_id,policy_version:root.RepoStatus?.version||'change-evidence-1',rows};
+      const body={surface,native,client_id:clientId,observation_id:status.diagnostic_observation_id,policy_version:root.RepoStatus?.version||'change-evidence-1',client_freshness:clientFreshness,rows};
       const signature=JSON.stringify(body),now=clock();
       if(signature===last&&now-lastAt<60000)return false;
       pending=true;
@@ -21,5 +21,9 @@
     }
     return {observe};
   }
-  const api={create};if(typeof module==='object'&&module.exports)module.exports=api;else root.RepoDiagnostics=api;
+  function displayState(status,reason='current'){
+    if(reason==='current')return status;
+    return {...status,repos:(status.repos||[]).map(repo=>({...repo,health:{fresh:false,reasons:['Local status unavailable · '+reason.replaceAll('_',' ')]}}))};
+  }
+  const api={create,displayState};if(typeof module==='object'&&module.exports)module.exports=api;else root.RepoDiagnostics=api;
 })(typeof globalThis==='object'?globalThis:this);

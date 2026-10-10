@@ -56,6 +56,21 @@ class EvidenceTests(unittest.TestCase):
         self.assertTrue(self.hub.scan_lock.acquire(timeout=5)); self.hub.scan_lock.release()
         self.assertTrue(any(e['event']=='scan_retry_requested' for e in self.events()))
 
+    def test_client_freshness_override_preserves_backend_and_detects_false_green(self):
+        payload = self.payload('menu','Status outdated','stale')
+        before = copy.deepcopy(self.hub.evidence.snapshots[payload['observation_id']])
+        for reason in ('request_failed','response_timeout','cache_expired'):
+            payload['client_freshness'] = reason
+            self.hub.evidence.presentation(payload)
+            self.assertEqual([e for e in self.events() if e['event']=='ui_presented'][-1]['reason'], 'client_'+reason)
+        self.assertEqual(self.hub.evidence.snapshots[payload['observation_id']], before)
+        self.assertFalse(any(e['event']=='presentation_input_disagreement' for e in self.events()))
+        payload['rows'][0].update(phase='ready',display_label='Backed up',ready=True)
+        self.hub.evidence.presentation(payload)
+        self.assertTrue(any(e['event']=='presentation_input_disagreement' for e in self.events()))
+        payload['client_freshness']='private arbitrary prose'
+        with self.assertRaises(ValueError):self.hub.evidence.presentation(payload)
+
     def test_finder_timestamp_and_real_edits_have_distinct_evidence(self):
         (self.repo/'.DS_Store').write_text('finder after')
         self.hub.scan(force=True)

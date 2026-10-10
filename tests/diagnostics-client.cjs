@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {create}=require('../web/diagnostics-client.js');
+const {create,displayState}=require('../web/diagnostics-client.js');
 (async()=>{
   let now=0,calls=[],fail=false;
   const fetcher=async(url,options={})=>{calls.push({url,options});if(fail)throw new Error('unreachable');return {ok:true,json:async()=>({token:'test-current-token'})};};
@@ -15,5 +15,11 @@ const {create}=require('../web/diagnostics-client.js');
   rows[0].display_label='Files changed';assert.equal(await client.observe(status,rows),true);
   fail=true;rows[0].display_label='Git data changed';assert.equal(await client.observe(status,rows),false);
   fail=false;assert.equal(await client.observe(status,rows),true);
+  const backend={...status,repos:[{health:{fresh:true},id:'known'}]};
+  const frozen=JSON.stringify(backend);
+  const offline=displayState(backend,'cache_expired');assert.equal(offline.repos[0].health.fresh,false);
+  assert.equal(JSON.stringify(backend),frozen);assert.equal(displayState(backend),backend);
+  assert.equal(await client.observe(backend,[{repo_id:'known',phase:'stale',display_label:'Status outdated',ready:false}],'cache_expired'),true);
+  assert.equal(JSON.parse(calls.at(-1).options.body).client_freshness,'cache_expired');
   console.log('Diagnostic delivery checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

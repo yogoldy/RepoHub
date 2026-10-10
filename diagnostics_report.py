@@ -36,10 +36,10 @@ def summarize(events):
                 backend.pop(next(iter(backend)))
         elif kind == 'ui_presented':
             surface = event.get('surface') + ('_native' if event.get('native') else '_browser')
-            presented = {key: event.get(key) for key in ('utc', 'run_id', 'archive_ref', 'reason', 'observation_id', 'phase', 'display_label', 'result', 'policy_version')}
+            presented = {key: event.get(key) for key in ('utc', 'run_id', 'archive_ref', 'reason', 'observation_id', 'phase', 'display_label', 'result', 'policy_version', 'client_freshness')}
             presented['backend'] = backend.get((event.get('session_id'), event.get('observation_id'), ref))
             presentations.setdefault(ref, {})[surface] = presented
-            peers = agreements.setdefault((event.get('session_id'), event.get('observation_id'), ref), {})
+            peers = agreements.setdefault((event.get('session_id'), event.get('observation_id'), ref, event.get('client_freshness','current')), {})
             peers[surface] = (event.get('phase'), event.get('display_label'), event.get('result'))
             if len(agreements) > 4096:
                 agreements.pop(next(iter(agreements)))
