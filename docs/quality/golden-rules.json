@@ -258,7 +258,8 @@
         "test_report_delivery.ReportDeliveryTests.test_foreign_or_malformed_receipt_never_becomes_sent",
         "test_report_delivery.ReportDeliveryTests.test_delivery_diagnostics_contain_only_codes_and_aliased_identity",
         "test_report_delivery.ReportDeliveryTests.test_sender_api_uses_existing_origin_and_token_boundary",
-        "test_report_labels.ReportLabelTests.test_issue_text_never_selects_other_labels_or_commands"
+        "test_report_labels.ReportLabelTests.test_issue_text_never_selects_other_labels_or_commands",
+        "test_report_delivery.ReportDeliveryTests.test_failed_durable_intent_flush_cannot_start_a_post"
       ],
       "remaining_gap": "GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. Native Keychain prompts and installed two-Mac connection setup need live acceptance. Owner categorization workflow activates only after merge to main."
     }

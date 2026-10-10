@@ -128,6 +128,9 @@ def private_write(path, value):
             json.dump(value, target, ensure_ascii=False)
             target.flush(); os.fsync(target.fileno())
         os.replace(tmp, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try: os.fsync(directory)
+        finally: os.close(directory)
     finally:
         tmp.unlink(missing_ok=True)
 

@@ -53,5 +53,10 @@ def preview_report(state_dir, log_dir, payload):
     issue = public_payload(result)
     result.update(github_title=issue['title'], issue_body=issue['body'], preview_digest=digest(issue))
     fd=os.open(case/'draft.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-    with os.fdopen(fd,'w') as target:json.dump(result,target,indent=2)
+    with os.fdopen(fd,'w') as target:
+        json.dump(result,target,indent=2)
+        target.flush(); os.fsync(target.fileno())
+    directory=os.open(case,os.O_RDONLY)
+    try:os.fsync(directory)
+    finally:os.close(directory)
     return result

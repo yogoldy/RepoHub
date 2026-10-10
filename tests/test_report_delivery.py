@@ -80,6 +80,18 @@ class ReportDeliveryTests(unittest.TestCase):
         self.client.error=None
         self.assertEqual(self.send()['state'],'sent');self.assertEqual(self.client.creates,1)
 
+    def test_failed_durable_intent_flush_cannot_start_a_post(self):
+        original=os.fsync
+        calls=[]
+        def fsync(fd):
+            calls.append(fd)
+            if len(calls)==2: raise OSError('synthetic directory flush failure')
+            return original(fd)
+        with patch('report_delivery.os.fsync',side_effect=fsync):
+            with self.assertRaises(OSError):self.send()
+        self.assertEqual(self.client.creates,0)
+        self.assertEqual(delivery_status(self.root/'state',self.payload['report_id'])['state'],'uncertain')
+
     def test_double_click_while_posting_is_serialized(self):
         entered=threading.Event();release=threading.Event();original=self.client.create
         def create(payload): entered.set();release.wait(3);return original(payload)
