@@ -252,7 +252,7 @@
         "report_delivery"
       ],
       "cause_and_solution": "Freeze and hash the exact public preview; require explicit Send/account confirmation; persist sending before POST under a process-safe lock; reconcile ambiguous outcomes against exact authored issue bytes without automatically reposting. Credentials remain in native Keychain/backend memory.",
-      "required_behavior": "Fixed product tracker and approved diagnostic text only. Durable exact-identity receipts, retained drafts, no background sending, no token/prose in operational logs or HTML credential handling.",
+      "required_behavior": "Fixed product tracker and approved diagnostic text only. Durable exact-identity receipts, retained drafts, no background sending, no token/prose in operational logs or HTML credential handling. Account verification is not proof of issue-write permission; denied submissions explain token/repository/Issues access and preserve the exact draft for explicit retry.",
       "test_ids": [
         "test_report_delivery.ReportDeliveryTests.test_exact_preview_receipt_and_repeat_send_never_duplicates",
         "test_report_delivery.ReportDeliveryTests.test_lost_post_response_recovers_existing_issue_without_second_post",
@@ -264,9 +264,10 @@
         "test_report_delivery.ReportDeliveryTests.test_delivery_diagnostics_contain_only_codes_and_aliased_identity",
         "test_report_delivery.ReportDeliveryTests.test_sender_api_uses_existing_origin_and_token_boundary",
         "test_report_labels.ReportLabelTests.test_issue_text_never_selects_other_labels_or_commands",
-        "test_report_delivery.ReportDeliveryTests.test_failed_durable_intent_flush_cannot_start_a_post"
+        "test_report_delivery.ReportDeliveryTests.test_failed_durable_intent_flush_cannot_start_a_post",
+        "test_report_delivery.ReportDeliveryTests.test_sign_in_success_does_not_grant_post_permission_and_retry_keeps_draft"
       ],
-      "remaining_gap": "GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. Native Keychain prompts and installed two-Mac connection setup need live acceptance. Owner categorization workflow activates only after merge to main."
+      "remaining_gap": "GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. MacBook Pro native token entry and public delivery were accepted on 2026-10-09 (issue #3). Air credential setup and public non-owner onboarding remain untested. HTTP 401/403 share one access-denied code; permission absence, expired credentials, rate limiting and account policy are not individually diagnosed."
     },
     {
       "id": "GR14",
