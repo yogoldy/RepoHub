@@ -19,7 +19,7 @@
   }
   const model={draft,source,picked};
   if(typeof module==='object'&&module.exports){module.exports=model;return;}
-  const $=id=>document.getElementById(id),dialog=$('workspace-dialog');
+  const $=id=>document.getElementById(id),dialog=$('settings-dialog');
   if(!dialog)return;
   let state=null,busy=false;
   const native=!!root.webkit?.messageHandlers?.repoHub;
@@ -63,13 +63,14 @@
     }
   }
   async function open(){
-    try{const current=await request('/api/workspaces');state=draft(current);$('settings-dialog')?.close();$('workspace-error').textContent='';$('workspace-feedback').textContent='';$('workspace-reload').hidden=true;if(!dialog.open)dialog.showModal();render();}
+    try{const current=await request('/api/workspaces');state=draft(current);$('settings-form').hidden=true;$('workspace-form').hidden=false;dialog.setAttribute('aria-labelledby','workspace-title');$('workspace-error').textContent='';$('workspace-feedback').textContent='';$('workspace-reload').hidden=true;if(!dialog.open)dialog.showModal();render();}
     catch(error){const target=$('settings-error')||$('notice');if(target)target.textContent=error.message;}
   }
-  function close(){if(busy)return;if(state)state.pending=null;dialog.close();}
+  function reset(){if(state)state.pending=null;$('workspace-form').hidden=true;$('settings-form').hidden=false;dialog.setAttribute('aria-labelledby','settings-title');}
+  function close(){if(busy)return;dialog.close();reset();}
   $('workspace-open').onclick=open;$('workspace-reload').onclick=open;
   $('workspace-close').onclick=close;$('workspace-cancel').onclick=close;
-  dialog.addEventListener('cancel',event=>{if(busy)event.preventDefault();else if(state)state.pending=null;});
+  dialog.addEventListener('cancel',event=>{if(busy)event.preventDefault();else reset();});
   for(const mode of ['home','manual'])$('workspace-'+mode+'-mode').onclick=()=>{state.mode=mode;state.review=null;$('workspace-error').textContent='';render();};
   $('workspace-back').onclick=()=>{state.review=null;$('workspace-error').textContent='';render();};
   $('workspace-pick').onclick=()=>{
@@ -86,7 +87,7 @@
     event.preventDefault();if(busy||!state||state.pending)return;busy=true;render();$('workspace-error').textContent='';
     try{
       if(!state.review){state.review=await request('/api/workspaces/preview',{source:source(state),revision:state.revision});$('workspace-feedback').textContent='Review the exact folders before saving.';}
-      else{await request('/api/workspaces',{source:source(state),revision:state.revision,review:state.review.review});dialog.close();state=null;const target=$('notice')||$('message');if(target)target.textContent='Monitored folders saved. Existing backups and schedules are preserved.';}
+      else{await request('/api/workspaces',{source:source(state),revision:state.revision,review:state.review.review});dialog.close();reset();state=null;const target=$('notice')||$('message');if(target)target.textContent='Monitored folders saved. Existing backups and schedules are preserved.';}
     }catch(error){$('workspace-error').textContent=error.name==='AbortError'?'The helper took too long to respond. Reopen setup to check the saved selection.':error.message;if(error.conflict){state.review=null;$('workspace-reload').hidden=false;}}
     finally{busy=false;render();}
   };
