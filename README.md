@@ -142,3 +142,5 @@ See [docs/CLOUD_RESTORE_HANDOFF.md](docs/CLOUD_RESTORE_HANDOFF.md) for the pinne
 ## Golden-rule release checks
 
 Run `python3 tools/release_gate.py --require-clean` on clean macOS source before promotion. [The release contract](docs/quality/RELEASE_GATE.md) explains the executable checks and remaining manual obligations; [the failure-mode register](docs/quality/FAILURE_MODES.md) connects diagnostic evidence, fixes, susceptible boundaries and exact regression tests. GitHub runs the automated gate for pushes and pull requests.
+
+GitHub bug/feature delivery, native credential setup and uncertain-send recovery are described in [the delivery contract](docs/REPORT_DELIVERY.md).

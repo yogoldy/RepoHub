@@ -4,7 +4,7 @@ import Foundation
     static func main() {
         let url = URL(string: "http://127.0.0.1:8767/menu.html")!
         var count = 0
-        for action in ["openBackups", "toggleNotifications", "quit"] {
+        for action in ["openBackups", "toggleNotifications", "connectGitHub", "quit"] {
             precondition(MenuBridge.action(body: ["action":action], frameURL: url, isMainFrame: true)?.rawValue == action)
             count += 1
         }
@@ -22,6 +22,7 @@ import Foundation
         precondition(MenuBridge.action(body: ["action":"quit"], frameURL: url, isMainFrame: false) == nil)
         precondition(MenuBridge.action(body: ["action":"quit"], frameURL: nil, isMainFrame: true) == nil)
         count += 2
+        precondition(MenuBridge.action(body:["action":"connectGitHub", "token":"forbidden"], frameURL:url, isMainFrame:true) == nil)
         let repoBody: [String: Any] = ["action":"openRepo", "repo_id":"Example-1234567890"]
         precondition(MenuBridge.action(body: repoBody, frameURL: url, isMainFrame: true) == .openRepo)
         count += 1

@@ -27,6 +27,7 @@ from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
 from report_preview import preview_report
+from report_delivery import send_report, connection_status, delivery_status, case_path, read_private
 
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
@@ -932,6 +933,28 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(self.hub.evidence.presentation(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
+            if path == "/api/reports/connection":
+                if payload: raise ValueError("Unknown connection field")
+                return self.send(connection_status())
+            if path == "/api/reports/send":
+                return self.send(send_report(self.hub.state_dir, payload, logger=self.hub.diagnostics))
+            if path == "/api/reports/draft":
+                if set(payload) != {"report_id"}: raise ValueError("Invalid draft request")
+                case = case_path(self.hub.state_dir, payload["report_id"])
+                return self.send({"draft":read_private(case / "draft.json"), "delivery":delivery_status(self.hub.state_dir, payload["report_id"])})
+            if path == "/api/reports/list":
+                if payload: raise ValueError("Unknown report field")
+                parent = self.hub.state_dir / "reports"
+                if parent.is_symlink(): raise ValueError("Unsafe report directory")
+                cases = sorted(parent.glob("*/draft.json"), key=lambda p:p.stat().st_mtime, reverse=True)[:25]
+                rows = []
+                for file in cases:
+                    try:
+                        case = case_path(self.hub.state_dir, file.parent.name)
+                        draft = read_private(case / "draft.json")
+                        rows.append({"report_id":draft["report_id"], "title":draft["title"], "type":draft["type"], **delivery_status(self.hub.state_dir, draft["report_id"])})
+                    except (OSError, ValueError, KeyError): continue
+                return self.send({"reports":rows})
             if path == "/api/reports/preview":
                 return self.send(preview_report(self.hub.state_dir, self.hub.diagnostics.directory, payload), 201)
             if path == "/api/backup":

@@ -252,3 +252,28 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 **Remaining exposure:** Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration.
 
+
+### GR13 — A report sends only its exact consented payload once
+
+**Susceptible boundary:** Timeouts, double-clicks, crashes, account switches or unsafe preview/destination changes can publish the wrong report or duplicate it.
+
+**Cause / solution:** Freeze and hash the exact public preview; require explicit Send/account confirmation; persist sending before POST under a process-safe lock; reconcile ambiguous outcomes against exact authored issue bytes without automatically reposting. Credentials remain in native Keychain/backend memory.
+
+**Required behavior:** Fixed product tracker and approved diagnostic text only. Durable exact-identity receipts, retained drafts, no background sending, no token/prose in operational logs or HTML credential handling.
+
+**Diagnostic trail:** `report_delivery`, with report-local aliases and approved state/reason codes only. No titles, prose, account names, issue URLs or credentials.
+
+**Regression tests:**
+
+- `test_report_delivery.ReportDeliveryTests.test_exact_preview_receipt_and_repeat_send_never_duplicates`
+- `test_report_delivery.ReportDeliveryTests.test_lost_post_response_recovers_existing_issue_without_second_post`
+- `test_report_delivery.ReportDeliveryTests.test_absent_issue_after_ambiguous_send_is_not_permission_to_repost`
+- `test_report_delivery.ReportDeliveryTests.test_process_interruption_leaves_durable_uncertain_identity`
+- `test_report_delivery.ReportDeliveryTests.test_double_click_while_posting_is_serialized`
+- `test_report_delivery.ReportDeliveryTests.test_client_cannot_change_destination_payload_or_consent`
+- `test_report_delivery.ReportDeliveryTests.test_foreign_or_malformed_receipt_never_becomes_sent`
+- `test_report_delivery.ReportDeliveryTests.test_delivery_diagnostics_contain_only_codes_and_aliased_identity`
+- `test_report_delivery.ReportDeliveryTests.test_sender_api_uses_existing_origin_and_token_boundary`
+- `test_report_labels.ReportLabelTests.test_issue_text_never_selects_other_labels_or_commands`
+
+**Remaining exposure:** GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. Native Keychain prompts and installed two-Mac connection setup need live acceptance. Owner categorization workflow activates only after merge to main.

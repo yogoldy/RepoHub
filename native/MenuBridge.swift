@@ -1,7 +1,7 @@
 import Foundation
 
 enum MenuAction: String {
-    case openBackups, openRepo, toggleNotifications, quit
+    case openBackups, openRepo, toggleNotifications, connectGitHub, quit
 }
 
 enum MenuBridge {
