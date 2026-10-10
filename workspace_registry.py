@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import threading
+import stat
 
 ID = re.compile(r'^[a-zA-Z0-9_-]{1,80}$')
 
@@ -112,7 +113,11 @@ class WorkspaceRegistry:
             raise ValueError('Repo home is unavailable or has changed location')
         by_path = {row['path']: row for row in value['workspaces']}
         ids = {row['id'] for row in value['workspaces']}
-        for path in sorted(home.iterdir(), key=lambda p: str(p).lower()):
+        try:
+            children = sorted(home.iterdir(), key=lambda p: str(p).lower())
+        except OSError:
+            return value
+        for path in children:
             if path.name.startswith('.') or path.is_symlink() or not path.is_dir():
                 continue
             self.safe_source(path)
@@ -215,5 +220,6 @@ class WorkspaceRegistry:
 
 def require_source(path, canonical_only=False):
     path = Path(path)
-    if path.is_symlink() or (canonical_only and path.resolve() != path) or not path.is_dir():
-        raise FileNotFoundError('Workspace folder is unavailable or its location changed')
+    info = path.stat()  # Preserve errno; is_dir() can hide access failures.
+    if path.is_symlink() or (canonical_only and path.resolve() != path) or not stat.S_ISDIR(info.st_mode):
+        raise FileNotFoundError(2, 'Workspace folder is unavailable or its location changed')

@@ -335,6 +335,27 @@
         "test_workspace_registry.WorkspaceTests.test_unmonitored_home_inventory_drift_rejects_review_without_registry_change"
       ],
       "remaining_gap": "Native picker pixels, focus/cancel/multiple selection and installed menu flow require live acceptance. Separate volume and permissions remain additional acceptance cases. Native bridge and workspace-setup JavaScript checks run in the gate."
+    },
+    {
+      "id": "GR17",
+      "title": "Access failure cannot publish an incomplete backup",
+      "breakpoint": "Denied source reads and destination writes can be confused with empty or changed content.",
+      "diagnostic_events": [
+        "repo_backup_failed",
+        "scan_finished",
+        "verification_deferred"
+      ],
+      "cause_and_solution": "Retain errno and classify access/unavailable/I/O outcomes without claiming a specific macOS privacy decision. Continue independent repos and recover after access returns.",
+      "required_behavior": "No partial archive or replacement of the previous verified backup; access failures remain visible and recoverable.",
+      "test_ids": [
+        "test_access_failures.AccessTests.test_errno_classification_is_not_a_privacy_claim",
+        "test_access_failures.AccessTests.test_unreadable_nested_file_preserves_archive_and_other_repo_recovers",
+        "test_access_failures.AccessTests.test_unreadable_root_scan_keeps_identity_and_previous_archive",
+        "test_access_failures.AccessTests.test_unwritable_destination_preserves_previous_archive",
+        "test_access_failures.AccessTests.test_revocation_during_archive_creation_never_publishes_partial_copy",
+        "test_access_failures.AccessTests.test_missing_destination_is_not_empty_success"
+      ],
+      "remaining_gap": "Actual macOS privacy refusal/revocation and installed readiness UI require isolated native acceptance; POSIX tests do not establish TCC behavior."
     }
   ]
 }

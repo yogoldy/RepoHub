@@ -26,6 +26,7 @@ from diagnostics import DiagnosticLog, diagnostic_ref
 from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
+from access_checks import access_failure
 from workspace_registry import WorkspaceRegistry, workspace_id, require_source, overlaps
 from report_preview import preview_report
 from report_delivery import send_report, connection_status, delivery_status, case_path, read_private
@@ -474,6 +475,9 @@ class Hub:
                                 "signature": fingerprint(entries), "edit_signature": fingerprint(edit_entries(entries))})
                 except Exception as e:
                     row["error"] = str(e)
+                    if isinstance(e, OSError):
+                        row["access"] = access_failure(e, "source_read")
+                        row["error"] = row["access"]["detail"]
                 with self.lock:
                     row["last_backup"] = self.index.get(key)
                     cached = self.verifications.get(key, {})
@@ -504,6 +508,9 @@ class Hub:
                         valid = True
                     except Exception as e:
                         cached = {"state": "error", "checked_at": utc_now(), "error": str(e)}
+                        if isinstance(e, OSError):
+                            cached["access"] = access_failure(e, "verification_read")
+                            cached["error"] = cached["access"]["detail"]
                         valid = True
                 row["verification"] = cached if valid else {"state": "checking"}
                 if row["verification"]["state"] == "matched":
@@ -760,7 +767,7 @@ class Hub:
                 self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "current_repo_id": None, "reason": reason, "run_id": run_id}
                 self.persist_status()
             if not self.backups.parent.is_dir():
-                raise RuntimeError("iCloud Repository Backups folder is unavailable")
+                raise FileNotFoundError(2, "Backup destination unavailable")
             backup_sources = {key: root for key, root in repositories.items() if keys is None or key in keys}
             backup_sources["repohub-data"] = self.data_dir
             for key, root in backup_sources.items():
@@ -856,8 +863,12 @@ class Hub:
                     outcome = "failed"
                     self.lifecycle.emit("repo_backup_failed", key=key, run_id=run_id, stage=stage, archive_ref=diagnostic_ref(current_archive),
                                         severity="error", result="failed", error_type=type(e).__name__,
-                                        duration_ms=(time.monotonic()-repo_started)*1000)
-                    failures.append({"repo": root.name, "repo_id": key, "error": str(e)})
+                                        error_code=getattr(e, "errno", None), duration_ms=(time.monotonic()-repo_started)*1000)
+                    failure = {"repo": root.name, "repo_id": key, "error": str(e)}
+                    if isinstance(e, OSError):
+                        failure["access"] = access_failure(e, "destination_write" if stage in {"archive_transfer", "destination_verification", "index_publication", "publication_recovery"} else "verification_read" if stage == "existing_verification" else "source_read")
+                        failure["error"] = failure["access"]["detail"]
+                    failures.append(failure)
             with self.lock:
                 self.status["backup"] = {"running": False, "finished_at": utc_now(), "run_id": run_id, "errors": failures,
                                          "note": "Archives verified locally. macOS manages iCloud upload."}

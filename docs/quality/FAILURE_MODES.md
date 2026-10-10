@@ -330,3 +330,7 @@ Native acceptance also found an inaccessible second top-level modal: visually re
 ## Client startup freshness — GR06
 
 The menu changed cached backend health when local requests failed or a 20-second timer expired. It then reported stale icons against a fresh original observation. Both HTML surfaces now retain the original snapshot and render a separate client freshness projection. Typed request-failed, timeout and cache-expired contexts explain conservative stale displays; false green still raises disagreement. Native startup/timeout/recovery acceptance remains pending the reliability run.
+
+## Access denial and unavailable storage — GR17
+
+Actual mode-bit restrictions exercise denied root and nested-file reads, denied archive writes and revocation between archive creation and validation. Existing verified bytes/index remain unchanged; accessible independent repos continue and restore of access recovers. Typed errno-based outcomes do not diagnose TCC. Real privacy prompting remains native acceptance work.
