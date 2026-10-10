@@ -8,6 +8,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var popoverWebView: WKWebView!
     var lastNotificationData: Data?
     var notificationInFlight = false
+    var permissionRequestInFlight = false
     var unavailableSince: Date?
     var notificationsEnabled: Bool { UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true }
     var polling: Timer?
@@ -78,9 +79,16 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func requestNotifications() {
+        guard !permissionRequestInFlight else { return }
+        permissionRequestInFlight = true
+        UserDefaults.standard.set("pending", forKey: "notificationRequest")
+        updateNotificationStatus()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
-            if let error = error { print("Notification authorization:", error.localizedDescription) }
-            DispatchQueue.main.async { self.updateNotificationStatus() }
+            DispatchQueue.main.async {
+                self.permissionRequestInFlight = false
+                UserDefaults.standard.set(error == nil ? "completed" : "failed", forKey: "notificationRequest")
+                self.updateNotificationStatus()
+            }
         }
     }
 
@@ -94,7 +102,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 case .notDetermined: permission = "waiting"
                 default: permission = "unknown"
                 }
-                let status: [String: Any] = ["enabled": self.notificationsEnabled, "permission": permission]
+                let request = UserDefaults.standard.string(forKey: "notificationRequest") ?? "not_requested"
+                let status: [String: Any] = ["enabled": self.notificationsEnabled, "permission": permission,
+                    "request": ["pending", "completed", "failed"].contains(request) ? request : "not_requested"]
                 let path = FileManager.default.homeDirectoryForCurrentUser
                     .appendingPathComponent("Library/Application Support/RepoHub/notifications.json")
                 if let data = try? JSONSerialization.data(withJSONObject: status, options: [.sortedKeys]), data != self.lastNotificationData {

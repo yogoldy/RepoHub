@@ -2,7 +2,13 @@
 (function(root){
   const labels={accessible:'Access checked',blocked:'Access blocked',unavailable:'Folder unavailable',changed:'Folder changed · review selection',error:'Access check failed',unchecked:'Not checked'};
   function label(value){return labels[value?.state]||labels.unchecked;}
-  if(typeof module==='object'&&module.exports){module.exports={label};return;}
+  function notificationLabel(value){
+    if(value.permission==='allowed')return 'allowed';
+    if(value.permission==='denied')return 'denied; enable Repo Hub in macOS Notification settings';
+    if(value.permission!=='waiting')return 'not checked';
+    return {pending:'waiting for macOS permission',failed:'permission request failed; try again or open Notification settings',completed:'macOS has not confirmed permission; open Notification settings',not_requested:'not requested'}[value.request||'not_requested']||'not checked';
+  }
+  if(typeof module==='object'&&module.exports){module.exports={label,notificationLabel};return;}
   const $=id=>document.getElementById(id),dialog=$('settings-dialog');if(!dialog)return;
   let busy=false;
   async function request(path,payload){
@@ -20,10 +26,11 @@
       $('readiness-destination').textContent='Backup destination · '+label(value.destination)+(value.destination.detail?' · '+value.destination.detail:'');
       $('readiness-background').textContent='Backup helper · running. Login operation · '+({registered:'registered',not_registered:'not confirmed for this installation',unknown:'not checked'}[value.background.login]||'not checked')+'.';
       const permission=value.notifications.permission;
-      $('readiness-notifications').textContent='Notifications · '+({allowed:'allowed',denied:'denied; enable Repo Hub in macOS Notification settings',waiting:'not requested',unknown:'not checked'}[permission]||'not checked')+(value.notifications.enabled===false?' · turned off in Repo Hub':'')+'. Backups work without notifications.';
+      $('readiness-notifications').textContent='Notifications · '+notificationLabel(value.notifications)+(value.notifications.enabled===false?' · turned off in Repo Hub':'')+'. Backups work without notifications.';
       const isNative=!!root.webkit?.messageHandlers?.repoHub;
       $('readiness-enable').hidden=(permission==='allowed'&&value.notifications.enabled!==false)||permission==='denied';
       for(const id of ['readiness-enable','readiness-notification-settings','readiness-privacy','readiness-login'])$(id).disabled=!isNative;
+      $('readiness-enable').disabled=!isNative||value.notifications.request==='pending';
     }catch(error){$('readiness-error').textContent=error.message;}finally{busy=false;}
   }
   $('readiness-check').onclick=async()=>{try{$('readiness-error').textContent='';$('readiness-check').disabled=true;await request('/api/readiness/check',{});await refresh();}catch(error){$('readiness-error').textContent=error.message;$('readiness-check').disabled=false;}};

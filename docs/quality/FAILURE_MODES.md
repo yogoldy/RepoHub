@@ -357,3 +357,13 @@ review despite referring to the same directory. Native picker results now use
 POSIX realpath, matching helper canonicalization. Finder resolution uses the same
 comparison for approved registry paths. Native bridge checks cover both aliases
 and a directory symlink; the real multi-selection repeat remains required.
+
+### Notification request is separate from permission
+
+The isolated native readiness screen remained `notDetermined` after an explicit
+request. No grant/refusal prompt was successfully observed, so this is not evidence
+of a macOS permission decision. Calling a request must not continue to display
+“not requested”: the native app now records pending/completed/failed request states
+without exception prose and suppresses duplicate requests while one is pending.
+Only the OS authorization state can say allowed or denied. Readiness JavaScript
+regressions cover those combinations; native grant/refusal acceptance stays open.
