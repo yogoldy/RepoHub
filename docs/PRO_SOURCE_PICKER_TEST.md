@@ -35,6 +35,12 @@ One deployment probe initially looked for a JavaScript-generated label in static
 
 Computer use then opened the **installed daily app**, inspected preserved hourly battery/four-hour adapter defaults, opened source setup, reviewed all 13 exact existing paths, and cancelled. No production selection was saved. The helper's private diagnostics recorded the 13-repo review; sources and schedules remained unchanged. Credentials were neither read nor changed; this was not a new Keychain/report-delivery acceptance test.
 
+## Installed startup diagnostic gap
+
+The isolated picker runs had zero presentation disagreements. The installed daily run did not: shortly after helper restart, one cached observation produced 13 native-menu `presentation_input_disagreement` events, all with the client-rendered `stale` phase. Its original backend snapshot recorded fresh inputs; the menu later changes its cached health to `fresh: false` when a request fails or its 20-second freshness timer expires, then reports those rendered rows against the unchanged observation ID. This is a client freshness override being compared with an older backend observation. The retained events establish the mismatch; they do not distinguish the request-failure path from the timer path or establish its underlying cause.
+
+Subsequent fresh status reports agreed with backend inputs. The source review completed with 13 repos and no production configuration save. Installed asset hashes still match the gated application commit. A follow-up should separately record the client transport/freshness reason so a conservative outdated warning is not confused with an incorrect icon for fresh backend evidence. This gap is documented, not fixed in the folder-selection feature; zero disagreement is claimed only for the isolated picker acceptance runs.
+
 ## Remaining acceptance and scope
 
 Native selection was exercised across separate picker sessions; one-panel simultaneous multi-selection and external-volume/permission failure remain live coverage gaps. Empty/manual removal, path deduplication, overlap rejection, stale revision, candidate drift and backup/JSON/schedule preservation have automated coverage. This pass does not test a new iCloud delivery, second-device restore, sleep/power transitions or long progress percentages. Destination selection/status, guided onboarding, readable archive names and AI-assisted import remain later roadmap items. The main protection/PR process remains in force.
