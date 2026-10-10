@@ -26,17 +26,25 @@ enum MenuBridge {
     }
 
     static func repositoryURL(id: String, status: [String: Any]) -> URL? {
-        guard let rootPath = status["repos_root"] as? String, rootPath.hasPrefix("/"),
-              let repos = status["repos"] as? [[String: Any]],
+        guard let repos = status["repos"] as? [[String: Any]],
               let repo = repos.first(where: { $0["id"] as? String == id }),
               let path = repo["path"] as? String, path.hasPrefix("/"),
               let name = repo["name"] as? String, !name.isEmpty,
               name != ".", name != "..", !name.contains("/") else { return nil }
-        let root = URL(fileURLWithPath: rootPath).standardizedFileURL
         let item = URL(fileURLWithPath: path).standardizedFileURL
-        guard item == root.appendingPathComponent(name).standardizedFileURL,
-              item.resolvingSymlinksInPath().deletingLastPathComponent() == root.resolvingSymlinksInPath(),
-              let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+        if let sources = status["workspace_sources"] as? [[String: Any]] {
+            // Registry-backed status resolves exact approved IDs; arbitrary
+            // paths from web messages are still never accepted.
+            guard sources.filter({ $0["id"] as? String == id && $0["path"] as? String == path }).count == 1,
+                  item.resolvingSymlinksInPath() == item else { return nil }
+        } else {
+            // Compatibility with the installed single-root helper.
+            guard let rootPath = status["repos_root"] as? String, rootPath.hasPrefix("/") else { return nil }
+            let root = URL(fileURLWithPath: rootPath).standardizedFileURL
+            guard item == root.appendingPathComponent(name).standardizedFileURL,
+                  item.resolvingSymlinksInPath().deletingLastPathComponent() == root.resolvingSymlinksInPath() else { return nil }
+        }
+        guard let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
               values.isDirectory == true, values.isSymbolicLink != true else { return nil }
         return item
     }

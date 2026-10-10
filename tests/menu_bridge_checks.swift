@@ -65,6 +65,17 @@ import Foundation
         }
         precondition(MenuBridge.repositoryURL(id:"missing",status:status("Example",repo.path)) == nil)
         count += 1
+        let manualPath = outside.resolvingSymlinksInPath().path
+        var manual: [String: Any] = ["source_mode":"manual", "repos":[["id":"Outside-id", "name":"Outside", "path":manualPath]],
+                                    "workspace_sources":[["id":"Outside-id", "path":manualPath]]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual)?.path == manualPath)
+        manual["workspace_sources"] = [["id":"Other-id", "path":manualPath]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        manual["workspace_sources"] = [["id":"Outside-id", "path":repo.path]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        manual["workspace_sources"] = [["id":"Outside-id", "path":manualPath], ["id":"Outside-id", "path":manualPath]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        count += 4
         print("\(count) menu bridge checks passed")
     }
 }

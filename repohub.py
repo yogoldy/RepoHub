@@ -26,6 +26,7 @@ from diagnostics import DiagnosticLog, diagnostic_ref
 from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
+from workspace_registry import WorkspaceRegistry, workspace_id, require_source, overlaps
 from report_preview import preview_report
 from report_delivery import send_report, connection_status, delivery_status, case_path, read_private
 
@@ -71,13 +72,9 @@ def atomic_json_if_changed(path, value):
     return True
 
 
-def workspace_id(name):
-    slug = re.sub(r"[^a-zA-Z0-9_-]", "-", name).strip("-")[:45] or "repo"
-    return slug + "-" + hashlib.sha256(name.encode()).hexdigest()[:10]
-
-
 def tree_entries(root):
     root = Path(root)
+    require_source(root)
     found = []
     for current, dirs, files in os.walk(root, followlinks=False, onerror=lambda e: (_ for _ in ()).throw(e)):
         for name in dirs + files:
@@ -338,10 +335,12 @@ class Hub:
         self.retention = config.get("retention", "all")
         if self.retention not in {"all", "latest"}:
             raise ValueError("Unknown backup retention policy")
-        self.root = Path(config["repos_root"]).resolve()
+        self.root = Path(config["repos_root"]).resolve() if config.get("repos_root") else None
         self.backups = Path(config["backup_root"]).resolve()
         self.state_dir = Path(config["state_dir"]).resolve()
-        if self.root == self.backups or self.root in self.backups.parents or self.root in self.state_dir.parents:
+        # Once migrated, the registry is authoritative; the legacy repo-home
+        # setting must not block an unrelated saved manual selection.
+        if not (self.state_dir / "data/workspace-registry.json").exists() and self.root is not None and (overlaps(self.root, self.backups) or overlaps(self.root, self.state_dir)):
             raise ValueError("Backups and app state must be outside the source repos")
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.diagnostics = DiagnosticLog(self.state_dir / "diagnostics")
@@ -357,6 +356,8 @@ class Hub:
         self.index = load_json(self.state_dir / "backups.json", {})
         self.data_dir = self.state_dir / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.registry = WorkspaceRegistry(self.data_dir / "workspace-registry.json", self.root,
+                                          (self.backups, self.state_dir), atomic_json, config.get("sources"))
         self.settings_path = self.data_dir / "settings.json"
         self.settings = validate_settings(load_json(self.settings_path, default_settings()))
         if not self.settings_path.exists():
@@ -379,12 +380,33 @@ class Hub:
         if previous_backup.get("running"):
             self.lifecycle.emit("backup_interrupted", run_id=self.previous_backup_run, reason="helper_restarted", result="unobserved_completion")
         self.status = {"scanned_at": None, "repos": [], "backup": {"running": False},
-                       "repos_root": str(self.root), "backup_root": str(self.backups)}
+                       "repos_root": str(self.root) if self.root else None, "backup_root": str(self.backups)}
         self.scan(deep=False)
 
     def repositories(self):
-        return {workspace_id(p.name): p for p in sorted(self.root.iterdir(), key=lambda p: p.name.lower())
-                if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")}
+        return self.registry.refresh()
+
+    def workspace_status(self):
+        return self.registry.status()
+
+    def save_workspaces(self, payload):
+        if set(payload) != {"source", "revision"}:
+            raise ValueError("Invalid workspace configuration request")
+        if not self.backup_lock.acquire(blocking=False):
+            raise FileExistsError("A backup is running. Try after it finishes.")
+        try:
+            if not self.scan_lock.acquire(blocking=False):
+                raise FileExistsError("A scan is running. Try after it finishes.")
+            try:
+                result = self.registry.save(payload["source"], payload["revision"])
+                self.diagnostics.emit("workspace_configuration", result="saved", mode=result["configuration"]["source"]["mode"],
+                                      repo_count=sum(r["active"] for r in result["configuration"]["workspaces"]))
+            finally:
+                self.scan_lock.release()
+        finally:
+            self.backup_lock.release()
+        self.scan(deep=False)
+        return result
 
     def retry_check(self, repo_id):
         if not isinstance(repo_id, str) or repo_id not in self.repositories():
@@ -416,6 +438,7 @@ class Hub:
                 verification_performed = False
                 row = {"id": key, "name": root.name, "path": str(root)}
                 try:
+                    require_source(root, canonical_only=True)
                     entries = tree_entries(root)
                     actual = [e for e in entries if stat.S_ISREG(e[1])
                               and ".git" not in Path(e[0]).parts
@@ -475,7 +498,10 @@ class Hub:
                 rows.append(row)
             with self.lock:
                 self.scheduler.observe(rows, time.monotonic())
-                self.status.update({"scan_id": scan_id, "repos": rows})
+                self.status.update({"scan_id": scan_id, "repos": rows,
+                                    "source_mode": self.registry.value["source"]["mode"],
+                                    "repos_root": self.registry.value["source"].get("home"),
+                                    "workspace_sources": [{"id": row["id"], "path": row["path"]} for row in rows]})
                 if repo_id is None:
                     self.status["scanned_at"] = utc_now()
                 self.status["verifying"] = None
@@ -689,14 +715,20 @@ class Hub:
         if expected_power is not None and power_source() != expected_power:
             self.lifecycle.emit("backup_deferred", run_id=run_id, reason="power_changed", result="not_started")
             return False
-        repositories = self.repositories()
-        if keys is not None:
-            if not isinstance(keys, (list, tuple, set)) or any(not isinstance(key, str) or key not in repositories for key in keys):
-                raise ValueError("Backup selection must contain current workspace IDs")
-            if not keys:
-                return False
         if not self.backup_lock.acquire(blocking=False):
             self.lifecycle.emit("backup_deferred", run_id=run_id, reason="backup_busy", result="not_started")
+            return False
+        # Select sources under the same lock as configuration saves. Otherwise
+        # a removed source could be archived after the new selection was saved.
+        try:
+            repositories = self.repositories()
+            if keys is not None and (not isinstance(keys, (list, tuple, set)) or any(not isinstance(key, str) or key not in repositories for key in keys)):
+                raise ValueError("Backup selection must contain current workspace IDs")
+        except BaseException:
+            self.backup_lock.release()
+            raise
+        if keys is not None and not keys:
+            self.backup_lock.release()
             return False
         failures = []
         outcome = "complete"
@@ -730,6 +762,7 @@ class Hub:
                     stage = value
                     self.lifecycle.emit("archive_stage", key=key, run_id=run_id, stage=value)
                 try:
+                    require_source(root, canonical_only=True)
                     entries = tree_entries(root)
                     signature = fingerprint(entries)
                     with self.lock:
@@ -882,6 +915,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path.startswith("/api/repo-settings/"):
                 return self.send(self.hub.repo_settings_status(path.removeprefix("/api/repo-settings/")))
+            if path == "/api/workspaces":
+                return self.send(self.hub.workspace_status())
             if path == "/api/settings":
                 return self.send(self.hub.settings_status())
             if path == "/api/status":
@@ -964,6 +999,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/diagnostics/presentation":
                 try:
                     return self.send(self.hub.evidence.presentation(payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
+            if path == "/api/workspaces":
+                try:
+                    return self.send(self.hub.save_workspaces(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
             if path == "/api/reports/connection":
