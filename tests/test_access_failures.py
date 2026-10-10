@@ -67,6 +67,21 @@ class AccessTests(unittest.TestCase):
             with self.assertRaises((PermissionError,RuntimeError)):snapshot(self.a,directory,self.base/'stage',after_archive=after)
             self.kept();self.assertEqual(list(directory.glob('*.tar.gz')),[Path(self.before['archive'])])
         finally:path.chmod(self.modes[path])
+    def test_destination_revocation_during_snapshot_keeps_verified_copy(self):
+        from repohub import snapshot
+        directory = Path(self.before['archive']).parent
+        original_mode = stat.S_IMODE(directory.stat().st_mode)
+        (self.a/'file').write_text('meaningful replacement')
+        def revoke():directory.chmod(0o555)
+        try:
+            with self.assertRaises(PermissionError):
+                snapshot(self.a, directory, self.base/'stage', after_archive=revoke)
+            self.kept()
+            self.assertEqual(list(directory.glob('*.tar.gz')), [Path(self.before['archive'])])
+        finally:directory.chmod(original_mode)
+        self.hub.backup(keys=[self.ids[self.a]])
+        self.assertNotEqual(self.hub.index[self.ids[self.a]]['archive'], self.before['archive'])
+
     def test_missing_destination_is_not_empty_success(self):
         missing=self.base/'missing';self.hub.backups=missing/'Snapshots'
         self.hub.backup(keys=[self.ids[self.a]]);self.kept()

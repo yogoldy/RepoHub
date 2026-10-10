@@ -353,7 +353,8 @@
         "test_access_failures.AccessTests.test_unreadable_root_scan_keeps_identity_and_previous_archive",
         "test_access_failures.AccessTests.test_unwritable_destination_preserves_previous_archive",
         "test_access_failures.AccessTests.test_revocation_during_archive_creation_never_publishes_partial_copy",
-        "test_access_failures.AccessTests.test_missing_destination_is_not_empty_success"
+        "test_access_failures.AccessTests.test_missing_destination_is_not_empty_success",
+        "test_access_failures.AccessTests.test_destination_revocation_during_snapshot_keeps_verified_copy"
       ],
       "remaining_gap": "Actual macOS privacy refusal/revocation and installed readiness UI require isolated native acceptance; POSIX tests do not establish TCC behavior."
     },
@@ -384,7 +385,7 @@
         "access_readiness",
         "repo_backup_failed"
       ],
-      "cause_and_solution": "Contextual native notification requests and guarded helper-owned access probes expose unchecked/blocked/unavailable/changed states separately from backup/upload success.",
+      "cause_and_solution": "Contextual native notification requests and guarded helper-owned access probes expose unchecked/blocked/unavailable/changed states separately from backup/upload success. Track request progress separately from OS authorization and make an interrupted request retryable after restart; native readiness and JavaScript request-state regressions run in the gate.",
       "required_behavior": "No blanket privilege demand; notification refusal does not prevent backup. Login registration must match this installation.",
       "test_ids": [
         "test_readiness.ReadinessTests.test_helper_probe_detects_and_recovers_denial_without_changing_backup",
