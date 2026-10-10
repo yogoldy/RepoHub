@@ -73,6 +73,25 @@ class ReportDeliveryTests(unittest.TestCase):
         self.client.login=self.payload['account'];self.assertEqual(self.send()['state'],'sent')
         self.assertEqual(self.client.creates,2)
 
+    def test_sign_in_success_does_not_grant_post_permission_and_retry_keeps_draft(self):
+        self.assertTrue(connection_status(self.client)['ready'])
+        original = (self.case/'draft.json').read_bytes()
+        self.client.error = DeliveryError('github_access_denied')
+        result = self.send()
+        self.assertEqual(result['state'], 'failed')
+        self.assertEqual(result['error_code'], 'github_access_denied')
+        self.assertNotIn('issue_url', result)
+        self.assertEqual((self.case/'draft.json').read_bytes(), original)
+        bundle = export_bundle(self.logs.directory, self.root/'denied-export')
+        events = (bundle/'share/events.jsonl').read_text()
+        self.assertIn('github_access_denied', events)
+        self.assertNotIn(self.client.login, events)
+        self.client.error = None
+        self.assertEqual(self.send()['state'], 'sent')
+        self.assertEqual(self.send()['state'], 'sent')
+        self.assertEqual(self.client.creates, 2)
+        self.assertEqual((self.case/'draft.json').read_bytes(), original)
+
     def test_process_interruption_leaves_durable_uncertain_identity(self):
         self.client.error=KeyboardInterrupt()
         with self.assertRaises(KeyboardInterrupt): self.send()

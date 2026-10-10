@@ -15,14 +15,14 @@ async function surface(file){
   }
   const nodes=new Map(ids.map(id=>[id,new Element()]));
   const get=id=>{assert(nodes.has(id),`${file}: controller requests absent ${id}`);return nodes.get(id);};
-  const calls=[];let accepted=false;
+  const calls=[];let accepted=false,deny=true;
   async function api(url,payload){
     calls.push({url,payload});
     if(url==='/api/session')return {token:'synthetic-session'};
     if(url==='/api/reports/list')return {reports:[]};
     if(url==='/api/reports/connection')return {ready:true,account:'synthetic-account'};
     if(url==='/api/reports/preview')return {type:payload.type,title:payload.title,github_title:payload.title,issue_body:payload.description,report_id:'a'.repeat(24),preview_digest:'b'.repeat(64),labels:[payload.type],files:[],form:{...payload}};
-    if(url==='/api/reports/send'){accepted=true;return {state:'sent',issue_url:'https://github.com/yogoldy/RepoHub/issues/1'};}
+    if(url==='/api/reports/send'){if(deny)return {state:'failed',error_code:'github_access_denied'};accepted=true;return {state:'sent',issue_url:'https://github.com/yogoldy/RepoHub/issues/1'};}
     throw new Error('unexpected '+url);
   }
   const nativeCalls=[];const context={window:{webkit:{messageHandlers:{repoHub:{}}}},nativeAction:action=>nativeCalls.push(action),document:{getElementById:get,querySelectorAll:()=>[...nodes.values()],createElement:()=>new Element()},api,bytes:String,sessionToken:''};
@@ -41,8 +41,12 @@ async function surface(file){
   await get('report-form').onsubmit({preventDefault(){}});
   assert(!get('report-preview').hidden);assert(!get('report-send').disabled);assert(!accepted,'preview never sends');
   const preview=calls.filter(x=>x.url==='/api/reports/preview').at(-1).payload;assert.equal(preview.type,'feature');assert.equal(preview.include_diagnostics,false);
-  await get('report-send').onclick();assert(accepted);assert.equal(get('report-delivery-status').textContent,'Sent · Confirmed by GitHub');assert(get('report-send').disabled);
-  const send=calls.find(x=>x.url==='/api/reports/send').payload;assert.equal(send.confirm,true);assert.equal(send.preview_digest,'b'.repeat(64));assert.equal(send.account,'synthetic-account');
-  await get('report-send').onclick();assert.equal(calls.filter(x=>x.url==='/api/reports/send').length,1,'no repeated sent issue');
+  assert.match(get('report-connection-status').textContent,/Permission to post is checked when sending/);
+  await get('report-send').onclick();assert(!accepted);assert.match(get('report-error').textContent,/Signing in does not confirm permission to post/);assert.match(get('report-error').textContent,/yogoldy\/RepoHub/);assert.match(get('report-error').textContent,/Issues: read and write/);assert.match(get('report-error').textContent,/Your draft is kept/);assert.equal(get('report-send').textContent,'Retry send');assert(!get('report-send').disabled);
+  await get('report-connect').onclick();assert.equal(calls.filter(x=>x.url==='/api/reports/send').length,1,'checking connection does not retry denied report');
+  deny=false;await get('report-send').onclick();assert(accepted);assert.equal(get('report-delivery-status').textContent,'Sent · Confirmed by GitHub');assert(get('report-send').disabled);
+  const sends=calls.filter(x=>x.url==='/api/reports/send');assert.deepEqual(sends[0].payload,sends[1].payload,'retry retains the exact saved preview identity');
+  const send=sends[0].payload;assert.equal(send.confirm,true);assert.equal(send.preview_digest,'b'.repeat(64));assert.equal(send.account,'synthetic-account');
+  await get('report-send').onclick();assert.equal(calls.filter(x=>x.url==='/api/reports/send').length,2,'no repeated sent issue');
 }
 (async()=>{await surface('index.html');await surface('menu.html');console.log('Main and menu report entry/preview/explicit-send checks passed');})().catch(e=>{console.error(e);process.exitCode=1;});

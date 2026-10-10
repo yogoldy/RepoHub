@@ -296,3 +296,11 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 - `test_report_entry.ReportEntryTests.test_both_surfaces_support_report_compose_preview_and_explicit_send`
 
 **Remaining exposure:** The automated DOM/API harness does not prove native WebKit layout, modal focus, token onboarding or live GitHub behavior. Verify the installed menu with computer use.
+
+## Reporting access incident — 2026-10-09
+
+The MacBook Pro authenticated the saved token as the tracker owner, while a submission receipt recorded `failed / github_access_denied`. GitHub token settings showed no selected repositories or repository permissions. The generic UI error did not explain that sign-in and permission to create an issue are separate checks. The user later confirmed successful delivery to [issue #3](https://github.com/yogoldy/RepoHub/issues/3), corroborated by the local `sent` receipt and GitHub issue lookup. The intervening permission save was not directly observed; do not claim a captured end-to-end permission-change trace.
+
+The UI now identifies access denial and directs the owner to check token validity, selected RepoHub access and Issues read/write; it does not claim that a 401/403 proves missing permissions. Draft bytes and preview identity survive rejection and explicit retry. Operational diagnostics export only the existing enumerated denial code and aliased report identity. No credential or provider error prose is exported.
+
+GR13 additionally requires `test_report_delivery.ReportDeliveryTests.test_sign_in_success_does_not_grant_post_permission_and_retry_keeps_draft`. GR14's existing both-surface controller regression now exercises a successful account check followed by denied submission, actionable feedback, a connection check that does not resend, and explicit retry of the same preview. Native rendering of this new wording and Air onboarding remain pending; automated controller tests do not replace those checks.

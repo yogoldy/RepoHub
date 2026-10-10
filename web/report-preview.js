@@ -15,7 +15,7 @@
     el('report-back').disabled=busy||uncertain||state==='sent';
     const link=el('report-issue-link');link.hidden=state!=='sent';
     if(state==='sent')link.href=delivery.issue_url;
-    el('report-connection-status').textContent=connection?.ready?'Posting as '+connection.account+' · Public issue':connection?'GitHub is not connected or could not be reached. Set up the connection from the menu bar, then check again.':'Check your GitHub connection before sending.';
+    el('report-connection-status').textContent=connection?.ready?'Signed in as '+connection.account+' · Permission to post is checked when sending':connection?'GitHub is not connected or could not be reached. Set up the connection from the menu bar, then check again.':'Check your GitHub connection before sending.';
   }
   async function refreshConnection(){connection=await api('/api/reports/connection',{});updateDelivery();}
   async function savedReports(){
@@ -74,7 +74,7 @@
     try{
       sessionToken=(await api('/api/session')).token;
       delivery=await api('/api/reports/send',{report_id:preview.report_id,preview_digest:preview.preview_digest,account:connection.account,confirm:true});
-      if(delivery.state==='failed')el('report-error').textContent='GitHub did not accept the report. Check your connection and permissions, then retry. Your draft is kept.';
+      if(delivery.state==='failed')el('report-error').textContent=delivery.error_code==='github_access_denied'?'GitHub denied access to submit this report. Signing in does not confirm permission to post. Check that your token is valid, selects yogoldy/RepoHub, and has Issues: read and write. Then retry this saved report. Your draft is kept.':'GitHub did not accept the report. Check your connection and permissions, then retry. Your draft is kept.';
       if(delivery.state==='uncertain')el('report-error').textContent='GitHub may have received this report. Check delivery later; this will not post another copy.';
     }catch{
       // A lost helper response may hide a successful send. Never recreate the
