@@ -8,31 +8,56 @@ import stat
 import os
 import errno
 import sys
-import subprocess
-import plistlib
+import ctypes
+from functools import lru_cache
 
 class SourceIdentityChanged(OSError):
     def __init__(self):
         super().__init__(errno.ESTALE, 'Folder identity changed. Review and save the folder selection to approve this source.')
 
 
+@lru_cache(maxsize=1)
+def foundation():
+    cf = ctypes.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
+    cf.CFURLCreateFromFileSystemRepresentation.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_bool]
+    cf.CFURLCreateFromFileSystemRepresentation.restype = ctypes.c_void_p
+    cf.CFURLCopyResourcePropertyForKey.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p)]
+    cf.CFURLCopyResourcePropertyForKey.restype = ctypes.c_bool
+    cf.CFStringGetCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
+    cf.CFStringGetCString.restype = ctypes.c_bool
+    cf.CFGetTypeID.argtypes = [ctypes.c_void_p]; cf.CFGetTypeID.restype = ctypes.c_ulong
+    cf.CFStringGetTypeID.argtypes = []; cf.CFStringGetTypeID.restype = ctypes.c_ulong
+    cf.CFRelease.argtypes = [ctypes.c_void_p]; cf.CFRelease.restype = None
+    return cf
+
+
+def volume_uuid(path):
+    # A fresh URL avoids stale URL-property caches across unmount/remount.
+    cf = foundation(); raw = os.fsencode(path)
+    url = cf.CFURLCreateFromFileSystemRepresentation(None, raw, len(raw), True)
+    value, error = ctypes.c_void_p(), ctypes.c_void_p()
+    try:
+        key = ctypes.c_void_p.in_dll(cf, 'kCFURLVolumeUUIDStringKey').value
+        if not url or not cf.CFURLCopyResourcePropertyForKey(url, key, ctypes.byref(value), ctypes.byref(error)) or not value.value:
+            raise OSError(errno.EIO, 'Cannot establish persistent source volume identity')
+        if cf.CFGetTypeID(value) != cf.CFStringGetTypeID():
+            raise OSError(errno.EIO, 'Invalid source volume identity')
+        buffer = ctypes.create_string_buffer(256)
+        if not cf.CFStringGetCString(value, buffer, len(buffer), 0x08000100):
+            raise OSError(errno.EIO, 'Cannot decode source volume identity')
+        return buffer.value.decode('utf-8')
+    finally:
+        for item in (value.value, error.value, url):
+            if item:cf.CFRelease(item)
+
+
 def source_identity(path):
     require_source(path, canonical_only=True)
     info = Path(path).stat()
     with os.scandir(path) as entries:next(entries, None)
-    # Volume UUID survives a remount; st_dev alone can be reused by a different disk.
-    if sys.platform == 'darwin':
-        try:
-            device = subprocess.run(['/bin/df','-P',str(path)], capture_output=True, text=True, check=True, timeout=5).stdout.splitlines()[-1].split()[0]
-            result = subprocess.run(['/usr/sbin/diskutil','info','-plist',device], capture_output=True, timeout=5)
-            value = plistlib.loads(result.stdout) if result.returncode == 0 else {}
-            volume = value.get('VolumeUUID')
-        except (subprocess.SubprocessError, ValueError, IndexError, plistlib.InvalidFileException) as error:
-            raise OSError(errno.EIO, 'Cannot establish source volume identity') from error
-        if not isinstance(volume, str) or not volume:
-            raise OSError(errno.EIO, 'Cannot establish source volume identity')
-    else:
-        volume = 'device:' + str(info.st_dev)
+    # https://developer.apple.com/documentation/corefoundation/kcfurlvolumeuuidstringkey
+    volume = volume_uuid(path) if sys.platform == 'darwin' else 'device:' + str(info.st_dev)
+    if not volume:raise OSError(errno.EIO, 'Cannot establish source volume identity')
     return {'volume':volume, 'file_id':info.st_ino}
 
 

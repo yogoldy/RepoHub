@@ -344,3 +344,5 @@ Live Pro disk-image acceptance passed: unmount retained the prior archive/index,
 ## Permission readiness — GR19
 
 Settings shows helper-probed source/destination access, actual notification authorization and installation-matched login registration. An explicit Check access action probes all selected regular files without following links and creates/removes only its own destination test file; it does not verify archives or uploads. Notification requests are contextual, not automatic at every launch. An asynchronous check keeps large trees from timing out the settings request. Native TCC/notification acceptance uses a separate identity; daily permissions are never reset.
+
+Volume checking initially used repeated diskutil subprocesses, making the full regression run unacceptably slow. The helper now reads Apple's persistent volume UUID directly with Core Foundation using a fresh URL for each check, retaining remount/substitution protection without process startup. The slow gate was deliberately interrupted and is not accepted as a pass.
