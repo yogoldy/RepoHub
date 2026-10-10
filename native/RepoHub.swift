@@ -102,9 +102,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 case .notDetermined: permission = "waiting"
                 default: permission = "unknown"
                 }
-                let request = UserDefaults.standard.string(forKey: "notificationRequest") ?? "not_requested"
+                let request = BackupReadiness.permissionRequest(saved: UserDefaults.standard.string(forKey: "notificationRequest"), inFlight: self.permissionRequestInFlight)
                 let status: [String: Any] = ["enabled": self.notificationsEnabled, "permission": permission,
-                    "request": ["pending", "completed", "failed"].contains(request) ? request : "not_requested"]
+                    "request": request]
                 let path = FileManager.default.homeDirectoryForCurrentUser
                     .appendingPathComponent("Library/Application Support/RepoHub/notifications.json")
                 if let data = try? JSONSerialization.data(withJSONObject: status, options: [.sortedKeys]), data != self.lastNotificationData {
