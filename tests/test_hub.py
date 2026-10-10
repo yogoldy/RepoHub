@@ -78,6 +78,9 @@ class HubTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(self.repo), *args], check=True,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         git("init", "-b", "main")
+        # Isolate fixture mutations from newer Git background maintenance.
+        git("config", "maintenance.auto", "0")
+        git("config", "gc.auto", "0")
         git("add", ".")
         git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Fixture")
         (self.repo / "work.txt").write_text("unstaged")
@@ -223,6 +226,9 @@ class HubTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(self.repo), *args], check=True,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         git("init", "-b", "main")
+        # Isolate fixture mutations from newer Git background maintenance.
+        git("config", "maintenance.auto", "0")
+        git("config", "gc.auto", "0")
         git("add", ".")
         git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Fixture")
         path = self.repo / "work.txt"

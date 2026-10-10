@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "GR01",
+      "title": "Preserve complete contained workspace bytes",
+      "breakpoint": "Hidden, ignored and uncommitted files silently omitted; archive member handling loses directories or modes.",
+      "diagnostic_events": [
+        "archive_stage",
+        "archive_verified",
+        "repo_backup_finished"
+      ],
+      "cause_and_solution": "Git status is not a file inventory. Archive contained filesystem entries and verify their contents before publication.",
+      "required_behavior": "Include ignored/uncommitted bytes and ordinary contained Git history; do not follow external links.",
+      "test_ids": [
+        "test_hub.HubTests.test_complete_archive_includes_hidden_ignored_and_symlink_without_following",
+        "test_hub.HubTests.test_archive_content_verification_includes_hardlinks_and_empty_directories",
+        "test_scoped_backups.ScopedBackupTests.test_appledouble_and_hidden_ignored_files_are_still_protected"
+      ],
+      "remaining_gap": "Live databases and unsaved application memory are not atomic snapshots. External Git directories/worktrees/submodules require explicit support."
+    },
+    {
+      "id": "GR02",
+      "title": "Hashes decide meaningful changes",
+      "breakpoint": "Equal-size edits restore their mtime, or source content changes during archive construction.",
+      "diagnostic_events": [
+        "repo_checked",
+        "archive_stage",
+        "repo_backup_failed"
+      ],
+      "cause_and_solution": "Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members.",
+      "required_behavior": "Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits.",
+      "test_ids": [
+        "test_hub.HubTests.test_same_size_same_mtime_edit_is_detected_and_replaced",
+        "test_hub.HubTests.test_timestamp_only_changes_match_hashes_and_do_not_replace_backup",
+        "test_hub.HubTests.test_metadata_preserving_change_during_snapshot_is_rejected",
+        "test_hub.HubTests.test_change_during_backup_does_not_publish"
+      ],
+      "remaining_gap": "Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided."
+    },
+    {
+      "id": "GR03",
+      "title": "Finder-only hints cannot cause broad replacements",
+      "breakpoint": "Repeated .DS_Store writes look like edits; a whole-schedule check rebuilds unchanged repos.",
+      "diagnostic_events": [
+        "repo_checked",
+        "schedule_decision",
+        "archive_reused",
+        "repo_backup_finished"
+      ],
+      "cause_and_solution": "Classify Finder/Git/project differences separately; ignore only ordinary .DS_Store trigger changes while retaining honest full-match status.",
+      "required_behavior": "No replacement for Finder-only writes; build only selected meaningfully changed/new/damaged repos.",
+      "test_ids": [
+        "test_scoped_backups.ScopedBackupTests.test_repeated_finder_writes_do_not_replace_archives_or_rewrite_cloud_index",
+        "test_scoped_backups.ScopedBackupTests.test_only_meaningfully_changed_repo_gets_archive_when_schedule_checks_every_repo",
+        "test_scoped_backups.ScopedBackupTests.test_targeted_backup_cannot_copy_another_repo_even_if_it_changed",
+        "test_scoped_backups.ScopedBackupTests.test_finder_exception_cannot_hide_corrupt_archive"
+      ],
+      "remaining_gap": "Other metadata such as AppleDouble remains protected. Never generalize this exception to arbitrary hidden files."
+    },
+    {
+      "id": "GR04",
+      "title": "Unavailable verification is not corruption",
+      "breakpoint": "iCloud placeholders/timeouts/permissions produce read failures and can trigger unnecessary rebuilds.",
+      "diagnostic_events": [
+        "verification_deferred",
+        "repo_backup_failed",
+        "archive_repair_needed",
+        "archive_reused"
+      ],
+      "cause_and_solution": "Separate OSError availability from checksum/archive-format failures; defer unavailable reads instead of rebuilding.",
+      "required_behavior": "Keep index/archive intact on unavailable reads, disclose the failure, then reuse or replace after recovery.",
+      "test_ids": [
+        "test_scoped_backups.ScopedBackupTests.test_unavailable_archive_is_reported_without_replacement_and_recovery_reuses_it",
+        "test_scoped_backups.ScopedBackupTests.test_read_failure_defers_changed_repo_until_verification_can_recover",
+        "test_hub.HubTests.test_corrupted_archive_detected_and_repaired"
+      ],
+      "remaining_gap": "Conservative deferral also delays genuinely changed sources. Other RuntimeError classifications and real provider races remain review points."
+    },
+    {
+      "id": "GR05",
+      "title": "Retain old backup until exact replacement is safe",
+      "breakpoint": "Copy/index errors, stale cloud receipts or 100% progress lead to premature deletion.",
+      "diagnostic_events": [
+        "archive_verified",
+        "retention_decision",
+        "retention_verified",
+        "prune_started",
+        "prune_finished",
+        "retention_failed"
+      ],
+      "cause_and_solution": "Persist a verified replacement; gate pruning on fresh acknowledgement for its exact archive identity.",
+      "required_behavior": "Never prune on progress alone, missing/old receipts or failed publication; preserve unknown/legacy files.",
+      "test_ids": [
+        "test_hub.HubTests.test_failed_replacement_preserves_previous_copy",
+        "test_hub.HubTests.test_old_copy_kept_until_replacement_upload_is_confirmed",
+        "test_hub.HubTests.test_progress_and_retry_error_do_not_confirm_or_prune",
+        "test_hub.HubTests.test_index_publication_failure_keeps_old_copy_and_retries_cleanup",
+        "test_policy_health.SettingsHTTPTests.test_stale_upload_receipt_keeps_previous_backup"
+      ],
+      "remaining_gap": "Network outage, quota exhaustion and full-disk behavior need controlled live fault runs; mocked transitions are not provider guarantees."
+    },
+    {
+      "id": "GR06",
+      "title": "Display decisions need fresh evidence",
+      "breakpoint": "Green check uses old archive data, stale hashes, missing upload flags or an unavailable helper.",
+      "diagnostic_events": [
+        "status_repo",
+        "ui_presented",
+        "presentation_input_disagreement",
+        "presentation_disagreement",
+        "upload_stale"
+      ],
+      "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts.",
+      "required_behavior": "Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement.",
+      "test_ids": [
+        "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
+        "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
+        "test_backup_lifecycle.LifecycleTests.test_green_icon_with_missing_upload_is_logged_as_input_disagreement",
+        "test_change_evidence.EvidenceTests.test_no_record_of_second_view_is_not_claimed_as_agreement",
+        "test_change_evidence.EvidenceTests.test_both_views_are_correlated_and_disagreement_is_reported"
+      ],
+      "remaining_gap": "Rendered progress percentages, selected-card visibility, pixels and clickability still lack full diagnostic acceptance coverage."
+    },
+    {
+      "id": "GR07",
+      "title": "Schedule and power policy stay per repo",
+      "breakpoint": "A power transition pauses incorrectly, resets unrelated timers or starts all repos after one edit.",
+      "diagnostic_events": [
+        "schedule_decision",
+        "backup_deferred",
+        "backup_paused",
+        "backup_finished"
+      ],
+      "cause_and_solution": "Track effective per-repo settings and cadence; recheck power before automatic work and preserve unattempted clocks.",
+      "required_behavior": "Battery defaults have no after-edit backups; manual-only works; a selected automatic plan cannot force unrelated repos.",
+      "test_ids": [
+        "test_policy_health.PolicyTests.test_battery_default_is_no_after_edits_and_manual_only_is_supported",
+        "test_policy_health.SettingsHTTPTests.test_after_edit_plan_only_archives_selected_repo",
+        "test_policy_health.SettingsHTTPTests.test_power_change_finishes_current_archive_and_stops_next_repo",
+        "test_policy_health.SettingsHTTPTests.test_partial_automatic_run_does_not_advance_unattempted_repo_clock",
+        "test_policy_health.SettingsHTTPTests.test_repo_cadence_survives_restart_and_only_backs_up_due_repo"
+      ],
+      "remaining_gap": "Physical battery transitions, full sleep/wake and logout/login cycles still require hardware smoke tests."
+    },
+    {
+      "id": "GR08",
+      "title": "Diagnostics cannot break or mutate backups",
+      "breakpoint": "Full disk, partial records, rotation or logging recursion stops backups or produces fake edits.",
+      "diagnostic_events": [
+        "heartbeat",
+        "runtime_gap",
+        "helper_started",
+        "backup_interrupted"
+      ],
+      "cause_and_solution": "Bound private JSONL storage; tolerate write loss; exclude diagnostics from monitored/saved data. Record unobserved gaps honestly.",
+      "required_behavior": "Backup operation survives log failure; malformed records are bounded; diagnostic activity creates no backup changes.",
+      "test_ids": [
+        "test_diagnostics.DiagnosticTests.test_full_disk_failure_recovers_and_records_loss",
+        "test_diagnostics.DiagnosticTests.test_partial_write_survives_restart_without_poisoning_next_event",
+        "test_diagnostics.DiagnosticTests.test_logging_failure_does_not_stop_backup_or_enter_backup_data",
+        "test_change_evidence.EvidenceTests.test_diagnostic_activity_does_not_create_repo_or_saved_data_changes",
+        "test_backup_lifecycle.LifecycleTests.test_restart_discloses_incomplete_run_without_claiming_recovery"
+      ],
+      "remaining_gap": "The app cannot observe while powered off. Missing records are evidence gaps, not successful recovery."
+    },
+    {
+      "id": "GR09",
+      "title": "Shared diagnostics have an explicit type contract",
+      "breakpoint": "A new log field, raw error, nested payload or exact timestamp leaks through the export.",
+      "diagnostic_events": [
+        "verification_deferred",
+        "repo_checked",
+        "ui_presented"
+      ],
+      "cause_and_solution": "Use separately reviewed field-specific enums/types, fresh aliases and bounded relative measurements; reject unknown events and values.",
+      "required_behavior": "No names/paths/raw hashes/arbitrary text/exact dates/exact sizes; exclude private alias key from previews.",
+      "test_ids": [
+        "test_diagnostic_export.ExportTests.test_enums_are_field_specific_and_not_a_global_word_list",
+        "test_diagnostic_export.ExportTests.test_unknown_events_and_unknown_nested_fields_fail_closed",
+        "test_diagnostic_export.ExportTests.test_no_wall_clock_raw_sizes_hashes_or_free_text",
+        "test_diagnostic_export.ExportTests.test_adversarial_types_and_huge_numbers_do_not_escape_or_crash",
+        "test_diagnostic_export.ExportTests.test_namespaces_are_fresh_and_relative_order_preserved",
+        "test_report_preview.ReportPreviewTests.test_bug_has_exact_share_files_and_private_local_draft"
+      ],
+      "remaining_gap": "Operational patterns remain bounded facts. User-written report prose is separate; a preview and confidentiality reminder cannot guarantee it contains no personal information."
+    },
+    {
+      "id": "GR10",
+      "title": "Local HTML APIs cannot widen filesystem access",
+      "breakpoint": "Untrusted origin/frame/path or stale JSON revision changes files outside its scope.",
+      "diagnostic_events": [
+        "presentation_input_disagreement",
+        "runtime_error"
+      ],
+      "cause_and_solution": "Keep loopback Host/Origin/token and revision guards; resolve allowed paths; native bridge accepts fixed actions and valid repo IDs.",
+      "required_behavior": "Reject cross-origin and arbitrary path/payload requests; report previews cannot redirect their destination.",
+      "test_ids": [
+        "test_hub.HubTests.test_http_json_conflicts_origin_host_and_view_boundaries",
+        "test_hub.HubTests.test_data_and_views_cannot_escape",
+        "test_report_preview.ReportPreviewTests.test_http_preview_requires_existing_origin_and_token_checks",
+        "test_report_preview.ReportPreviewTests.test_bad_inputs_and_destination_injection_rejected"
+      ],
+      "remaining_gap": "Credential-backed GitHub delivery and other cloud destinations are unimplemented and need their own threat model/tests."
+    },
+    {
+      "id": "GR11",
+      "title": "Restore audit must independently verify every supported entry",
+      "breakpoint": "Archive corruption/path traversal, input mutation or receiving umask hides a broken restore.",
+      "diagnostic_events": [
+        "archive_verified"
+      ],
+      "cause_and_solution": "Use an independently captured manifest, trusted input identities, safe isolated extraction and Git fsck/history checks. Explicitly restore link modes without changing targets.",
+      "required_behavior": "Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts.",
+      "test_ids": [
+        "test_restore_audit.RestoreAuditTests.test_full_restore_with_ignored_uncommitted_git_and_log_receipts",
+        "test_restore_audit.RestoreAuditTests.test_symlink_mode_survives_different_receiver_umask_without_changing_target",
+        "test_restore_audit.RestoreAuditTests.test_corrupt_archive_and_wrong_manifest_identity_fail_before_extraction",
+        "test_restore_audit.RestoreAuditTests.test_traversal_duplicate_extra_and_absolute_paths_are_rejected",
+        "test_restore_audit.RestoreAuditTests.test_input_mutation_during_restore_is_reported",
+        "test_restore_audit.RestoreAuditTests.test_restored_hooks_and_fsmonitor_are_not_executed"
+      ],
+      "remaining_gap": "Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics."
+    },
+    {
+      "id": "GR12",
+      "title": "Installation and restart must load the tested release",
+      "breakpoint": "Missing runtime module/route, stale native web view or launch-job reload fails after copying new code.",
+      "diagnostic_events": [
+        "helper_started",
+        "backup_interrupted",
+        "heartbeat"
+      ],
+      "cause_and_solution": "Validate package/asset dependencies; retain old runtime; restart existing registered jobs; verify installed hashes and helper build identity before considering deployment complete.",
+      "required_behavior": "Compiled native sources and packaged modules/routes must agree; local diagnostics must disclose interrupted runs.",
+      "test_ids": [
+        "test_backup_lifecycle.LifecycleTests.test_restart_discloses_incomplete_run_without_claiming_recovery",
+        "test_backup_lifecycle.LifecycleTests.test_creation_reuse_and_render_reason_share_archive_run_identity"
+      ],
+      "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration."
+    }
+  ]
+}

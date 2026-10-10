@@ -138,3 +138,7 @@ Keep restore inputs outside the repository, or in the ignored `restore-inputs/` 
 ## Controlled cloud restore pilot
 
 See [docs/CLOUD_RESTORE_HANDOFF.md](docs/CLOUD_RESTORE_HANDOFF.md) for the pinned-input, privately provisioned receive-and-restore experiment. `restore_audit.py` independently captures source expectations and verifies the supplied archive in a fresh output directory, including Git checks and structured logs. No iCloud credentials or restored-code execution are needed. Actual archives/baselines remain private; successful synthetic tests are not proof of a personal cloud restore.
+
+## Golden-rule release checks
+
+Run `python3 tools/release_gate.py --require-clean` on clean macOS source before promotion. [The release contract](docs/quality/RELEASE_GATE.md) explains the executable checks and remaining manual obligations; [the failure-mode register](docs/quality/FAILURE_MODES.md) connects diagnostic evidence, fixes, susceptible boundaries and exact regression tests. GitHub runs the automated gate for pushes and pull requests.
