@@ -48,3 +48,11 @@ When a failure is found, preserve private incident evidence, distinguish the obs
 ## Fixed-port native staging isolation
 
 When testing a candidate against the native app's fixed loopback port, fully stop the daily helper and all daily UI surfaces before starting the candidate; SIGSTOP alone retains the listener or allows WebKit renderer children to keep polling. Preserve daily files/credentials and arrange unconditional job restoration. Count diagnostic UI client IDs and reject unexplained clients before accepting a run. Confirm exact Finder URLs and rendered labels with computer use; diagnostic labels alone do not prove pixels or progress percentages. See [the controlled Pro test and repeat](../PRO_WORKSPACE_STAGING_TEST.md).
+
+## Reliability candidate acceptance
+
+[The five-goal checkpoint](../PRO_RELIABILITY_ACCEPTANCE.md) distinguishes passing
+automated/real disk-image checks from still-open native freshness, corrected
+simultaneous selection and isolated OS permission evidence. A gate pass cannot
+override those missing release conditions. Retain the previous installed Pro
+version until required acceptance succeeds; keep the Air unchanged.

@@ -126,7 +126,7 @@
         "test_change_evidence.EvidenceTests.test_both_views_are_correlated_and_disagreement_is_reported",
         "test_change_evidence.EvidenceTests.test_client_freshness_override_preserves_backend_and_detects_false_green"
       ],
-      "remaining_gap": "Rendered progress percentages, selected-card visibility, pixels and clickability still lack full diagnostic acceptance coverage."
+      "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },
     {
       "id": "GR07",
@@ -316,7 +316,7 @@
         "test_workspace_registry.WorkspaceTests.test_backup_activity_and_failures_use_workspace_ids",
         "test_workspace_registry.WorkspaceTests.test_duplicate_names_scope_diagnostics_and_problem_episodes"
       ],
-      "remaining_gap": "Native URL checks do not prove actual Finder/picker interaction. Separate-volume remounts, inaccessible-volume recovery, concurrent filesystem replacement, source relocation and destination/naming migration need independent live coverage. Setup UI and provider-aware destinations remain unimplemented."
+      "remaining_gap": "Core source-selection UI is implemented and accepted on Pro at 5e24009. Real disk-image unmount/substitution/remount passed. Corrected native simultaneous selection and isolated TCC acceptance remain open; destination/naming migration is later work."
     },
     {
       "id": "GR16",
@@ -334,7 +334,7 @@
         "test_workspace_registry.WorkspaceTests.test_preview_guard_and_diagnostics_exclude_source_prose",
         "test_workspace_registry.WorkspaceTests.test_unmonitored_home_inventory_drift_rejects_review_without_registry_change"
       ],
-      "remaining_gap": "Native picker pixels, focus/cancel/multiple selection and installed menu flow require live acceptance. Separate volume and permissions remain additional acceptance cases. Native bridge and workspace-setup JavaScript checks run in the gate."
+      "remaining_gap": "Native simultaneous selection exposed a pathname alias duplicate; fixed and regression-tested. Corrected native cancel/removal/review/save/restart repeat remains open after computer-use timeout; native bridge and draft checks run in the gate."
     },
     {
       "id": "GR17",
@@ -375,7 +375,7 @@
         "test_source_identity.IdentityTests.test_volume_mismatch_cannot_be_hidden_by_same_inode",
         "test_source_identity.IdentityTests.test_legacy_identity_migration_waits_for_accessible_source"
       ],
-      "remaining_gap": "A disposable macOS disk-image mount/unmount/remount run is required; physical hot-unplug remains outside this pass."
+      "remaining_gap": "Real disposable macOS disk-image unmount/replacement/remount passed at 7d21621. Physical hot-unplug is outside this pass; sustained races and unusual/cloned filesystem identities remain untested."
     },
     {
       "id": "GR19",
@@ -392,7 +392,7 @@
         "test_readiness.ReadinessTests.test_notifications_are_optional_and_do_not_gate_backup",
         "test_readiness.ReadinessTests.test_access_endpoint_requires_origin_token_and_no_path_payload"
       ],
-      "remaining_gap": "Fresh native notification/TCC grant/refusal/revocation requires isolated macOS acceptance; mocked status or POSIX errno is not proof."
+      "remaining_gap": "Initial fresh native helper-readiness check passed; explicit notification request remained notDetermined. Real grant/refusal/revocation and TCC acceptance remain open; mocked authorization and POSIX errno are not proof."
     }
   ]
 }

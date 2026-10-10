@@ -87,3 +87,16 @@ Open the menu-bar gear, then **Choose repo folders**. Repo-home monitors immedia
 `workspace_review` diagnostics contain only complete/failed outcome, supported mode and repo count. Paths and prose are excluded from those events and the allowlisted export. The native picker itself does not bypass server validation. Saving changes monitoring only, not the destination, schedules or backup contents, and does not start a backup. Native source selection/review is accepted and deployed on the Pro at `5e24009`; see [the acceptance record](PRO_SOURCE_PICKER_TEST.md). The Air is held unchanged.
 
 Source setup reuses the native settings dialog so WebKit accessibility exposes its controls. Cancel restores the regular settings form. The successful save triggers an immediate card refresh. Rejected saves emit `workspace_configuration` with only a failed outcome; error prose and paths are not logged.
+
+## Reliability candidate (not yet deployed)
+
+The optional registry `identity` stores persistent volume identity plus directory
+file ID without changing workspace IDs. Checks guard reads and publication; a
+replacement at the saved path requires explicit reviewed selection. Existing
+accessible sources acquire evidence without ID regeneration; absent/denied ones
+wait. Native selections use POSIX realpath to match helper canonicalization.
+
+Menu Settings includes helper-owned source/destination access checks and optional
+notification/login guidance. Access readiness is separate from hash verification
+and upload evidence. See [the reliability checkpoint](PRO_RELIABILITY_ACCEPTANCE.md)
+for implemented behavior, fault evidence and unfinished native acceptance.

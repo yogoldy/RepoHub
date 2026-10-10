@@ -44,3 +44,12 @@ Subsequent fresh status reports agreed with backend inputs. The source review co
 ## Remaining acceptance and scope
 
 Native selection was exercised across separate picker sessions; one-panel simultaneous multi-selection and external-volume/permission failure remain live coverage gaps. Empty/manual removal, path deduplication, overlap rejection, stale revision, candidate drift and backup/JSON/schedule preservation have automated coverage. This pass does not test a new iCloud delivery, second-device restore, sleep/power transitions or long progress percentages. Destination selection/status, guided onboarding, readable archive names and AI-assisted import remain later roadmap items. The main protection/PR process remains in force.
+
+## Reliability follow-up
+
+[The reliability checkpoint](PRO_RELIABILITY_ACCEPTANCE.md) supersedes the next-step
+gaps above with current implementation/evidence. The previously accepted installed
+build remains `5e24009`; the reliability candidate is not deployed. Typed client
+freshness, additive directory/volume identity and helper readiness are implemented
+and regression-tested; actual native permission and corrected multi-selection
+acceptance remain open.
