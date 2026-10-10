@@ -73,3 +73,7 @@ Successful saves record `workspace_configuration` with enumerated `mode`/`result
 A development smoke run used an actual helper process on a separate loopback port with temporary folders, manual-only schedules and unavailable provider observations. Sixteen assertions verified API selection, distinct same-name identities, complete archive manifests/digests, the registry in helper-data backup, real restart persistence, non-destructive removal and diagnostic evidence. Fixtures were removed; private receipts/logs remain outside Git. The Pro's existing status API/menu remained reachable and its installed helper still matched main.
 
 Native compilation/URL tests do not prove an actual Finder click for a manual selection. Native picker interaction, separate-volume removal/remount, inaccessible-volume recovery, sustained concurrent writes, setup layout and provider upload evidence remain unchecked for this new configuration flow. No new iCloud upload, two-device restore, app installation or main promotion is claimed here.
+
+## Native staging evidence
+
+[The Pro fresh-state acceptance record](PRO_WORKSPACE_STAGING_TEST.md) covers native menu backups/settings, duplicate-name Finder paths, missing-source preservation, recovery, restart and diagnostic correlation at `83c52bd`. It also records the shared-port WebKit isolation failure and clean repeat. No daily deployment or provider-upload claim is implied.
