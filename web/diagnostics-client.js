@@ -21,7 +21,7 @@
         // original observation is still retained; an expired observation is a gap.
         if(deferred){
           const queued=deferred,response=await post(queued);
-          if(response.ok||response.status===409)deferred=null;
+          if((response.ok||response.status===409)&&deferred===queued)deferred=null;
           if(queued===signature&&response.ok){last=signature;lastAt=now;return true;}
         }
         const response=await fetcher('/api/diagnostics/presentation',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-RepoHub-Token':token},body:signature});

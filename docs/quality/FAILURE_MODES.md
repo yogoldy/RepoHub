@@ -367,3 +367,7 @@ of a macOS permission decision. Calling a request must not continue to display
 without exception prose and suppresses duplicate requests while one is pending.
 Only the OS authorization state can say allowed or denied. Readiness JavaScript
 regressions cover those combinations; native grant/refusal acceptance stays open.
+
+The bounded offline-frame slot is also compare-and-clear: completion of an older
+POST cannot erase a newer freshness frame queued while that request was in flight.
+A JavaScript concurrency counterexample is required by the gate's delivery suite.

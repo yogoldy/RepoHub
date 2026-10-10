@@ -29,5 +29,18 @@ const {create,displayState}=require('../web/diagnostics-client.js');
   const replay=calls.slice(at).filter(c=>c.url==='/api/diagnostics/presentation').map(c=>JSON.parse(c.options.body));
   assert.equal(replay[0].client_freshness,'response_timeout');assert.equal(replay[1].client_freshness,'current');
   assert.equal(JSON.stringify(backend),frozen);
+  let release,announce;const entered=new Promise(resolve=>announce=resolve),blocked=new Promise(resolve=>release=resolve),frames=[];
+  let first=true;
+  const concurrent=create('menu',{native:true,clientId:'c'.repeat(24),fetcher:async(url,options={})=>{
+    if(url==='/api/session')return {ok:true,json:async()=>({token:'test'})};
+    frames.push(JSON.parse(options.body));
+    if(first){first=false;announce();await blocked;}
+    return {ok:true};
+  }});
+  const inFlight=concurrent.observe(backend,stale,'response_timeout');await entered;
+  assert.equal(await concurrent.observe(backend,stale,'cache_expired'),false);
+  release();await inFlight;
+  await concurrent.observe(backend,rows,'current');
+  assert.deepEqual(frames.map(frame=>frame.client_freshness),['response_timeout','cache_expired','current']);
   console.log('Diagnostic delivery checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});
