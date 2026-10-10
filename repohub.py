@@ -402,6 +402,13 @@ class Hub:
         return result
 
     def save_workspaces(self, payload):
+        try:
+            return self._save_workspaces(payload)
+        except (ValueError, OSError):
+            self.diagnostics.emit("workspace_configuration", result="failed")
+            raise
+
+    def _save_workspaces(self, payload):
         if set(payload) not in ({"source", "revision"}, {"source", "revision", "review"}):
             raise ValueError("Invalid workspace configuration request")
         if "review" in payload and (not isinstance(payload["review"], str) or not re.fullmatch(r"[0-9a-f]{64}", payload["review"])):

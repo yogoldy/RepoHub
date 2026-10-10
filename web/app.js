@@ -67,3 +67,5 @@ $('#settings').onclick=async()=>{try{const result=await api('/api/settings');set
 for(const id of ['settings-close','settings-cancel'])$('#'+id).onclick=()=>$('#settings-dialog').close();
 $('#settings-form').onsubmit=async e=>{e.preventDefault();$('#settings-save').disabled=true;try{sessionToken=(await api('/api/session')).token;const settings={};for(const source of ['battery','adapter'])settings[source]={frequency_minutes:Number($('#'+source+'-frequency').value),after_edits:$('#'+source+'-edits').checked,edit_delay_minutes:Number($('#'+source+'-delay').value)};if(!$('#battery-automatic').checked){settings.battery.frequency_minutes=0;settings.battery.after_edits=false;}await api('/api/settings',{settings,revision:settingsRevision});$('#settings-dialog').close();await load();}catch(e){$('#settings-error').textContent=e.message;}finally{$('#settings-save').disabled=false;}};
 (async()=>{try{sessionToken=(await api('/api/session')).token;await load();setInterval(load,5000);}catch(e){message(e.message);}})();
+
+window.addEventListener('repoHubWorkspacesChanged',()=>void load());

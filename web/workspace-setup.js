@@ -87,7 +87,7 @@
     event.preventDefault();if(busy||!state||state.pending)return;busy=true;render();$('workspace-error').textContent='';
     try{
       if(!state.review){state.review=await request('/api/workspaces/preview',{source:source(state),revision:state.revision});$('workspace-feedback').textContent='Review the exact folders before saving.';}
-      else{await request('/api/workspaces',{source:source(state),revision:state.revision,review:state.review.review});dialog.close();reset();state=null;const target=$('notice')||$('message');if(target)target.textContent='Monitored folders saved. Existing backups and schedules are preserved.';}
+      else{await request('/api/workspaces',{source:source(state),revision:state.revision,review:state.review.review});dialog.close();reset();state=null;root.dispatchEvent(new Event('repoHubWorkspacesChanged'));const target=$('notice')||$('message');if(target)target.textContent='Monitored folders saved. Existing backups and schedules are preserved.';}
     }catch(error){$('workspace-error').textContent=error.name==='AbortError'?'The helper took too long to respond. Reopen setup to check the saved selection.':error.message;if(error.conflict){state.review=null;$('workspace-reload').hidden=false;}}
     finally{busy=false;render();}
   };

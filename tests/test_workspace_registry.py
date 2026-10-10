@@ -282,3 +282,14 @@ class WorkspaceTests(unittest.TestCase):
             self.assertEqual([e['result'] for e in events],['complete','failed'])
             self.assertNotIn(str(self.repo),json.dumps(events));self.assertNotIn('Example',json.dumps(events))
         finally:server.shutdown();server.server_close();thread.join()
+
+    def test_unmonitored_home_inventory_drift_rejects_review_without_registry_change(self):
+        other=self.folder('other-home/One');source={'mode':'home','home':str(other.parent)}
+        payload={'source':source,'revision':self.hub.workspace_status()['revision']}
+        reviewed=self.hub.preview_workspaces(payload);before=self.hub.registry.path.read_bytes()
+        self.folder('other-home/Two')
+        with self.assertRaises(FileExistsError):self.hub.save_workspaces({**payload,'review':reviewed['review']})
+        self.assertEqual(self.hub.registry.path.read_bytes(),before)
+        from diagnostics import read_events
+        failed=[e for e in read_events(self.hub.state_dir/'diagnostics') if e['event']=='workspace_configuration']
+        self.assertEqual(failed[-1]['result'],'failed');self.assertNotIn(str(other),json.dumps(failed))

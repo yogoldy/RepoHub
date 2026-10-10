@@ -92,3 +92,5 @@ window.addEventListener('resize',updatePosition);setInterval(()=>{if(lastRespons
 (async()=>{try{sessionToken=(await api('/api/session')).token;}catch(e){/* Read status still works; writes acquire a fresh token when needed. */}await load();setInterval(load,5000);})();
 
 $('#connect-github').onclick=()=>nativeAction('connectGitHub');
+
+window.addEventListener('repoHubWorkspacesChanged',()=>void load());

@@ -330,7 +330,8 @@
       "test_ids": [
         "test_workspace_registry.WorkspaceTests.test_review_is_read_only_and_requires_same_discovered_folder_list",
         "test_workspace_registry.WorkspaceTests.test_review_discloses_removal_without_erasing_data_and_rejects_invalid_token",
-        "test_workspace_registry.WorkspaceTests.test_preview_guard_and_diagnostics_exclude_source_prose"
+        "test_workspace_registry.WorkspaceTests.test_preview_guard_and_diagnostics_exclude_source_prose",
+        "test_workspace_registry.WorkspaceTests.test_unmonitored_home_inventory_drift_rejects_review_without_registry_change"
       ],
       "remaining_gap": "Native picker pixels, focus/cancel/multiple selection and installed menu flow require live acceptance. Separate volume and permissions remain additional acceptance cases. Native bridge and workspace-setup JavaScript checks run in the gate."
     }
