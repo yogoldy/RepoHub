@@ -1,0 +1,1 @@
+const assert=require('node:assert/strict');const {label}=require('../web/readiness.js');assert.equal(label({state:'accessible'}),'Access checked');assert.equal(label({state:'blocked'}),'Access blocked');assert.equal(label({state:'injected private prose'}),'Not checked');console.log('Readiness label checks passed');

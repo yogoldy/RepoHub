@@ -340,3 +340,7 @@ Actual mode-bit restrictions exercise denied root and nested-file reads, denied 
 Canonical path and workspace ID alone cannot distinguish a replacement folder/volume. Add directory file ID and volume UUID when accessible; retain existing IDs. Recheck before reads and publication, block mismatches and require an explicit reviewed selection. Remount testing uses a disposable disk image; physical hot-unplug is not simulated proof.
 
 Live Pro disk-image acceptance passed: unmount retained the prior archive/index, a replacement directory at the former mount path was rejected, and remount of the original HFS+ image recovered with the same volume/directory identity and reused the verified archive. Private receipts are outside Git. This is real separate-volume evidence; physical unplug and privacy prompting remain separate.
+
+## Permission readiness — GR19
+
+Settings shows helper-probed source/destination access, actual notification authorization and installation-matched login registration. An explicit Check access action probes all selected regular files without following links and creates/removes only its own destination test file; it does not verify archives or uploads. Notification requests are contextual, not automatic at every launch. An asynchronous check keeps large trees from timing out the settings request. Native TCC/notification acceptance uses a separate identity; daily permissions are never reset.

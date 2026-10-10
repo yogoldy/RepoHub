@@ -11,7 +11,7 @@ import Foundation
                     "https://user@github.com/yogoldy/RepoHub/issues/12", "https://github.com:443/yogoldy/RepoHub/issues/12"] {
             precondition(!MenuBridge.isReportIssueURL(URL(string:bad)!)); count += 1
         }
-        for action in ["openBackups", "toggleNotifications", "connectGitHub", "quit"] {
+        for action in ["requestNotifications", "notificationSettings", "privacySettings", "loginSettings", "openBackups", "toggleNotifications", "connectGitHub", "quit"] {
             precondition(MenuBridge.action(body: ["action":action], frameURL: url, isMainFrame: true)?.rawValue == action)
             count += 1
         }

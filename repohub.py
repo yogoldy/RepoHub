@@ -26,7 +26,7 @@ from diagnostics import DiagnosticLog, diagnostic_ref
 from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
-from access_checks import access_failure
+from access_checks import access_failure, probe_source, probe_destination
 from workspace_registry import WorkspaceRegistry, workspace_id, require_source, overlaps
 from report_preview import preview_report
 from report_delivery import send_report, connection_status, delivery_status, case_path, read_private
@@ -357,6 +357,9 @@ class Hub:
         self.scan_lock = threading.Lock()
         self.backup_lock = threading.Lock()
         self.csrf = secrets.token_urlsafe(32)
+        self.readiness = None
+        self.readiness_running = False
+        self.readiness_result = 'unchecked'
         self.verifications = {}
         self.cloud_states = {}
         self.index = load_json(self.state_dir / "backups.json", {})
@@ -391,6 +394,62 @@ class Hub:
 
     def repositories(self):
         return self.registry.refresh()
+
+    def readiness_status(self):
+        with self.lock:
+            result = json.loads(json.dumps(self.readiness or {'checked_at':None,'sources':[], 'destination':{'state':'unchecked'},'background':{'helper':'running','login':'unknown'}}))
+            result['running'] = self.readiness_running
+            result['result'] = self.readiness_result
+            result['notifications'] = load_json(self.state_dir/'notifications.json', {'permission':'unknown'})
+            return result
+
+    def start_readiness(self):
+        with self.lock:
+            if self.readiness_running:raise FileExistsError('Access check already running')
+            self.readiness_running = True
+            self.readiness_result = "checking"
+        threading.Thread(target=self.check_readiness, daemon=True).start()
+        return self.readiness_status()
+
+    def check_readiness(self):
+        started = time.monotonic()
+        if not self.backup_lock.acquire(blocking=False):
+            with self.lock:self.readiness_running = False;self.readiness_result = "deferred"
+            self.diagnostics.emit('access_readiness', result='deferred', reason='backup_busy')
+            return
+        if not self.scan_lock.acquire(blocking=False):
+            self.backup_lock.release()
+            with self.lock:self.readiness_running = False;self.readiness_result = "deferred"
+            self.diagnostics.emit('access_readiness', result='deferred', reason='scan_error')
+            return
+        try:
+            sources = []
+            for key, path in self.repositories().items():
+                try:
+                    self.registry.require_workspace(key, path);probe_source(path)
+                    self.registry.require_workspace(key, path)
+                    outcome = {'state':'accessible','operation':'source_read'}
+                except OSError as error:outcome = access_failure(error,'source_read')
+                sources.append({'id':key,'name':path.name, **outcome})
+                self.diagnostics.emit('access_readiness', repo_ref=diagnostic_ref(key), state=outcome['state'], operation='source_read', error_code=outcome.get('error_code'),result='complete')
+            try:
+                # Probe the existing destination root; never create a missing mounted path.
+                probe_destination(self.backups if self.backups.exists() else self.backups.parent)
+                destination = {'state':'accessible','operation':'destination_write'}
+            except OSError as error:destination = access_failure(error,'destination_write')
+            login = 'unknown'
+            try:
+                registration = subprocess.run(['/bin/launchctl','print',f'gui/{os.getuid()}/com.leogoldberg.repohub.service'],capture_output=True,text=True,timeout=3)
+                login = 'registered' if registration.returncode == 0 and str(self.state_dir) in registration.stdout else 'not_registered'
+            except (OSError,subprocess.SubprocessError):pass
+            with self.lock:self.readiness_result = 'complete';self.readiness = {'checked_at':utc_now(),'sources':sources,'destination':destination,'background':{'helper':'running','login':login}}
+            self.diagnostics.emit('access_readiness', operation='destination_write',state=destination['state'],result='complete',error_code=destination.get('error_code'),duration_ms=(time.monotonic()-started)*1000)
+        except Exception as error:
+            with self.lock:self.readiness_result = 'failed'
+            self.diagnostics.emit('access_readiness',result='failed',error_type=type(error).__name__)
+        finally:
+            self.scan_lock.release();self.backup_lock.release()
+            with self.lock:self.readiness_running = False
 
     def workspace_status(self):
         return self.registry.status()
@@ -956,6 +1015,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path.startswith("/api/repo-settings/"):
                 return self.send(self.hub.repo_settings_status(path.removeprefix("/api/repo-settings/")))
+            if path == "/api/readiness":
+                return self.send(self.hub.readiness_status())
             if path == "/api/workspaces":
                 return self.send(self.hub.workspace_status())
             if path == "/api/settings":
@@ -977,6 +1038,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.serve_view(path)
             routes = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                       "/view-client.js": "view-client.js", "/notes.html": "notes.html",
+                      "/readiness.js": "readiness.js", "/readiness.css": "readiness.css",
                       "/workspace-setup.js": "workspace-setup.js", "/workspace-setup.css": "workspace-setup.css",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
                       "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
@@ -1038,6 +1100,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(self.hub.save_settings(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
+            if path == "/api/readiness/check":
+                if payload:raise ValueError("Unknown access-check field")
+                try:return self.send(self.hub.start_readiness())
+                except FileExistsError as error:return self.send({"error":str(error)},409)
             if path == "/api/diagnostics/presentation":
                 try:
                     return self.send(self.hub.evidence.presentation(payload))

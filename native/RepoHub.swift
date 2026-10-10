@@ -35,7 +35,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         popoverWebView = view
         view.load(URLRequest(url: address.appendingPathComponent("menu.html")))
         UNUserNotificationCenter.current().delegate = self
-        if notificationsEnabled { requestNotifications() }
+        updateNotificationStatus()
         pollStatus()
         polling = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.pollStatus() }
         if !CommandLine.arguments.contains("--background") { showPopover() }
@@ -202,6 +202,12 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         case .openBackups: openBackups()
         case .openRepo:
             if let body = message.body as? [String: Any], let id = body["repo_id"] as? String { openRepository(id) }
+        case .requestNotifications:
+            UserDefaults.standard.set(true, forKey: "notificationsEnabled")
+            requestNotifications()
+        case .notificationSettings: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+        case .privacySettings: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_FilesAndFolders")!)
+        case .loginSettings: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!)
         case .toggleNotifications: toggleNotifications()
         case .connectGitHub: GitHubConnection.configure()
         case .chooseRepoHome, .chooseRepoFolders:
@@ -226,6 +232,14 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             guard let self = self else { return }
             webView.load(URLRequest(url: self.address.appendingPathComponent("menu.html")))
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if !UserDefaults.standard.bool(forKey: "readinessShown") {
+            webView.evaluateJavaScript("window.dispatchEvent(new Event('repoHubReadinessRequested'))") { _, error in
+                if error == nil { UserDefaults.standard.set(true, forKey: "readinessShown") }
+            }
         }
     }
 

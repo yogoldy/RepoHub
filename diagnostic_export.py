@@ -10,10 +10,11 @@ from pathlib import Path
 import secrets
 from diagnostics import read_events
 
-EVENTS = frozenset("workspace_review workspace_configuration scan_retry_requested report_delivery helper_started heartbeat runtime_gap runtime_error scan_started scan_finished repo_checked status_snapshot status_repo ui_frame ui_presented presentation_input_disagreement presentation_disagreement schedule_decision backup_deferred backup_interrupted backup_started backup_paused backup_failed backup_finished repo_backup_started archive_stage archive_verified archive_repair_needed archive_reused repo_backup_finished repo_backup_failed verification_deferred upload_observed upload_stale retention_decision retention_verified retention_failed prune_started prune_finished".split())
+EVENTS = frozenset("access_readiness workspace_review workspace_configuration scan_retry_requested report_delivery helper_started heartbeat runtime_gap runtime_error scan_started scan_finished repo_checked status_snapshot status_repo ui_frame ui_presented presentation_input_disagreement presentation_disagreement schedule_decision backup_deferred backup_interrupted backup_started backup_paused backup_failed backup_finished repo_backup_started archive_stage archive_verified archive_repair_needed archive_reused repo_backup_finished repo_backup_failed verification_deferred upload_observed upload_stale retention_decision retention_verified retention_failed prune_started prune_finished".split())
 IDENTITIES = frozenset("session_id report_ref repo_ref archive_ref previous_archive_ref verification_archive_ref cloud_archive_ref run_id previous_run_id scan_id previous_scan_id observation_id client_id build_id backup_hash_ref edit_signature previous_signature source_signature backup_signature content_signature archive_content_signature path_ref".split())
 BOOLEANS = frozenset("after_edits archive_dataless copying has_error has_backup ignored_finder_only backup_required cached needs_backup metadata_changed fresh scan_running backup_running native".split())
 ENUMS = {
+    'operation': {'source_read','destination_write','verification_read'},
     'client_freshness': {'current','request_failed','response_timeout','cache_expired'},
     'event': EVENTS,
     'app_version': {'0.1.0'},
@@ -22,7 +23,7 @@ ENUMS = {
     'phase': {'background','stale','error','copying','changed','verifying','ready','uploading','pending','unknown'},
     'surface': {'app','menu'},
     'verification_state': {'changing','matched','different','checking','error','missing','unknown'},
-    'state': {'draft','sending','sent','failed','uncertain','battery','adapter','unknown','pending','uploading','uploaded','error','unavailable','recording'},
+    'state': {'accessible','blocked','unchecked','changed','draft','sending','sent','failed','uncertain','battery','adapter','unknown','pending','uploading','uploaded','error','unavailable','recording'},
     'mode': {'home','manual','content','metadata','all','selected','posix','pending','uploading','uploaded','error','unknown'},
     'stage': {'scan','scheduler','cloud','source_inspection','source_hashing','archive_creation','archive_verification','archive_transfer','destination_verification','existing_verification','publication_recovery','index_publication','retention'},
     'result': {'saved','selected','waiting','complete','failed','failed_power_paused','power_paused','not_started','partial','reused','created','verified','removed','kept','deferred','unknown','ready','not_ready','views_differ','unobserved_interval','unobserved_completion'},
