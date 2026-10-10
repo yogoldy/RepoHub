@@ -24,7 +24,7 @@ async function load(){if(loading)return;loading=true;try{
   else if(state.verifying)message('Verifying hashes: '+state.verifying+'…');
   else message('');
   render();
-}catch(e){markUnreachable('Could not reach the local helper: '+e.message);}finally{loading=false;}}
+}catch(e){markUnreachable('Could not reach the local helper: '+e.message,e.name==='AbortError'?'response_timeout':'request_failed');}finally{loading=false;}}
 function backupIssue(repo){return repo.error || repo.verification?.error || state.backup.errors?.find(e=>e.repo===repo.name)?.error;}
 function matchLabel(repo){if(repo.health?.fresh!==true)return 'Status outdated';return backupIssue(repo)?'Backup issue':repo.needs_backup?(repo.last_backup?'Needs backup':'First backup pending'):repo.verification?.state==='matched'?'Hashes verified':'Verifying hashes';}
 const uploadLabel=r=>r.health?.fresh!==true?'Waiting for fresh checks':({uploaded:'iCloud upload confirmed',uploading:'Uploading to iCloud',pending:'Waiting for iCloud',error:'Upload not confirmed · issue reported',unknown:'iCloud status unknown'}[r.cloud?.state]||'iCloud status unknown');
