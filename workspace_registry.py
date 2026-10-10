@@ -185,12 +185,29 @@ class WorkspaceRegistry:
                 rows.append({'id': key, 'path': str(path), 'active': True}); ids.add(key)
         return self.validate({'schema_version': 1, 'source': selected, 'workspaces': rows})
 
-    def save(self, source, revision):
+    def review(self, source, revision):
+        with self.lock:
+            self.refresh()
+            if revision != self.revision():
+                raise FileExistsError('Workspace selection changed. Reopen setup and review it again.')
+            candidate = self.candidate(source)
+            active = [r for r in candidate['workspaces'] if r['active']]
+            selected = {r['id'] for r in active}
+            removed = [r for r in self.value['workspaces'] if r['active'] and r['id'] not in selected]
+            digest = hashlib.sha256(json.dumps(candidate, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+            return {'source': source, 'revision': revision, 'review': digest,
+                    'workspaces': active, 'removed': removed}
+
+    def save(self, source, revision, review=None):
         with self.lock:
             self.refresh()
             if revision != self.revision():
                 raise FileExistsError('Workspace selection changed. Review it again before saving.')
             value = self.candidate(source)
+            if review is not None:
+                current = self.review(source, revision)
+                if not isinstance(review, str) or review != current['review']:
+                    raise FileExistsError('The folder list changed. Review it again before saving.')
             self.writer(self.path, value)
             self.value = value
             return self.status()

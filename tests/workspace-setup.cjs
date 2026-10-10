@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');
+const {draft,source,picked}=require('../web/workspace-setup.js');
+const state=draft({revision:'initial',configuration:{source:{mode:'home',home:'/repos'},workspaces:[{path:'/repos/A',active:true},{path:'/repos/Old',active:false}]}});
+assert.deepEqual(source(state),{mode:'home',home:'/repos'});
+state.pending='current';assert.equal(picked(state,{request_id:'old',paths:['/elsewhere']}),false);assert.equal(state.pending,'current');
+assert.equal(picked(state,{request_id:'current',cancelled:true,paths:[]}),false);assert.equal(state.home,'/repos');assert.equal(state.pending,null);
+state.pending='next';state.review={review:'old'};assert.equal(picked(state,{request_id:'next',paths:['/newhome']}),true);assert.equal(state.review,null);assert.equal(state.revision,'initial');
+state.mode='manual';assert.deepEqual(source(state),{mode:'manual',paths:['/repos/A']});
+state.pending='multi';assert.equal(picked(state,{request_id:'multi',paths:['/one/Project','/two/Project','/one/Project']}),true);assert.deepEqual(source(state).paths,['/repos/A','/one/Project','/two/Project']);
+state.pending='bad';const before=source(state);assert.equal(picked(state,{request_id:'bad',paths:['relative']}),false);assert.deepEqual(source(state),before);
+const copy=source(state);copy.paths.push('/outside');assert.deepEqual(source(state),before);
+console.log('Workspace draft: stale/cancelled picker, duplicate paths, same-name paths, review invalidation and source isolation passed');

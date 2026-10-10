@@ -1,7 +1,7 @@
 import Foundation
 
 enum MenuAction: String {
-    case openBackups, openRepo, toggleNotifications, connectGitHub, quit
+    case openBackups, openRepo, toggleNotifications, connectGitHub, chooseRepoHome, chooseRepoFolders, quit
 }
 
 enum MenuBridge {
@@ -15,6 +15,9 @@ enum MenuBridge {
         if action == .openRepo {
             guard Set(payload.keys) == ["action", "repo_id"], let id = payload["repo_id"] as? String,
                   id.range(of: "^[a-zA-Z0-9_-]{1,128}$", options: .regularExpression) != nil else { return nil }
+        } else if action == .chooseRepoHome || action == .chooseRepoFolders {
+            guard Set(payload.keys) == ["action", "request_id"], let id = payload["request_id"] as? String,
+                  id.range(of: "^[a-f0-9]{24}$", options: .regularExpression) != nil else { return nil }
         } else if payload.count != 1 { return nil }
         return action
     }

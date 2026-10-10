@@ -389,16 +389,30 @@ class Hub:
     def workspace_status(self):
         return self.registry.status()
 
-    def save_workspaces(self, payload):
+    def preview_workspaces(self, payload):
         if set(payload) != {"source", "revision"}:
+            raise ValueError("Invalid workspace review request")
+        try:
+            result = self.registry.review(payload["source"], payload["revision"])
+        except (ValueError, OSError):
+            self.diagnostics.emit("workspace_review", result="failed")
+            raise
+        self.diagnostics.emit("workspace_review", result="complete", mode=payload["source"]["mode"],
+                              repo_count=len(result["workspaces"]))
+        return result
+
+    def save_workspaces(self, payload):
+        if set(payload) not in ({"source", "revision"}, {"source", "revision", "review"}):
             raise ValueError("Invalid workspace configuration request")
+        if "review" in payload and (not isinstance(payload["review"], str) or not re.fullmatch(r"[0-9a-f]{64}", payload["review"])):
+            raise ValueError("Review the folder selection before saving")
         if not self.backup_lock.acquire(blocking=False):
             raise FileExistsError("A backup is running. Try after it finishes.")
         try:
             if not self.scan_lock.acquire(blocking=False):
                 raise FileExistsError("A scan is running. Try after it finishes.")
             try:
-                result = self.registry.save(payload["source"], payload["revision"])
+                result = self.registry.save(payload["source"], payload["revision"], payload.get("review"))
                 self.diagnostics.emit("workspace_configuration", result="saved", mode=result["configuration"]["source"]["mode"],
                                       repo_count=sum(r["active"] for r in result["configuration"]["workspaces"]))
             finally:
@@ -937,6 +951,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.serve_view(path)
             routes = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                       "/view-client.js": "view-client.js", "/notes.html": "notes.html",
+                      "/workspace-setup.js": "workspace-setup.js", "/workspace-setup.css": "workspace-setup.css",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
                       "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:
@@ -1000,6 +1015,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/diagnostics/presentation":
                 try:
                     return self.send(self.hub.evidence.presentation(payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
+            if path == "/api/workspaces/preview":
+                try:
+                    return self.send(self.hub.preview_workspaces(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
             if path == "/api/workspaces":

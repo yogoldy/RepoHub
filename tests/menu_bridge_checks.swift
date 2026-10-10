@@ -30,6 +30,16 @@ import Foundation
         precondition(MenuBridge.action(body: ["action":"quit"], frameURL: nil, isMainFrame: true) == nil)
         count += 2
         precondition(MenuBridge.action(body:["action":"connectGitHub", "token":"forbidden"], frameURL:url, isMainFrame:true) == nil)
+        for picker in ["chooseRepoHome", "chooseRepoFolders"] {
+            let valid: [String:Any] = ["action":picker, "request_id":String(repeating:"a",count:24)]
+            precondition(MenuBridge.action(body:valid,frameURL:url,isMainFrame:true)?.rawValue == picker); count += 1
+            for bad: Any in [["action":picker], ["action":picker,"request_id":"../path"],
+                             ["action":picker,"request_id":42], ["action":picker,"request_id":String(repeating:"a",count:24),"path":"/outside"]] {
+                precondition(MenuBridge.action(body:bad,frameURL:url,isMainFrame:true) == nil); count += 1
+            }
+            precondition(MenuBridge.action(body:valid,frameURL:url,isMainFrame:false) == nil); count += 1
+            precondition(MenuBridge.action(body:valid,frameURL:URL(string:"http://127.0.0.1:8767/views/test/index.html"),isMainFrame:true) == nil); count += 1
+        }
         let repoBody: [String: Any] = ["action":"openRepo", "repo_id":"Example-1234567890"]
         precondition(MenuBridge.action(body: repoBody, frameURL: url, isMainFrame: true) == .openRepo)
         count += 1

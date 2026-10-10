@@ -232,3 +232,53 @@ class WorkspaceTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as caught:request(payload)
             self.assertEqual(caught.exception.code,409);caught.exception.close()
         finally:server.shutdown();server.server_close();thread.join()
+
+    def test_review_is_read_only_and_requires_same_discovered_folder_list(self):
+        self.hub.backup();before=self.hub.registry.path.read_bytes();index=copy.deepcopy(self.hub.index)
+        source={'mode':'home','home':str(self.home)}
+        payload={'source':source,'revision':self.hub.workspace_status()['revision']}
+        reviewed=self.hub.preview_workspaces(payload)
+        self.assertEqual(self.hub.registry.path.read_bytes(),before)
+        self.assertEqual(self.hub.index,index)
+        self.assertEqual([r['path'] for r in reviewed['workspaces']],[str(self.repo)])
+        self.folder('repos/Added')
+        with self.assertRaises(FileExistsError):self.hub.save_workspaces({**payload,'review':reviewed['review']})
+        self.assertEqual(self.hub.index,index)
+        latest=self.hub.workspace_status();payload['revision']=latest['revision']
+        reviewed=self.hub.preview_workspaces(payload)
+        saved=self.hub.save_workspaces({**payload,'review':reviewed['review']})
+        self.assertEqual(len([r for r in saved['configuration']['workspaces'] if r['active']]),2)
+        self.assertEqual(self.hub.index,index)
+
+    def test_review_discloses_removal_without_erasing_data_and_rejects_invalid_token(self):
+        self.hub.backup();key=workspace_id('Example');notes=self.hub.data_path(key,'notes');atomic_json(notes,{'keep':True})
+        index=copy.deepcopy(self.hub.index);payload={'source':{'mode':'manual','paths':[]},'revision':self.hub.workspace_status()['revision']}
+        reviewed=self.hub.preview_workspaces(payload)
+        self.assertEqual(reviewed['workspaces'],[]);self.assertEqual(reviewed['removed'][0]['id'],key)
+        for token in [None,'wrong','0'*64]:
+            with self.assertRaises((ValueError,FileExistsError)):self.hub.save_workspaces({**payload,'review':token})
+        self.hub.save_workspaces({**payload,'review':reviewed['review']})
+        self.assertEqual(self.hub.index,index);self.assertTrue(self.repo.exists())
+        self.assertEqual(json.loads(notes.read_text()),{'keep':True})
+
+    def test_preview_guard_and_diagnostics_exclude_source_prose(self):
+        from diagnostics import read_events
+        server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.hub=self.hub
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        origin='http://127.0.0.1:'+str(server.server_port)
+        payload={'source':{'mode':'manual','paths':[str(self.repo)]},'revision':self.hub.workspace_status()['revision']}
+        def post(token,site,body):
+            return urllib.request.urlopen(urllib.request.Request(origin+'/api/workspaces/preview',json.dumps(body).encode(),
+                {'Content-Type':'application/json','Origin':site,'X-RepoHub-Token':token}),timeout=5)
+        try:
+            for token,site in [('bad',origin),(self.hub.csrf,'https://other.example')]:
+                with self.assertRaises(urllib.error.HTTPError) as caught:post(token,site,payload)
+                self.assertEqual(caught.exception.code,403);caught.exception.close()
+            with post(self.hub.csrf,origin,payload) as response:preview=json.load(response)
+            self.assertEqual(preview['workspaces'][0]['id'],workspace_id('Example'))
+            with self.assertRaises(urllib.error.HTTPError) as caught:post(self.hub.csrf,origin,{**payload,'revision':'stale'})
+            self.assertEqual(caught.exception.code,409);caught.exception.close()
+            events=[e for e in read_events(self.hub.state_dir/'diagnostics') if e['event']=='workspace_review']
+            self.assertEqual([e['result'] for e in events],['complete','failed'])
+            self.assertNotIn(str(self.repo),json.dumps(events));self.assertNotIn('Example',json.dumps(events))
+        finally:server.shutdown();server.server_close();thread.join()

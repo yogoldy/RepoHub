@@ -1,6 +1,6 @@
 # Workspace configuration foundation (Tier 3A)
 
-Registry implementation: `4363423`, with ID-scoped presentation/diagnostic follow-up on `codex/workspace-setup`. This is the persisted source model and API that the future setup interface will use. Folder pickers, destination selection, visual onboarding and readable backup-folder names remain separate roadmap items. The installed Macs were not updated in this pass.
+Registry implementation: `4363423`, with ID-scoped presentation/diagnostic follow-up on `codex/workspace-setup`. This is the persisted source model and API that the future setup interface will use. Native source pickers and the explicit review screen are implemented in the follow-up on this branch. Destination selection, visual onboarding and readable backup-folder names remain separate roadmap items.
 
 ## Registry and identity
 
@@ -77,3 +77,11 @@ Native compilation/URL tests do not prove an actual Finder click for a manual se
 ## Native staging evidence
 
 [The Pro fresh-state acceptance record](PRO_WORKSPACE_STAGING_TEST.md) covers native menu backups/settings, duplicate-name Finder paths, missing-source preservation, recovery, restart and diagnostic correlation at `83c52bd`. It also records the shared-port WebKit isolation failure and clean repeat. No daily deployment or provider-upload claim is implied.
+
+## Source-selection screen (Tier 3B/3C)
+
+Open the menu-bar gear, then **Choose repo folders**. Repo-home monitors immediate visible subdirectories and discloses automatic future discovery. Individual selection supports adding/removing folders across multiple picker sessions; the list shows exact paths so identical display names can be distinguished. Removing the last manual selection explicitly reviews zero monitored repos. Native selection is available only in the exact top-level menu page, using directory-only `NSOpenPanel` with a typed per-request ID. Cancellation or a late result cannot save or replace another draft.
+
+**Review folders** calls the token/Origin-guarded `POST /api/workspaces/preview` with `source` and registry `revision`. It validates the candidate without saving it and returns canonical `workspaces`, `removed`, and a SHA-256 `review` fingerprint. The review screen shows exact monitored paths and removals. **Save monitored folders** sends that fingerprint with the original source/revision to `/api/workspaces`; the backend recomputes the candidate under the source-selection locks and refuses a changed folder inventory. Reload/review is required on conflict. Existing two-field local API saves remain supported for programmatic clients; the UI always uses the three-field reviewed save. The fingerprint is a change guard, not an authentication credential.
+
+`workspace_review` diagnostics contain only complete/failed outcome, supported mode and repo count. Paths and prose are excluded from those events and the allowlisted export. The native picker itself does not bypass server validation. Saving changes monitoring only, not the destination, schedules or backup contents, and does not start a backup. Native live acceptance and Pro deployment are pending at this implementation checkpoint; the Air is held unchanged.

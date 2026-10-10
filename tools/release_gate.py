@@ -169,7 +169,7 @@ def main():
         node = shutil.which('node') or 'node'
         for file in sorted((ROOT/'web').glob('*.js')):
             command('syntax-'+file.stem,[node,'--check',str(file)])
-        for file in ['menu-status.cjs','diagnostics-client.cjs']:
+        for file in ['menu-status.cjs','diagnostics-client.cjs','workspace-setup.cjs']:
             command(file.split('.')[0],[node,str(ROOT/'tests'/file)])
         if args.profile=='macos':
             if platform.system()!='Darwin':

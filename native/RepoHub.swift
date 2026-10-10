@@ -11,6 +11,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var unavailableSince: Date?
     var notificationsEnabled: Bool { UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true }
     var polling: Timer?
+    var sourcePicker: NSOpenPanel?
     let address = URL(string: "http://127.0.0.1:8767/")!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -203,6 +204,10 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             if let body = message.body as? [String: Any], let id = body["repo_id"] as? String { openRepository(id) }
         case .toggleNotifications: toggleNotifications()
         case .connectGitHub: GitHubConnection.configure()
+        case .chooseRepoHome, .chooseRepoFolders:
+            if let body = message.body as? [String: Any], let id = body["request_id"] as? String {
+                chooseSources(multiple: action == .chooseRepoFolders, requestID: id)
+            }
         case .quit: quit()
         }
     }
@@ -221,6 +226,32 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             guard let self = self else { return }
             webView.load(URLRequest(url: self.address.appendingPathComponent("menu.html")))
+        }
+    }
+
+    func chooseSources(multiple: Bool, requestID: String) {
+        guard sourcePicker == nil else { return }
+        let panel = NSOpenPanel()
+        sourcePicker = panel
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = multiple
+        panel.canCreateDirectories = false
+        panel.title = multiple ? "Choose individual repo folders" : "Choose a repo-home folder"
+        panel.message = multiple ? "Each selected folder is one repo. You can add more in setup." : "Immediate subfolders of this folder will be monitored as repos."
+        panel.prompt = "Choose"
+        popover.behavior = .applicationDefined
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] response in
+            guard let self = self else { return }
+            let detail: [String: Any] = ["request_id": requestID, "cancelled": response != .OK,
+                                        "paths": response == .OK ? panel.urls.map { $0.resolvingSymlinksInPath().path } : []]
+            self.sourcePicker = nil
+            self.popover.behavior = .transient
+            self.showPopover()
+            guard let data = try? JSONSerialization.data(withJSONObject: detail),
+                  let json = String(data: data, encoding: .utf8) else { return }
+            self.popoverWebView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('repoHubSourcesPicked',{detail:" + json + "}))")
         }
     }
 

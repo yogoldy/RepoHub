@@ -316,6 +316,23 @@
         "test_workspace_registry.WorkspaceTests.test_duplicate_names_scope_diagnostics_and_problem_episodes"
       ],
       "remaining_gap": "Native URL checks do not prove actual Finder/picker interaction. Separate-volume remounts, inaccessible-volume recovery, concurrent filesystem replacement, source relocation and destination/naming migration need independent live coverage. Setup UI and provider-aware destinations remain unimplemented."
+    },
+    {
+      "id": "GR16",
+      "title": "Review exact source selections before saving",
+      "breakpoint": "Folder discovery changes after review; cancelled or stale native picker result updates a different draft; selection UI saves without disclosing removal.",
+      "diagnostic_events": [
+        "workspace_review",
+        "workspace_configuration"
+      ],
+      "cause_and_solution": "Keep folder choice local until backend validation, bind the review to the current registry and candidate inventory, and correlate native picker results to a single request.",
+      "required_behavior": "Review lists exact canonical paths and removals; stale review is rejected; cancel and failed review never save; picker accepts only exact main menu frame and typed request IDs.",
+      "test_ids": [
+        "test_workspace_registry.WorkspaceTests.test_review_is_read_only_and_requires_same_discovered_folder_list",
+        "test_workspace_registry.WorkspaceTests.test_review_discloses_removal_without_erasing_data_and_rejects_invalid_token",
+        "test_workspace_registry.WorkspaceTests.test_preview_guard_and_diagnostics_exclude_source_prose"
+      ],
+      "remaining_gap": "Native picker pixels, focus/cancel/multiple selection and installed menu flow require live acceptance. Separate volume and permissions remain additional acceptance cases. Native bridge and workspace-setup JavaScript checks run in the gate."
     }
   ]
 }
