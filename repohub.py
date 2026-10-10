@@ -283,10 +283,12 @@ def git_info(root):
             "last_commit": run("log", "-1", "--format=%cI")}
 
 
-def snapshot(root, destination, staging, expected=None, after_archive=None, observe=None):
+def snapshot(root, destination, staging, expected=None, after_archive=None, observe=None, source_check=None):
     """Verify source bytes, stored archive contents, and destination checksum before publication."""
     root, destination, staging = map(Path, (root, destination, staging))
     observe = observe or (lambda stage: None)
+    source_check = source_check or (lambda: None)
+    source_check()
     observe("source_hashing")
     before = tree_entries(root)
     if expected is not None and fingerprint(before) != expected:
@@ -303,11 +305,13 @@ def snapshot(root, destination, staging, expected=None, after_archive=None, obse
                 archive.add(root / relative, arcname=root.name + "/" + relative, recursive=False)
         if after_archive:
             after_archive()
+        source_check()
         if before != tree_entries(root):
             raise RuntimeError("Repo changed during the backup; no snapshot was published")
         observe("archive_verification")
         if archive_manifest(temporary, root.name) != contents or content_manifest(root) != contents:
             raise RuntimeError("Repo content changed during the backup; no snapshot was published")
+        source_check()
         digest = sha256(temporary)
         destination.mkdir(parents=True, exist_ok=True)
         filename = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S.%fZ") + ".tar.gz"
@@ -317,6 +321,7 @@ def snapshot(root, destination, staging, expected=None, after_archive=None, obse
         observe("destination_verification")
         if sha256(published) != digest:
             raise RuntimeError("Snapshot checksum verification failed")
+        source_check()
         return {"completed_at": utc_now(), "archive": str(published), "sha256": digest,
                 "signature": fingerprint(before), "content_signature": content_signature(contents),
                 "archive_bytes": published.stat().st_size,
@@ -461,6 +466,7 @@ class Hub:
                 row = {"id": key, "name": root.name, "path": str(root)}
                 try:
                     require_source(root, canonical_only=True)
+                    if key != "repohub-data":self.registry.require_workspace(key, root)
                     entries = tree_entries(root)
                     actual = [e for e in entries if stat.S_ISREG(e[1])
                               and ".git" not in Path(e[0]).parts
@@ -792,6 +798,7 @@ class Hub:
                     self.lifecycle.emit("archive_stage", key=key, run_id=run_id, stage=value)
                 try:
                     require_source(root, canonical_only=True)
+                    if key != "repohub-data":self.registry.require_workspace(key, root)
                     entries = tree_entries(root)
                     signature = fingerprint(entries)
                     with self.lock:
@@ -824,6 +831,7 @@ class Hub:
                             self.lifecycle.emit("archive_repair_needed", key=key, run_id=run_id,
                                                 previous_archive_ref=diagnostic_ref(previous["archive"]), error_type=type(error).__name__)
                             pass  # Replace a corrupt copy from the intact source; do not prune first.
+                    if key != "repohub-data":self.registry.require_workspace(key, root)
                     if verified and (verified["state"] == "matched" or verified.get("ignored_finder_only") is True):
                         with self.lock:
                             self.verifications[key] = verified
@@ -839,7 +847,7 @@ class Hub:
                         self.lifecycle.emit("repo_backup_finished", key=key, run_id=run_id, result="reused",
                                             archive_ref=diagnostic_ref(previous["archive"]), duration_ms=(time.monotonic()-repo_started)*1000)
                         continue
-                    result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature, observe=observe)
+                    result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature, observe=observe, source_check=(lambda: self.registry.require_workspace(key, root)) if key != "repohub-data" else None)
                     current_archive = result["archive"]
                     self.lifecycle.emit("archive_verified", key=key, run_id=run_id, archive_ref=diagnostic_ref(current_archive),
                                         backup_hash_ref=diagnostic_ref(result["sha256"]), result="verified")

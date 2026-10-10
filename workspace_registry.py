@@ -5,6 +5,43 @@ from pathlib import Path
 import re
 import threading
 import stat
+import os
+import errno
+import sys
+import subprocess
+import plistlib
+
+class SourceIdentityChanged(OSError):
+    def __init__(self):
+        super().__init__(errno.ESTALE, 'Folder identity changed. Review and save the folder selection to approve this source.')
+
+
+def source_identity(path):
+    require_source(path, canonical_only=True)
+    info = Path(path).stat()
+    with os.scandir(path) as entries:next(entries, None)
+    # Volume UUID survives a remount; st_dev alone can be reused by a different disk.
+    if sys.platform == 'darwin':
+        try:
+            device = subprocess.run(['/bin/df','-P',str(path)], capture_output=True, text=True, check=True, timeout=5).stdout.splitlines()[-1].split()[0]
+            result = subprocess.run(['/usr/sbin/diskutil','info','-plist',device], capture_output=True, timeout=5)
+            value = plistlib.loads(result.stdout) if result.returncode == 0 else {}
+            volume = value.get('VolumeUUID')
+        except (subprocess.SubprocessError, ValueError, IndexError, plistlib.InvalidFileException) as error:
+            raise OSError(errno.EIO, 'Cannot establish source volume identity') from error
+        if not isinstance(volume, str) or not volume:
+            raise OSError(errno.EIO, 'Cannot establish source volume identity')
+    else:
+        volume = 'device:' + str(info.st_dev)
+    return {'volume':volume, 'file_id':info.st_ino}
+
+
+def validate_identity(value):
+    if (not isinstance(value,dict) or set(value) != {'volume','file_id'}
+        or not isinstance(value['volume'],str) or not 0 < len(value['volume']) <= 128
+        or type(value['file_id']) is not int or value['file_id'] <= 0):
+        raise ValueError('Invalid saved source identity')
+
 
 ID = re.compile(r'^[a-zA-Z0-9_-]{1,80}$')
 
@@ -69,12 +106,13 @@ class WorkspaceRegistry:
         if not isinstance(source, dict) or source.get('mode') not in {'home', 'manual'}:
             raise ValueError('Invalid source mode')
         if source['mode'] == 'home':
-            if set(source) != {'mode', 'home'}:
+            if set(source) not in ({'mode', 'home'}, {'mode', 'home', 'identity'}):
                 raise ValueError('Invalid repo-home configuration')
             home = canonical(source['home'])
             if str(home) != source['home']:
                 raise ValueError('Repo home has changed its canonical location')
             self.safe_source(home)
+            if 'identity' in source:validate_identity(source['identity'])
         elif set(source) != {'mode'}:
             raise ValueError('Invalid manual configuration')
         rows = value['workspaces']
@@ -82,8 +120,9 @@ class WorkspaceRegistry:
             raise ValueError('Invalid workspace list')
         ids, paths, active = set(), set(), []
         for row in rows:
-            if not isinstance(row, dict) or set(row) != {'id', 'path', 'active'} or not isinstance(row['id'], str) or not ID.fullmatch(row['id']) or row['id'] == 'repohub-data' or type(row['active']) is not bool:
+            if not isinstance(row, dict) or set(row) not in ({'id','path','active'}, {'id','path','active','identity'}) or not isinstance(row['id'], str) or not ID.fullmatch(row['id']) or row['id'] == 'repohub-data' or type(row['active']) is not bool:
                 raise ValueError('Invalid workspace entry')
+            if 'identity' in row:validate_identity(row['identity'])
             # Preserve canonical strings for absent folders; reject retargeted
             # symlinks instead of silently adopting a different source.
             raw = row['path']
@@ -105,18 +144,25 @@ class WorkspaceRegistry:
     def discover(self, value):
         value = json.loads(json.dumps(value))
         if value['source']['mode'] != 'home':
-            return value
+            return self.bind_accessible(value)
         home = Path(value['source']['home'])
         if not home.exists():
-            return value  # Keep missing sources visible; do not erase identity.
+            return self.bind_accessible(value)  # Keep missing sources visible; do not erase identity.
         if home.resolve() != home or not home.is_dir():
             raise ValueError('Repo home is unavailable or has changed location')
+        try:
+            identity = source_identity(home)
+            if 'identity' in value['source'] and value['source']['identity'] != identity:
+                return value  # Do not discover children of a substituted home.
+            value['source']['identity'] = identity
+        except OSError:
+            return self.bind_accessible(value)
         by_path = {row['path']: row for row in value['workspaces']}
         ids = {row['id'] for row in value['workspaces']}
         try:
             children = sorted(home.iterdir(), key=lambda p: str(p).lower())
         except OSError:
-            return value
+            return self.bind_accessible(value)
         for path in children:
             if path.name.startswith('.') or path.is_symlink() or not path.is_dir():
                 continue
@@ -132,7 +178,24 @@ class WorkspaceRegistry:
                     raise ValueError('Workspace identity collision')
                 row = {'id': key, 'path': str(path), 'active': True}
                 value['workspaces'].append(row); ids.add(key)
-        return self.validate(value)
+        return self.validate(self.bind_accessible(value))
+
+    def bind_accessible(self, value):
+        for row in value['workspaces']:
+            if row['active'] and 'identity' not in row:
+                try:row['identity'] = source_identity(Path(row['path']))
+                except OSError:pass
+        return value
+
+    def require_workspace(self, key, path):
+        with self.lock:
+            row = next(r for r in self.value['workspaces'] if r['id'] == key and r['active'])
+            identity = source_identity(path)
+            if row.get('identity') != identity:
+                raise SourceIdentityChanged()
+            source = self.value['source']
+            if source['mode'] == 'home' and source.get('identity') != source_identity(Path(source['home'])):
+                raise SourceIdentityChanged()
 
     def refresh(self):
         with self.lock:
@@ -160,7 +223,7 @@ class WorkspaceRegistry:
             home = canonical(source['home']); self.safe_source(home)
             if not home.is_dir():
                 raise ValueError('Choose an accessible repo-home folder')
-            selected = {'mode': 'home', 'home': str(home)}
+            selected = {'mode': 'home', 'home': str(home), 'identity':source_identity(home)}
             paths = [p for p in sorted(home.iterdir()) if p.is_dir() and not p.is_symlink() and not p.name.startswith('.')]
         elif mode == 'manual' and set(source) == {'mode', 'paths'} and isinstance(source['paths'], list):
             selected = {'mode': 'manual'}
@@ -183,11 +246,12 @@ class WorkspaceRegistry:
             previous = by_path.get(str(path)) or next((r for r in rows if same_location(Path(r['path']), path)), None)
             if previous:
                 previous['active'] = True
+                previous['identity'] = source_identity(path)
             else:
                 key = workspace_id(str(path))
                 if key in ids:
                     raise ValueError('Workspace identity collision')
-                rows.append({'id': key, 'path': str(path), 'active': True}); ids.add(key)
+                rows.append({'id': key, 'path': str(path), 'active': True, 'identity':source_identity(path)}); ids.add(key)
         return self.validate({'schema_version': 1, 'source': selected, 'workspaces': rows})
 
     def review(self, source, revision):

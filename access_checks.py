@@ -4,7 +4,9 @@ import errno
 
 def access_failure(error, operation):
     code = getattr(error, 'errno', None)
-    if code in (errno.EACCES, errno.EPERM):
+    if code == errno.ESTALE:
+        state, detail = 'changed', 'Folder identity changed. Review and save the folder selection before backing it up.'
+    elif code in (errno.EACCES, errno.EPERM):
         state, detail = 'blocked', 'Access denied. Check folder permissions and macOS Privacy & Security, then retry.'
     elif code in (errno.ENOENT, errno.ENODEV, errno.ENXIO, errno.ENOTDIR):
         state, detail = 'unavailable', 'Folder or storage unavailable. Reconnect it or review the selected path, then retry.'

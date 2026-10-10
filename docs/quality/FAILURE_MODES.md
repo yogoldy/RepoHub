@@ -334,3 +334,9 @@ The menu changed cached backend health when local requests failed or a 20-second
 ## Access denial and unavailable storage — GR17
 
 Actual mode-bit restrictions exercise denied root and nested-file reads, denied archive writes and revocation between archive creation and validation. Existing verified bytes/index remain unchanged; accessible independent repos continue and restore of access recovers. Typed errno-based outcomes do not diagnose TCC. Real privacy prompting remains native acceptance work.
+
+## Source substitution — GR18
+
+Canonical path and workspace ID alone cannot distinguish a replacement folder/volume. Add directory file ID and volume UUID when accessible; retain existing IDs. Recheck before reads and publication, block mismatches and require an explicit reviewed selection. Remount testing uses a disposable disk image; physical hot-unplug is not simulated proof.
+
+Live Pro disk-image acceptance passed: unmount retained the prior archive/index, a replacement directory at the former mount path was rejected, and remount of the original HFS+ image recovered with the same volume/directory identity and reused the verified archive. Private receipts are outside Git. This is real separate-volume evidence; physical unplug and privacy prompting remain separate.
