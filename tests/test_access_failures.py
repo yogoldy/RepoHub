@@ -2,6 +2,7 @@ import copy
 import errno
 import json
 import os
+import stat
 from pathlib import Path
 import tempfile
 import unittest
@@ -17,6 +18,7 @@ class AccessTests(unittest.TestCase):
         self.a = self.base/'repos/A'; self.b = self.base/'repos/B'
         for p in (self.a,self.b):p.mkdir(parents=True);(p/'file').write_text('baseline')
         (self.base/'destination').mkdir()
+        self.modes={p:stat.S_IMODE(p.stat().st_mode) for p in (self.a,self.b,self.a/'file',self.b/'file')}
         self.hub = Hub({'repos_root':str(self.a.parent),'state_dir':str(self.base/'state'),'backup_root':str(self.base/'destination/Snapshots')})
         self.hub.backup();self.ids = {p:k for k,p in self.hub.repositories().items()}
         self.before = copy.deepcopy(self.hub.index[self.ids[self.a]])
@@ -39,23 +41,23 @@ class AccessTests(unittest.TestCase):
             self.assertEqual(row['verification']['access']['state'],'blocked')
             self.hub.backup();self.kept()
             self.assertNotEqual(self.hub.index[self.ids[self.b]]['signature'],self.before['signature'])
-        finally:path.chmod(0o644)
+        finally:path.chmod(self.modes[path])
         self.hub.scan(force=True);self.assertEqual(next(r for r in self.hub.status['repos'] if r['id']==self.ids[self.a])['verification']['state'],'matched')
     def test_unreadable_root_scan_keeps_identity_and_previous_archive(self):
         self.a.chmod(0)
         try:
             self.hub.scan(force=True);row=next(r for r in self.hub.status['repos'] if r['id']==self.ids[self.a])
             self.assertEqual(row['access']['state'],'blocked');self.hub.backup();self.kept()
-        finally:self.a.chmod(0o755)
+        finally:self.a.chmod(self.modes[self.a])
         self.hub.scan(force=True);self.assertNotIn('error',next(r for r in self.hub.status['repos'] if r['id']==self.ids[self.a]))
     def test_unwritable_destination_preserves_previous_archive(self):
-        directory=Path(self.before['archive']).parent;directory.chmod(0o555)
+        directory=Path(self.before['archive']).parent;old_mode=stat.S_IMODE(directory.stat().st_mode);directory.chmod(0o555)
         try:
             (self.a/'file').write_text('changed source')
             self.hub.backup(keys=[self.ids[self.a]]);self.kept()
             failure=self.hub.status['backup']['errors'][0]
             self.assertEqual(failure['access']['operation'],'destination_write');self.assertEqual(failure['access']['state'],'blocked')
-        finally:directory.chmod(0o755)
+        finally:directory.chmod(old_mode)
         self.hub.backup(keys=[self.ids[self.a]]);self.assertNotEqual(self.hub.index[self.ids[self.a]]['archive'],self.before['archive'])
     def test_revocation_during_archive_creation_never_publishes_partial_copy(self):
         from repohub import snapshot
@@ -64,7 +66,7 @@ class AccessTests(unittest.TestCase):
         try:
             with self.assertRaises((PermissionError,RuntimeError)):snapshot(self.a,directory,self.base/'stage',after_archive=after)
             self.kept();self.assertEqual(list(directory.glob('*.tar.gz')),[Path(self.before['archive'])])
-        finally:path.chmod(0o644)
+        finally:path.chmod(self.modes[path])
     def test_missing_destination_is_not_empty_success(self):
         missing=self.base/'missing';self.hub.backups=missing/'Snapshots'
         self.hub.backup(keys=[self.ids[self.a]]);self.kept()

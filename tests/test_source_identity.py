@@ -40,5 +40,5 @@ class IdentityTests(unittest.TestCase):
             again=Hub(self.hub.config);row=next(r for r in again.registry.value['workspaces'] if r['id']==self.ids[self.a])
             self.assertNotIn('identity',row)
             self.assertEqual(again.index[self.ids[self.a]],self.before)
-        finally:self.a.chmod(0o755)
+        finally:self.a.chmod(self.modes[self.a])
         again.registry.refresh();self.assertEqual(again.registry.value['workspaces'][0]['id'],self.ids[self.a])

@@ -19,7 +19,7 @@ class ReadinessTests(unittest.TestCase):
             self.hub.check_readiness();status=self.hub.readiness_status()
             self.assertEqual(next(r for r in status['sources'] if r['id']==self.ids[self.a])['state'],'blocked')
             self.assertEqual(status['destination']['state'],'accessible')
-        finally:(self.a/'file').chmod(0o644)
+        finally:(self.a/'file').chmod(self.modes[self.a/'file'])
         self.hub.check_readiness();self.assertTrue(all(r['state']=='accessible' for r in self.hub.readiness_status()['sources']))
         self.assertEqual(self.hub.registry.path.read_bytes(),before);self.assertEqual(json.dumps(self.hub.index,sort_keys=True),index)
         self.assertFalse(list(self.hub.backups.glob('.repohub-access-*')))
