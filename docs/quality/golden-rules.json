@@ -26,7 +26,8 @@
       "diagnostic_events": [
         "repo_checked",
         "archive_stage",
-        "repo_backup_failed"
+        "repo_backup_failed",
+        "scan_retry_requested"
       ],
       "cause_and_solution": "Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members.",
       "required_behavior": "Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits.",
@@ -34,7 +35,11 @@
         "test_hub.HubTests.test_same_size_same_mtime_edit_is_detected_and_replaced",
         "test_hub.HubTests.test_timestamp_only_changes_match_hashes_and_do_not_replace_backup",
         "test_hub.HubTests.test_metadata_preserving_change_during_snapshot_is_rejected",
-        "test_hub.HubTests.test_change_during_backup_does_not_publish"
+        "test_hub.HubTests.test_change_during_backup_does_not_publish",
+        "test_hub.HubTests.test_source_mutation_is_transient_and_retry_is_scoped",
+        "test_hub.HubTests.test_archive_mutation_is_not_source_mutation",
+        "test_hub.HubTests.test_retry_api_requires_trusted_explicit_repo_and_never_uploads",
+        "test_change_evidence.EvidenceTests.test_changing_source_has_explainable_icon_and_manual_retry_trail"
       ],
       "remaining_gap": "Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided."
     },

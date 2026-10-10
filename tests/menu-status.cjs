@@ -48,3 +48,9 @@ check({...finderIgnored,cloud:{state:'pending',archive:'/current'}},'pending');
 check({...finderIgnored,cloud:{state:'error',archive:'/current'}},'error');
 check(finderIgnored,'copying',false,{running:true,current_repo:'Example'});
 console.log(count+' menu status checks passed');
+
+const changing={...good,needs_backup:true,verification:{state:'changing'}};
+assert.equal(check(changing,'verifying').label,'Files changing');
+assert.match(view(changing).detail,/next scan/);
+check({...changing,error:'real error'},'error');
+check({...changing,cloud:{state:'error'}},'error');

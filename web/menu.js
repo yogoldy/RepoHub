@@ -1,3 +1,4 @@
+let retryingRepo=null;
 const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
 let menuState=null,selectedId=null,sessionToken='',loading=false,lastResponseAt=0,settingsRevision='',settingsRepo=null,defaultsRevision='',settingsDefaults=null;
 const $=s=>document.querySelector(s);
@@ -58,9 +59,15 @@ function renderDetail(){
   const state=view(repo),cloud=repo.cloud||{},copying=state.phase==='copying',uploading=cloud.state==='uploading'||cloud.state==='pending';
   const showProgress=repo.health?.fresh===true&&(copying||uploading),label=copying?'Building backup':state.percent===null?'Waiting for upload progress':state.percent===100?'100% · awaiting confirmation':percentLabel(state.percent);
   const progress=showProgress?`<div class="progress-line"><progress max="100" ${!copying&&state.percent!==null?`value="${state.percent}"`:''} aria-label="${escape(repo.name)} ${copying?'backup':'upload'} progress"></progress><span>${escape(label)}</span></div>`:'';
-  const markup=`<div class="detail-top"><h2>${escape(repo.name)}</h2><span class="pill ${escape(state.phase)}">${escape(state.label)}</span></div><p class="detail-note" title="${escape(state.detail)}">${escape(state.detail)}</p>${progress}<div class="facts"><div class="fact"><small>Last backup saved</small>${when(repo.last_backup?.completed_at)}</div><div class="fact"><small>Hashes checked</small>${when(repo.verification?.checked_at)}</div><div class="fact"><small>Backup size</small>${bytes(repo.last_backup?.archive_bytes)}</div></div><button id="repo-schedule" class="repo-schedule" aria-label="Schedule for ${escape(repo.name)}">Schedule <span>${repo.schedule_override?'Custom':'Default'}</span><span aria-hidden="true">›</span></button>`;
+  const markup=`<div class="detail-top"><h2>${escape(repo.name)}</h2><span class="pill ${escape(state.phase)}">${escape(state.label)}</span></div><p class="detail-note" title="${escape(state.detail)}">${escape(state.detail)}</p>${progress}${['changing','error'].includes(repo.verification?.state)?`<button id="retry-check" class="repo-schedule" ${retryingRepo===repo.id?'disabled':''}>${retryingRepo===repo.id?'Check requested…':'Retry check now'}</button>`:''}<div class="facts"><div class="fact"><small>Last backup saved</small>${when(repo.last_backup?.completed_at)}</div><div class="fact"><small>Hashes checked</small>${when(repo.verification?.checked_at)}</div><div class="fact"><small>Backup size</small>${bytes(repo.last_backup?.archive_bytes)}</div></div><button id="repo-schedule" class="repo-schedule" aria-label="Schedule for ${escape(repo.name)}">Schedule <span>${repo.schedule_override?'Custom':'Default'}</span><span aria-hidden="true">›</span></button>`;
   if($('#detail').innerHTML!==markup)$('#detail').innerHTML=markup;
   $('#repo-schedule').onclick=()=>openSettings(repo.id);
+  if($('#retry-check'))$('#retry-check').onclick=async()=>{
+    retryingRepo=repo.id;renderDetail();
+    try{sessionToken=(await api('/api/session')).token;await api('/api/retry-check',{repo_id:repo.id});$('#notice').textContent='Check requested for '+repo.name+'.';}
+    catch(e){$('#notice').textContent=e.message;}
+    finally{setTimeout(()=>{retryingRepo=null;void load();},1000);}
+  };
 }
 function selectRepo(id){selectedId=id;render();}
 function updatePosition(){const rail=$('#cards'),buttons=[...rail.querySelectorAll('.repo-card')],rect=rail.getBoundingClientRect();const visible=buttons.map((button,i)=>({rect:button.getBoundingClientRect(),index:i})).filter(b=>b.rect.left>=rect.left-2&&b.rect.right<=rect.right+2);$('#position').textContent=visible.length?`${visible[0].index+1}–${visible[visible.length-1].index+1} of ${buttons.length} repos`:`${buttons.length} repos`;$('#previous').disabled=rail.scrollLeft<=2;$('#next').disabled=rail.scrollLeft+rail.clientWidth>=rail.scrollWidth-2;}

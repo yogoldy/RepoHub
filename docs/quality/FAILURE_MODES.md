@@ -42,7 +42,7 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 **Cause / solution:** Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members.
 
-**Required behavior:** Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits.
+**Required behavior:** Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits. Source changes during verification appear as “Files changing,” with another check on the next scan and a scoped menu-bar retry. Archive mutation or corruption remains an error. A scoped retry never creates an archive or refreshes the global scan timestamp.
 
 **Diagnostic trail:** `repo_checked`, `archive_stage`, `repo_backup_failed`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
 
@@ -51,6 +51,8 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 - `test_hub.HubTests.test_same_size_same_mtime_edit_is_detected_and_replaced`
 - `test_hub.HubTests.test_timestamp_only_changes_match_hashes_and_do_not_replace_backup`
 - `test_hub.HubTests.test_metadata_preserving_change_during_snapshot_is_rejected`
+- `test_hub.HubTests.test_source_mutation_is_transient_and_retry_is_scoped`
+- `test_hub.HubTests.test_archive_mutation_is_not_source_mutation`
 - `test_hub.HubTests.test_change_during_backup_does_not_publish`
 
 **Remaining exposure:** Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided.

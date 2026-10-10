@@ -41,6 +41,21 @@ class EvidenceTests(unittest.TestCase):
                 'observation_id':status['diagnostic_observation_id'], 'policy_version':'change-evidence-2',
                 'rows':[{'repo_id':self.key, 'display_label':label, 'phase':phase, 'ready':phase=='ready'}]}
 
+    def test_changing_source_has_explainable_icon_and_manual_retry_trail(self):
+        from unittest.mock import patch
+        from repohub import SourceChanged
+        with patch("repohub.verify_current", side_effect=SourceChanged("private prose")):
+            self.hub.scan(force=True)
+        payload = self.payload('menu', 'Files changing', 'verifying')
+        self.hub.evidence.presentation(payload)
+        events = self.events()
+        self.assertEqual([e for e in events if e['event']=='ui_presented'][-1]['reason'], 'source_changed_during_verification')
+        self.assertFalse(any(e['event']=='presentation_input_disagreement' for e in events))
+        self.assertNotIn('private prose', json.dumps(events))
+        self.hub.retry_check(self.key)
+        self.assertTrue(self.hub.scan_lock.acquire(timeout=5)); self.hub.scan_lock.release()
+        self.assertTrue(any(e['event']=='scan_retry_requested' for e in self.events()))
+
     def test_finder_timestamp_and_real_edits_have_distinct_evidence(self):
         (self.repo/'.DS_Store').write_text('finder after')
         self.hub.scan(force=True)
