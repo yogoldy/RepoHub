@@ -115,3 +115,46 @@ class AcceptanceHarnessTests(unittest.TestCase):
                   if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and node.target.id == "name"
                   and isinstance(node.iter, (ast.Tuple, ast.List))]
         self.assertEqual(sum("repohub.py" in group for group in groups), 1)
+
+    def test_registered_native_cleanup_never_removes_foreign_or_changed_assets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp) / "run"
+            base.mkdir()
+            home = Path(temp) / "home"
+            home.mkdir()
+            original = base / "RepoHub Reliability.app"
+            original.mkdir()
+            (original / "asset").write_text("known candidate")
+            marker = {"id": "b" * 32}
+            with patch.object(harness, "run"):
+                app = harness.register_native(base, marker, home)
+                (app / "asset").write_text("unexpected mutation")
+                self.assertEqual(harness.unregister_native(base, marker, home), "registered_assets_changed")
+                self.assertTrue(app.exists())
+                receipt = harness.read_json(base / "native-registration.json")
+                receipt["path"] = str(home / "Applications/Repo Hub.app")
+                harness.write_json(base / "native-registration.json", receipt)
+                self.assertEqual(harness.unregister_native(base, marker, home), "unowned_registration")
+                self.assertTrue(app.exists())
+                receipt["path"] = str(app)
+                harness.write_json(base / "native-registration.json", receipt)
+                (app / "asset").write_text("known candidate")
+                self.assertIsNone(harness.unregister_native(base, marker, home))
+                self.assertFalse(app.exists())
+                self.assertIsNone(harness.unregister_native(base, marker, home))
+
+    def test_native_registration_refuses_existing_and_redirected_application(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            marker = {"id": "c" * 32}
+            app = harness.registered_app_path(home, marker)
+            app.mkdir(parents=True)
+            (app / "personal").write_text("preserve")
+            with self.assertRaises(ValueError):
+                harness.register_native(home, marker, home)
+            self.assertEqual((app / "personal").read_text(), "preserve")
+            redirected_home = home / "redirected-home"
+            redirected_home.mkdir()
+            (redirected_home / "Applications").symlink_to(app.parent, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                harness.register_native(home, marker, redirected_home)

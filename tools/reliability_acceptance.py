@@ -228,6 +228,43 @@ def job_loaded(label):
     return run(["/bin/launchctl", "print", domain() + "/" + label], check=False).returncode == 0
 
 
+LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+
+
+def registered_app_path(home, marker):
+    return home / "Applications" / ("RepoHub Reliability " + marker["id"] + ".app")
+
+
+def register_native(base, marker, home):
+    app = registered_app_path(home, marker)
+    if app.parent.is_symlink() or app.exists() or app.is_symlink():
+        raise ValueError("Refusing existing or redirected staging application")
+    app.parent.mkdir(exist_ok=True)
+    # Durable ownership before copying. Partial copies are preserved for inspection.
+    write_json(base / "native-registration.json", {"path": str(app),
+               "files": tree_hashes(base / "RepoHub Reliability.app")})
+    shutil.copytree(base / "RepoHub Reliability.app", app, symlinks=True)
+    run([LSREGISTER, "-f", str(app)])
+    return app
+
+
+def unregister_native(base, marker, home):
+    receipt = base / "native-registration.json"
+    if not receipt.exists():
+        return None
+    owned = read_json(receipt)
+    app = registered_app_path(home, marker)
+    if owned.get("path") != str(app) or app.parent.is_symlink() or app.is_symlink():
+        return "unowned_registration"
+    if not app.exists():
+        return None
+    if app.stat().st_uid != os.getuid() or tree_hashes(app) != owned.get("files"):
+        return "registered_assets_changed"
+    run([LSREGISTER, "-u", str(app)])
+    shutil.rmtree(app)
+    return None
+
+
 def cleanup(base):
     base, marker = guarded_run(base)
     with (base / "cleanup.lock").open("a") as lock:
@@ -247,6 +284,10 @@ def cleanup(base):
             # Resume a suspended helper before bootout; only this run's exact label.
             run(["/bin/launchctl", "kill", "SIGCONT", domain() + "/" + label], check=False)
             run(["/bin/launchctl", "bootout", domain() + "/" + label], check=False)
+        try:
+            registration_error = unregister_native(base, marker, Path(journal["daily_home"]))
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            registration_error = type(error).__name__
         paths = [Path(p) for p in journal["protected_before"]]
         try:
             observed = capture(paths)
@@ -265,7 +306,7 @@ def cleanup(base):
                     errors.append(label)
         restored = all(job_loaded(label) for label in journal["restore_intents"])
         result = {"protected_preserved": preserved, "protected_after": observed,
-                  "daily_jobs_restored": restored, "restore_errors": errors, "capture_error": capture_error, "finished_at": time.time()}
+                  "daily_jobs_restored": restored, "restore_errors": errors, "native_registration_error": registration_error, "capture_error": capture_error, "finished_at": time.time()}
         write_json(base / "cleanup.json", result)
         return result
 
@@ -321,7 +362,7 @@ def stage(base, python, labels, control_evidence, seconds=1800):
     prefix = "com.leogoldberg.repohub.acceptance." + marker["id"]
     test_labels = [prefix + ".service", prefix + ".app"]
     env = {"HOME": str(base / "home"), "CFFIXED_USER_HOME": str(base / "home"), "PYTHONDONTWRITEBYTECODE": "1"}
-    for label, argv in zip(test_labels, [[str(python), str(base / "runtime/repohub.py"), "--config", str(base / "config.json")], [str(app / "Contents/MacOS/RepoHub")]]):
+    for label, argv in zip(test_labels, [[str(python), str(base / "runtime/repohub.py"), "--config", str(base / "config.json")], [str(registered_app_path(home, marker) / "Contents/MacOS/RepoHub")]]):
         value = {"Label": label, "ProgramArguments": argv, "RunAtLoad": True, "EnvironmentVariables": env,
                  "StandardOutPath": str(base / (label.rsplit(".", 1)[-1] + ".log")),
                  "StandardErrorPath": str(base / (label.rsplit(".", 1)[-1] + ".log"))}
@@ -340,6 +381,7 @@ def stage(base, python, labels, control_evidence, seconds=1800):
             time.sleep(0.05)
         else:
             raise RuntimeError("Independent watchdog did not start; no pause performed")
+        register_native(base, marker, home)
         for label in labels:
             journal["restore_intents"].append(label)
             write_json(base / "journal.json", journal)  # durable restore intent BEFORE bootout

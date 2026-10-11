@@ -379,3 +379,21 @@ Acceptance must not depend on the lifetime of the controlling tool session. A de
 ## Native picker obscured by the menu (2026-10-10)
 
 The first Air acceptance at be02a30 showed the NSOpenPanel behind the floating menu popover. Helper/API operation and draft-only removals were intact; the private saved registry still matched its initial API snapshot. This is a native window-order failure rather than a backup failure. Close the popover before showing the independent picker and reopen its retained WebKit draft on choose/cancel. The two-host matrix case 02 now explicitly checks unobscured controls and retained drafts. Air cleanup restored its existing launch jobs and matched all protected-file hashes. Native acceptance of the fix remains open; compilation is not proof of window order.
+
+## Temporary staging app is not notification permission evidence (2026-10-10)
+
+Air's notification daemon rejected the random temporary-path identity before a
+permission decision. An existing development signature alone did not fix it.
+Registration of an owned Applications copy allowed the real notification state;
+the unchanged ad-hoc candidate also observed grant/revocation there. This is a
+staging registration fault, not evidence that a user refused notifications.
+The harness now records exact installed assets, refuses existing/redirected paths,
+and unregisters/removes only its matching copy. Changed assets remain for review;
+watchdog restoration of daily jobs still proceeds. GR12 includes preservation
+counterexamples. Air grant/revocation, restart and synthetic backup after denial
+have private evidence, but clean initial-refusal and both-host repeats remain open.
+
+Actual source privacy must be tested through the background helper. Its system
+Python identity is shared with daily work; resetting or revoking that identity's
+permissions in the daily account violates isolation. Case 07 therefore requires a
+separate test account. POSIX denial is still distinct from an actual TCC decision.

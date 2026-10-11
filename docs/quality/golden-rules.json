@@ -245,9 +245,11 @@
         "test_reliability_acceptance.AcceptanceHarnessTests.test_payload_transfer_change_fails_closed",
         "test_reliability_acceptance.AcceptanceHarnessTests.test_only_known_matching_daily_labels_can_be_paused",
         "test_reliability_acceptance.AcceptanceHarnessTests.test_cleanup_restores_intents_even_when_protected_state_changed",
-        "test_reliability_acceptance.AcceptanceHarnessTests.test_watchdog_controller_loss_invokes_cleanup_without_parent"
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_watchdog_controller_loss_invokes_cleanup_without_parent",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_registered_native_cleanup_never_removes_foreign_or_changed_assets",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_native_registration_refuses_existing_and_redirected_application"
       ],
-      "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration. The acceptance harness now hashes a single Pro-built payload, guards staging identities and restores journaled daily jobs independently on controller loss. Actual watchdog interruption and identical two-Mac native matrix remain required."
+      "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration. The acceptance harness now hashes a single Pro-built payload, guards staging identities and restores journaled daily jobs independently on controller loss. Actual watchdog interruption and identical two-Mac native matrix remain required. Air native permission probes require a uniquely owned Applications copy registered with LaunchServices; temporary-path apps failed notification client validation. Clean two-host permission repeats and real controller-interruption acceptance remain open."
     },
     {
       "id": "GR13",
@@ -338,7 +340,7 @@
         "test_workspace_registry.WorkspaceTests.test_preview_guard_and_diagnostics_exclude_source_prose",
         "test_workspace_registry.WorkspaceTests.test_unmonitored_home_inventory_drift_rejects_review_without_registry_change"
       ],
-      "remaining_gap": "Native simultaneous selection exposed a pathname alias duplicate; fixed and regression-tested. Corrected native cancel/removal/review/save/restart repeat remains open after computer-use timeout; native bridge and draft checks run in the gate. Air native acceptance at be02a30 exposed a popover covering the independent NSOpenPanel. The menu now closes only for the picker lifetime and reopens its retained draft; actual choose/cancel/save/restart regression on both Macs is required."
+      "remaining_gap": "Native simultaneous selection exposed a pathname alias duplicate; fixed and regression-tested. Corrected native cancel/removal/review/save/restart repeat remains open after computer-use timeout; native bridge and draft checks run in the gate. Air native acceptance at be02a30 exposed a popover covering the independent NSOpenPanel. The menu now closes only for the picker lifetime and reopens its retained draft; actual choose/cancel/save/restart regression on both Macs is required. Air b97fdf2 native choose/cancel/dedup/remove/review/save/restart checks passed against private registry/archive evidence; the complete re-add/removal sequence and Pro repeat remain open."
     },
     {
       "id": "GR17",
@@ -396,7 +398,7 @@
         "test_readiness.ReadinessTests.test_notifications_are_optional_and_do_not_gate_backup",
         "test_readiness.ReadinessTests.test_access_endpoint_requires_origin_token_and_no_path_payload"
       ],
-      "remaining_gap": "Initial fresh native helper-readiness check passed; explicit notification request remained notDetermined. Real grant/refusal/revocation and TCC acceptance remain open; mocked authorization and POSIX errno are not proof."
+      "remaining_gap": "Initial fresh native helper-readiness check passed; explicit notification request remained notDetermined. Real grant/refusal/revocation and TCC acceptance remain open; mocked authorization and POSIX errno are not proof. Air registered-app probe observed real notification grant/revocation and restart with matching menu states; denial did not block a synthetic edit backup. Initial prompt refusal and clean identical-host repeats remain open. Actual helper TCC testing cannot change the shared system Python privacy identity without affecting daily work; use a separate test account."
     }
   ]
 }
