@@ -420,3 +420,53 @@ native testing; no permanent sleep settings were changed.
 Cases 02, 03, 05 and 06 have not run on this new application candidate. The Pro
 repeat, final permission lifecycles, protected promotion and both deployments
 remain unfinished. This documentation changes no application payload.
+
+
+## Desktop grant and restart recovery — 2026-10-11
+
+After the user authenticated the actual candidate's Desktop grant directly in
+macOS, unchanged application payload `71998b0` was staged again under fresh
+isolated state. The background helper successfully reviewed three synthetic
+paths without modifying the registry. A reviewed save established the Desktop
+source alongside two accessible fixtures, preserving their distinct identities.
+All three baseline archives verified locally; provider observations remained
+disabled and the native menu correctly displayed awaiting confirmation.
+
+The scoped helper and native app were restarted. Workspace IDs persisted, and
+the helper archived a known new Desktop file after restart. Acceptance correlated
+the new archive's contents with its terminal `backup_finished` event, rather
+than accepting an HTTP 202 or a previous idle status. All three earlier verified
+archives retained their exact SHA256 values. The actual native Settings panel
+showed all sources and the destination as Access checked, helper running, and
+notifications denied with backups still operational. The isolated launch labels
+correctly remained unconfirmed as production login registration. Diagnostic
+evidence contained zero presentation-input or cross-view disagreements.
+
+Two controller assumptions were corrected in private evidence: manual source
+configuration legitimately has a null `repos_root`, so ownership checks use the
+exact destination and saved identities/paths; an archive inspection without a
+terminal-event/content assertion was premature. Neither attempted assertion is
+counted as a product failure or successful acceptance. The clean repeat checked
+the actual new file bytes, terminal run ID, archive preservation and readiness.
+
+Refreshing macOS Settings was necessary to show the newly registered candidate
+entry. Turning off that entry's Desktop access to exercise post-backup revocation
+opened another native administrator/Touch ID prompt. Authentication remains a
+direct user action; revocation and subsequent recovery are still open. No daily
+permissions were reset and Full Disk Access was not requested.
+
+Before handing off that prompt, both watchdog cleanup receipts confirmed
+protected-state preservation, owned candidate jobs stopped and registration
+cleanup without errors. Both original daily Air jobs were restored; the live
+daily helper reported its original five sources and idle backup. Pro remains
+unchanged. Private evidence references: Air run
+`1e0aa4e89b6046afa839cf299039ced5`, case07-restored-review,
+case07-granted-baseline, case07-restart-recovery and both cleanup receipts.
+No private paths, credentials or raw logs are published here.
+
+This is partial case 07 evidence, not release acceptance. Post-backup privacy
+revocation/restoration, the complete notification lifecycle, cases 02/03/05/06
+on this payload and the identical Pro matrix remain required. Read-only checking
+found no isolated Pro test account yet; real Pro privacy tests therefore also
+need account preparation. No merge or daily deployment occurred. This checkpoint
+changes documentation only; the accepted application payload is unchanged.
