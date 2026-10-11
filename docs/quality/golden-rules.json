@@ -402,14 +402,17 @@
         "access_readiness",
         "repo_backup_failed"
       ],
-      "cause_and_solution": "Contextual native notification requests and guarded helper-owned access probes expose unchecked/blocked/unavailable/changed states separately from backup/upload success. Track request progress separately from OS authorization and make an interrupted request retryable after restart; native readiness and JavaScript request-state regressions run in the gate.",
+      "cause_and_solution": "Contextual native notification requests and guarded helper-owned access probes expose unchecked/blocked/unavailable/changed states separately from backup/upload success. Track request progress separately from OS authorization and make an interrupted request retryable after restart; native readiness and JavaScript request-state regressions run in the gate. Enter the Python helper through the signed native app executable using execv, preserving the launchd PID/runtime/config while giving macOS an app responsibility identity. Packaging and native exit/signal checks run in the gate.",
       "required_behavior": "No blanket privilege demand; notification refusal does not prevent backup. Login registration must match this installation.",
       "test_ids": [
         "test_readiness.ReadinessTests.test_helper_probe_detects_and_recovers_denial_without_changing_backup",
         "test_readiness.ReadinessTests.test_notifications_are_optional_and_do_not_gate_backup",
-        "test_readiness.ReadinessTests.test_access_endpoint_requires_origin_token_and_no_path_payload"
+        "test_readiness.ReadinessTests.test_access_endpoint_requires_origin_token_and_no_path_payload",
+        "test_helper_launch.HelperLaunchTests.test_native_entry_keeps_interpreter_script_config_and_spaces",
+        "test_helper_launch.HelperLaunchTests.test_relative_and_null_paths_fail_before_any_launch",
+        "test_helper_launch.HelperLaunchTests.test_detached_guard_copies_the_launcher_dependency"
       ],
-      "remaining_gap": "Mocked authorization and POSIX errno do not prove macOS privacy behavior. Air isolated-account native grant/revocation/restart and backup after notification denial were observed with the unchanged 36d76c0 payload. Initial explicit refusal and actual helper Desktop refusal/restoration remain open: the helper returned EPERM without a visible prompt, and the remote Test session was not the physical console. Caller/picker access is not equivalent helper evidence. Complete same-candidate repeats on both Macs remain required; daily permissions must not be reset."
+      "remaining_gap": "Actual macOS permission acceptance remains required on both hosts for the final candidate. Air controlled probes showed that physical console unlock, AssociatedBundleIdentifiers alone and direct Python did not resolve helper EPERM. A Pro-built native executable entering the same interpreter produced an actual Desktop prompt; explicit refusal blocked review without changing the registry, and native System Settings restoration recovered that same read. This is a diagnostic prototype, not final-candidate or full lifecycle acceptance. Repeat refusal/restoration/restart, notification initial refusal and the complete same-payload matrix on both Macs; never reset daily permissions."
     }
   ]
 }

@@ -319,3 +319,38 @@ regression-tested and make a new same-payload candidate for both-host acceptance
 A successful native picker or caller read must not substitute for a helper read.
 Do not grant Full Disk Access, reset daily permissions, or count a configuration
 hint as actual macOS refusal/restoration evidence.
+
+
+## Air local-console attribution experiment — 2026-10-11
+
+Private run reference 7c57f4c7eb3446c1afb6104898bcc6e2 used unchanged 36d76c0
+fixtures/app with separately recorded launch experiments. The physical console
+was RepoHub Test, native Terminal keyboard control worked, and a bounded owned
+caffeinate assertion prevented idle system/display sleep. Provider reporting
+remained disabled. The original helper still returned EPERM for a fresh synthetic
+Desktop source; its saved registry stayed identical. Association-only and direct
+Python experiments also failed that same review without a visible prompt.
+
+Filtered system evidence identified the helper's responsibility as Apple's
+Python/tool shim. A tiny independently identified native launcher was built only
+on the Pro, signed, hashed, transferred unchanged and registered as a disposable
+probe. Entering the same Python/helper/config through that native bundle produced
+an actual Desktop prompt. Explicit Don't Allow returned a denied review with no
+registry write. The user restored that probe's Desktop permission through native
+System Settings and authenticated directly; the same helper then returned a
+successful three-path review, still without changing the saved registry.
+
+The probe's jobs were stopped by the scoped cleanup. The unchanged owned probe
+and staging Applications copies were unregistered/removed. Test and daily cleanup
+receipts both confirmed protected preservation. The daily watchdog restored both
+original labels without errors; the daily API again reported its original five
+sources and idle backup. Private system logs, credentials and file paths are not
+in Git. The bounded caffeinate process remains available for the next test run
+and expires automatically; it changes no permanent sleep setting.
+
+This establishes the packaging counterexample and motivates the native helper
+entry fix in this commit. It does not count as final-candidate case 07 acceptance:
+no saved Desktop monitoring/restart/archive lifecycle was completed in this probe,
+and the other matrix groups and Pro repeat remain open. Rebuild/gate/transfer the
+new candidate and run the entire same-payload matrix on both hosts before merge
+or deployment. Nothing was installed as either machine's daily release.

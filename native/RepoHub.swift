@@ -319,6 +319,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
 @main enum RepoHubMain {
     static func main() {
+        if let code = HelperLaunch.run(CommandLine.arguments) { exit(code) }
         let application = NSApplication.shared
         let delegate = HubDelegate()
         application.delegate = delegate

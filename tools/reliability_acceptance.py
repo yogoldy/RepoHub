@@ -22,6 +22,9 @@ import tempfile
 import time
 import urllib.request
 import uuid
+if (Path(__file__).resolve().parents[1] / "helper_launch.py").is_file():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import helper_launch
 
 MARKER = "repohub-reliability-acceptance-v1"
 PREFIX = "repohub-acceptance-"
@@ -147,6 +150,7 @@ def package(source, gate_path, output):
     signing = run(["/usr/bin/codesign", "-dv", "--verbose=4", str(app)]).stderr
     for name in ["reliability_acceptance.py", "reliability_account_guard.py"]:
         shutil.copy2(source / "tools" / name, output / name)
+    shutil.copy2(source / "helper_launch.py", output / "helper_launch.py")
     shutil.copy2(source / "docs/quality/reliability-matrix.json", output / "matrix.json")
     shutil.copy2(gate_path, output / "golden-gate.json")
     for index, name in enumerate(["home/Project", "manual/Project", "home/Accessible"]):
@@ -176,6 +180,7 @@ def prepare(payload):
     for name in ["runtime", "fixtures", "RepoHub Reliability.app"]:
         shutil.copytree(payload / name, base / name, symlinks=True)
     shutil.copy2(payload / "reliability_acceptance.py", base / "harness.py")
+    shutil.copy2(payload / "helper_launch.py", base / "helper_launch.py")
     shutil.copy2(payload / "matrix.json", base / "matrix.json")
     home = base / "home"
     state = home / "Library/Application Support/RepoHub"
@@ -362,7 +367,7 @@ def stage(base, python, labels, control_evidence, seconds=1800):
     prefix = "com.leogoldberg.repohub.acceptance." + marker["id"]
     test_labels = [prefix + ".service", prefix + ".app"]
     env = {"HOME": str(base / "home"), "CFFIXED_USER_HOME": str(base / "home"), "PYTHONDONTWRITEBYTECODE": "1"}
-    for label, argv in zip(test_labels, [[str(python), str(base / "runtime/repohub.py"), "--config", str(base / "config.json")], [str(registered_app_path(home, marker) / "Contents/MacOS/RepoHub")]]):
+    for label, argv in zip(test_labels, [helper_launch.service_arguments(registered_app_path(home, marker), python, base / "runtime", base / "config.json"), [str(registered_app_path(home, marker) / "Contents/MacOS/RepoHub")]]):
         value = {"Label": label, "ProgramArguments": argv, "RunAtLoad": True, "EnvironmentVariables": env,
                  "StandardOutPath": str(base / (label.rsplit(".", 1)[-1] + ".log")),
                  "StandardErrorPath": str(base / (label.rsplit(".", 1)[-1] + ".log"))}

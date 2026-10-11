@@ -479,3 +479,32 @@ is not proof that adding it fixes the missing prompt. Preserve the failing helpe
 observation, distinguish GUI session membership from physical-console ownership,
 and require an actual isolated helper refusal/restoration test after any change.
 A packaging change starts a new candidate and both-host acceptance again.
+
+
+## Background Python shim lost app attribution — GR19
+
+Air private probe reference 7c57f4c7eb3446c1afb6104898bcc6e2 isolated the missing
+Desktop prompt. Local console activation did not resolve the original helper
+EPERM. Adding AssociatedBundleIdentifiers alone did not resolve it; neither did
+launching the same Python version directly. Narrowly filtered system logs
+attributed access to Apple's Python/tool shim, rather than RepoHub. The denied
+review left the saved registry unchanged. EPERM still must not be described as a
+user refusal without actual OS evidence.
+
+A Pro-built, uniquely owned native launcher entered the unchanged Python helper
+via execv. The actual macOS Desktop prompt appeared for that probe identity.
+Clicking Don't Allow blocked the helper's review; restoring only that test
+identity's Desktop switch through System Settings recovered the same review.
+The user authenticated that restoration directly. No daily TCC reset or Full
+Disk Access was used. This closes a controlled attribution experiment, not the
+complete release matrix or an accepted candidate.
+
+The fix enters helper mode through the app's native executable before any menu
+initialization, retaining the interpreter, config, environment and launchd PID.
+execv avoids a supervisor orphaning Python when its job stops. The production
+installer and both guarded staging paths use the same command builder. The gate
+checks strict arguments, inherited environment, exit/failure propagation and
+same-PID SIGTERM ownership. Detached watchdogs include the builder dependency.
+These checks prevent lifecycle/packaging regressions; only actual native reads
+can prove TCC permission behavior. A new candidate must repeat the full matrix
+on both Macs, including refusal/restoration/restart.

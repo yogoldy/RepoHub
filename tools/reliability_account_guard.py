@@ -230,6 +230,7 @@ def start_watchdog(base, python):
 def own_scripts(base):
     shutil.copy2(Path(__file__), base / 'account-guard.py')
     shutil.copy2(Path(h.__file__), base / 'reliability_acceptance.py')
+    shutil.copy2(Path(h.helper_launch.__file__), base / 'helper_launch.py')
 
 
 def hold_daily(coord, python, labels, evidence):
@@ -344,7 +345,7 @@ def stage_test(base, hold, python, evidence):
             current['state'] = 'active'
             public_json(coord / 'peer.json', current)  # active BEFORE launching; restoration must wait
             env = {'HOME': str(base / 'home'), 'CFFIXED_USER_HOME': str(base / 'home'), 'PYTHONDONTWRITEBYTECODE': '1'}
-            for label, argv in zip(labels, [[str(python), str(base / 'runtime/repohub.py'), '--config', str(base / 'config.json')], [str(app / 'Contents/MacOS/RepoHub')]]):
+            for label, argv in zip(labels, [h.helper_launch.service_arguments(app, python, base / 'runtime', base / 'config.json'), [str(app / 'Contents/MacOS/RepoHub')]]):
                 suffix = label.rsplit('.', 1)[-1]
                 plist = {'Label': label, 'ProgramArguments': argv, 'RunAtLoad': True, 'EnvironmentVariables': env,
                          'StandardOutPath': str(base / (suffix + '.log')), 'StandardErrorPath': str(base / (suffix + '.log'))}
