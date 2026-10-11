@@ -184,3 +184,15 @@ The follow-up clarifies account-versus-posting permission and explains access-de
 **Tier 3B/3C Pro acceptance — 2026-10-10:** [Native source-picker record](docs/PRO_SOURCE_PICKER_TEST.md) documents the screen/picker/review/save tests, accessibility failure and fix, stale-review rejection, full ignored/Git archive verification, diagnostics and rollback-protected Pro deployment. Application build `5e24009` passed the clean 165-test macOS Golden Gate and is installed on the Pro. Current 13 sources and schedules are preserved; Air unchanged and main unmerged. Core source-selection UI is complete; external-volume/permission and simultaneous panel multi-selection remain explicit coverage gaps. Next implementation is 3D/3E, then onboarding/readable names.
 
 **Reliability implementation checkpoint — 2026-10-10:** Goals 1, 3, 4 and 5 have separate implementation commits (`03d8ded`, `3d18f05`, `48fb7b1`, `e86a7f0`), with goal 2's native alias counterexample/fix at `a5eb444`. Follow-ups improve volume-probe performance, fixture hygiene, bounded freshness delivery, notification request/restart handling and mid-publication denial coverage. The clean implementation gate at `53ef1d5` passed 180 tests and native/JavaScript checks. Real disk-image loss/substitution/remount passed at `7d21621`. [The checkpoint](docs/PRO_RELIABILITY_ACCEPTANCE.md) records successful and failed attempts, private diagnostic evidence and remaining native acceptance. None of the incomplete OS permission cases is marked complete; no reliability deployment or main promotion occurred.
+
+
+**Two-Mac reliability checkpoint (2026-10-10):** Air-first b97fdf2 native staging
+through Jump Desktop validated picker foreground order, alias deduplication,
+cancel/save/restart persistence, preserved removed archives and visible stale
+cache/recovery against diagnostics. Notification probes exposed temporary-app
+registration rejection; an owned Applications copy allowed real grant/revocation
+and restart, with a synthetic backup continuing after denial. The daily Air jobs
+and all protected hashes were restored. These partial results do not close
+reliability: first-request refusal, actual helper privacy in an isolated account,
+remaining fault/volume cases and the identical Pro run stay open. No main promotion
+or daily deployment occurred. See the [case-by-case checkpoint](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).

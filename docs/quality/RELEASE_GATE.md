@@ -55,4 +55,4 @@ When testing a candidate against the native app's fixed loopback port, fully sto
 automated/real disk-image checks from still-open native freshness, corrected
 simultaneous selection and isolated OS permission evidence. A gate pass cannot
 override those missing release conditions. Retain the previous installed Pro
-version until required acceptance succeeds; keep the Air unchanged.
+version until required acceptance succeeds. The approved [two-Mac protocol](../RELIABILITY_TWO_MAC_ACCEPTANCE.md) permits isolated Air staging, followed by identical Pro acceptance; daily deployment still waits for both-host acceptance.
