@@ -208,3 +208,36 @@ launched no test app; cleanup restored both daily labels with matching protected
 hashes. The receiving account now performs its own bounded 45-second drain check
 and records typed per-condition admission evidence. Corrected native staging and
 active controller-loss acceptance still require a fresh clean candidate.
+
+
+## Air isolated-account preflight and real interruption — 2026-10-10
+
+Candidate 36d76c0 passed the clean macOS Golden Gate: 201 Python tests and all
+JavaScript/native checks. Both exact-head GitHub automated-contract jobs passed.
+The Pro-built payload manifest was verified unchanged after permission-preserving
+transfer; no independent Air build was used.
+
+Private probe reference: 754681d028d64bea9ad0f4f762769109. All nine recorded account
+admission checks passed, including receiving-user port release. Native menu-bar
+control worked in the standard test account. Its initial Settings flow showed
+unchecked access and optional unrequested notifications; Check access then showed
+both fixture sources and the destination accessible, matching helper API evidence.
+Login operation was accurately not confirmed for this isolated installation. The
+provider stayed unknown. Two recorded native repo frames had zero presentation
+or input disagreements. These are preflight observations, not the full matrix.
+
+A controlled SIGKILL targeted only the verified owned test controller. The test
+watchdog stopped both exact test labels, unregistered/removed its unchanged owned
+Applications copy and released its lease. The daily controller returned a waiting
+result while the other UID's port drained; its independent watchdog continued
+until both original daily labels were restored. Both cleanup records confirmed
+protected preservation without capture, registration or restore errors. The
+restored daily helper reported its original five test-only sources and was idle.
+
+This closes real cross-account cleanup/controller-loss preflight on Air. It does
+not close native folder-selection, freshness, filesystem/volume fault or actual
+OS privacy/notification cases on this candidate, nor the Pro repeat or release.
+No source/destination fault was performed during the probe, and no daily backup,
+schedule, credential or launch plist was changed. The accepted app payload remains
+36d76c0; this checkpoint is documentation only. Start a fresh owned run for the
+remaining unchanged matrix, preserving that application payload on both hosts.

@@ -214,3 +214,15 @@ additional server username allowlist, with a narrowly scoped administrator updat
 prepared for the user to apply. Daily services and saved Jump credentials are
 unchanged. This closes desktop connection preparation, not actual OS permission
 acceptance or the reliability release. See the [current acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
+
+
+**Air isolated-account reliability preflight (2026-10-10):** Standard-account SSH
+and native Jump menu control now work. Guarded staging exposed and fixed same-user
+shutdown timing and cross-user TCP handoff delays; fail-closed checks rejected
+permission-mode drift in a transfer. Candidate 36d76c0 passed 201 clean macOS tests
+and GitHub checks. A real owned-controller SIGKILL proved independent test cleanup
+and daily restoration with both protected baselines preserved. Native helper
+readiness agreed with observed source/destination states, and two native repo
+frames had no diagnostic disagreements. The full actual-privacy/fault matrix and
+same-candidate Pro repeat remain open; main and daily apps are unchanged. See the
+[two-Mac evidence record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
