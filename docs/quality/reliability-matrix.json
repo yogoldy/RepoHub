@@ -18,7 +18,7 @@
     {
       "id": "02",
       "title": "Simultaneous picker, aliases and distinct paths",
-      "procedure": "In one native picker choose choices/Project A, Project B and Duplicate A. Check draft dedup to exactly two paths. Cancel a draft. Remove a draft row, review/save; restart helper and menu. Re-add/remove monitoring with reviewed saves.",
+      "procedure": "In one native picker choose choices/Project A, Project B and Duplicate A. Check draft dedup to exactly two paths. Cancel a draft. Remove a draft row, review/save; restart helper and menu. Re-add/remove monitoring with reviewed saves. The native picker must appear unobscured; after choose/cancel the same menu draft reopens.",
       "required_result": "Exact resolved selection, distinct same-named IDs, no cancelled write; saved IDs persist; removed repo archive/settings remain.",
       "required_evidence": [
         "native_ui",

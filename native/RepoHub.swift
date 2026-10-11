@@ -265,6 +265,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         panel.message = multiple ? "Each selected folder is one repo. You can add more in setup." : "Immediate subfolders of this folder will be monitored as repos."
         panel.prompt = "Choose"
         popover.behavior = .applicationDefined
+        // A popover floats above an independent NSOpenPanel. Hide it while the
+        // picker is active; its WebKit draft survives and is reopened on return.
+        popover.performClose(nil)
         NSApp.activate(ignoringOtherApps: true)
         panel.begin { [weak self] response in
             guard let self = self else { return }

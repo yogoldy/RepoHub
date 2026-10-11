@@ -375,3 +375,7 @@ A JavaScript concurrency counterexample is required by the gate's delivery suite
 ## Two-Mac staging interruption and payload drift (2026-10-10)
 
 Acceptance must not depend on the lifetime of the controlling tool session. A detached watchdog starts before any pause, and durable restore intents precede launchd bootout; locked cleanup resumes/stops only owned test labels and restores daily registrations even on a protected-state mismatch. Payload transfer is verified against a manifest from the exact clean Pro Golden Gate build, not an independent Air compilation. Controlled guard/cleanup/controller-loss regressions are in `test_reliability_acceptance`; actual native interruption and both-host permission evidence remain open. See [two-Mac protocol](../RELIABILITY_TWO_MAC_ACCEPTANCE.md) and GR12.
+
+## Native picker obscured by the menu (2026-10-10)
+
+The first Air acceptance at be02a30 showed the NSOpenPanel behind the floating menu popover. Helper/API operation and draft-only removals were intact; the private saved registry still matched its initial API snapshot. This is a native window-order failure rather than a backup failure. Close the popover before showing the independent picker and reopen its retained WebKit draft on choose/cancel. The two-host matrix case 02 now explicitly checks unobscured controls and retained drafts. Air cleanup restored its existing launch jobs and matched all protected-file hashes. Native acceptance of the fix remains open; compilation is not proof of window order.
