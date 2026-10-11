@@ -470,3 +470,12 @@ The same staging identity showed real notification grant/revocation and restart
 with successful backup after revocation. Its initial request reported failed,
 not a proved explicit refusal. Record request lifecycle and observed authorization
 separately; do not infer a user decision from the banner or disabled switch.
+
+
+Apple's [responsible-code guidance](https://developer.apple.com/forums/thread/678819)
+provides a concrete next attribution hypothesis: the system-Python helper launch
+agents currently have no `AssociatedBundleIdentifiers`. Inspecting that omission
+is not proof that adding it fixes the missing prompt. Preserve the failing helper
+observation, distinguish GUI session membership from physical-console ownership,
+and require an actual isolated helper refusal/restoration test after any change.
+A packaging change starts a new candidate and both-host acceptance again.

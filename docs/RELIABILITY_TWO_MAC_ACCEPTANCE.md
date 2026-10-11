@@ -292,3 +292,30 @@ showed its original five test-only sources and idle backup. Synthetic fixtures a
 private evidence remain available for diagnosis; they are not production data.
 The Pro is unchanged. Cases 03–06, complete 02/07/08, same-candidate Pro acceptance,
 protected merge and deployment remain open.
+
+
+## Helper attribution investigation — 2026-10-10
+
+The documentation checkpoint 0b95cb6 passed both exact-head GitHub
+`automated-contract` runs (38104689893 and 38104686494), following its clean
+201-test macOS gate. The application payload remains 36d76c0. Required native
+acceptance is still open; passing automation does not close permission evidence.
+
+Apple's current [On File System Permissions](https://developer.apple.com/forums/thread/678819)
+guidance distinguishes a GUI login session from non-GUI execution and explains
+that Files & Folders prompts depend on responsible-code attribution. It recommends
+`AssociatedBundleIdentifiers` for a launch agent whose access is not attributed to
+its app. The production installer and both staging plist builders currently omit
+that property and launch the helper through a system Python interpreter. These are
+observed packaging facts and an attribution hypothesis, not proof of the Air's
+EPERM cause. A remote GUI login being off the physical console also does not prove
+that it is a non-GUI execution context.
+
+Next controlled investigation: first observe the user's locally unlocked Test
+console and retry the unchanged helper in a fresh guarded run. If denial persists,
+retain original denial evidence and compare the isolated job's responsible-code
+attribution with Apple's guidance. Any association/signing fix must be narrow,
+regression-tested and make a new same-payload candidate for both-host acceptance.
+A successful native picker or caller read must not substitute for a helper read.
+Do not grant Full Disk Access, reset daily permissions, or count a configuration
+hint as actual macOS refusal/restoration evidence.
