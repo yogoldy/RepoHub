@@ -354,3 +354,69 @@ no saved Desktop monitoring/restart/archive lifecycle was completed in this prob
 and the other matrix groups and Pro repeat remain open. Rebuild/gate/transfer the
 new candidate and run the entire same-payload matrix on both hosts before merge
 or deployment. Nothing was installed as either machine's daily release.
+
+
+## Native-launch candidate checkpoint — 2026-10-11
+
+Application candidate `71998b0` passed the clean macOS Golden Gate: 204 Python
+tests, zero skips, plus JavaScript/native builds and checks. Both exact-head
+GitHub automated-contract jobs passed. One Pro-built payload was transferred to
+Air preserving modes; its manifest SHA256 is
+`e81baa6bcfa4a9878c85f3e2729d480500db4fb836a0a3684f12d88f14e636a9`.
+No Air rebuild, daily installation, main merge or release acceptance occurred.
+
+The fresh isolated-account run used the real candidate's native helper launcher,
+not the earlier diagnostic probe. Its physical console was the test account, and
+Jump Desktop supplied visible native control. The background helper's source
+review produced the actual macOS Desktop-access prompt. Clicking **Don't Allow**
+returned a blocked review; the saved workspace-registry hash was unchanged. The
+candidate's own Files & Folders entry then exposed Desktop access. Restoration
+requires direct user administrator authentication and remains pending at this
+checkpoint. Saving a Desktop source, revocation after a baseline archive and
+restart/recovery still need evidence; case 07 is not passed.
+
+Real POSIX restrictions on the synthetic Project root and a nested tracked file
+produced accurate native access-denied states. The root case kept its verified
+archive bytes intact while an accessible sibling archived a known new edit.
+Restoring access recovered the same workspace ID. In the nested-file case the
+menu displayed the verification-read failure and scoped retry control; a new
+terminal backup run recorded failure without replacing the previous archive,
+while the sibling's known edit was present in its archive. Restoring permissions
+recovered and archived a known recovery edit. These failures did not claim an
+actual macOS privacy refusal from errno alone.
+
+Notification authorization was exercised through the actual candidate's menu
+and macOS Settings. The initial contextual request ended with a failed request
+callback and OS permission denied; it is **not** counted as an explicit user
+refusal. Switching the isolated application's Allow notifications on/off produced
+corresponding allowed/denied observations. A known edit was found inside a new
+archive after revocation; upload remained unknown with the provider disabled.
+The full notification request/refusal/restart lifecycle remains open (case 08).
+
+Diagnostic evidence includes 36 actual reported UI frames and zero
+presentation-input or cross-view disagreement events across the recorded window.
+This describes the observed frames, not unobserved screens. Private references:
+Air run `d1425da2d92345f5932d29faac70f139`; case01-api,
+case07-before/refusal, case04-root-before/blocked/completed,
+case04-nested-final-denied/recovery-final, case08-allowed/denied-backup,
+case01-04-08-diagnostics, checkpoint and cleanup. Raw paths, OS exception prose,
+credentials and logs remain outside Git.
+
+A test-controller polling mistake initially watched the top-level repo error
+rather than nested verification failure; an unrelated guessed retry route was
+rejected with 404. These attempts are not accepted assertions. The clean nested
+repeat recorded the actual verification error and a changed backup run ID with
+a terminal failure, plus unchanged archive bytes and the sibling edit. A 202
+response or the previous idle state is never evidence that the requested backup
+completed. Future controlled cases must correlate the new run's terminal result.
+
+Before waiting for authentication, both independent watchdogs completed cleanup:
+owned candidate jobs stopped, registered candidate copy removed, protected state
+hashes unchanged, and both daily Air registrations restored. The running daily
+helper again reported its original five test-only sources and an idle backup.
+A bounded two-hour test-account caffeinate assertion prevented idle sleep during
+native testing; no permanent sleep settings were changed.
+
+Cases 02, 03, 05 and 06 have not run on this new application candidate. The Pro
+repeat, final permission lifecycles, protected promotion and both deployments
+remain unfinished. This documentation changes no application payload.
