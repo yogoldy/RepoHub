@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "purpose": "Identical Air-first then Pro acceptance; private logs and paths stay outside Git",
+  "cases": [
+    {
+      "id": "01",
+      "title": "Native preflight and preservation",
+      "procedure": "Open the remote desktop/native menu and harmless controls before faults. Verify package signature/hash and known fixture bundle. Capture actual workspace-registry, settings, schedules, app/runtime and launch plists. Start own helper/menu only after watchdog ready.",
+      "required_result": "No daily mutation; isolated helper root/state/destination; provider unknown; same payload on both hosts.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    },
+    {
+      "id": "02",
+      "title": "Simultaneous picker, aliases and distinct paths",
+      "procedure": "In one native picker choose choices/Project A, Project B and Duplicate A. Check draft dedup to exactly two paths. Cancel a draft. Remove a draft row, review/save; restart helper and menu. Re-add/remove monitoring with reviewed saves.",
+      "required_result": "Exact resolved selection, distinct same-named IDs, no cancelled write; saved IDs persist; removed repo archive/settings remain.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    },
+    {
+      "id": "03",
+      "title": "Startup, request timeout and cache expiry",
+      "procedure": "Restart native with helper stopped. Observe checking/unavailable. Start helper, observe recovery. Suspend helper beyond 8s request timeout and 20s cache expiration; record displayed states, then resume/reconnect. Compare immutable original observation in private diagnostic frames. Run false-green counterexample regression separately.",
+      "required_result": "No green without current evidence; typed timeout/failure/cache reason; no mutation of cached backend fact; recovery and diagnostic reason agree.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    },
+    {
+      "id": "04",
+      "title": "Denied root and nested file, sibling continuation",
+      "procedure": "Make baseline fixture archives, record their SHA256 and IDs. Deny Project root (chmod000), restore; separately deny nested README (chmod000). Trigger scoped backup/scan while Accessible changes. Restore permissions exactly and retry/next scan.",
+      "required_result": "Blocked operation explained, no partial archive publication; previous verified archive bytes intact; accessible sibling still backs up; recovery uses same IDs.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    },
+    {
+      "id": "05",
+      "title": "Destination denial before and during publication",
+      "procedure": "Baseline archive then chmod own destination unwritable. Change source and request backup; restore permissions/retry. Use controlled real-publication revocation regression for during-backup timing, with diagnostic assertions, plus actual native blocked/recovery view.",
+      "required_result": "Old archive/index preserved; clear write-blocked message; restoration recovers. POSIX does not claim TCC.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    },
+    {
+      "id": "06",
+      "title": "Disk image disappearance, substitution, remount",
+      "procedure": "Create disposable mounted image inside owned run; copy known Git fixture and reviewed-add it. Record directory/volume identity and schedule. Baseline archive. Unmount; then put replacement directory at former path. Reject pending review. Remove own substitute and remount original.",
+      "required_result": "Missing never empty success; replacement rejected; original identity, schedule and prior bytes preserved; original remount recovers.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    },
+    {
+      "id": "07",
+      "title": "Actual macOS source privacy",
+      "procedure": "Use isolated signed identity/account with only synthetic Desktop repo. Actually refuse the macOS folder request, capture helper readiness/menu and recovery instructions. Restore permission in System Settings for that identity, recheck/restart. Never reset daily TCC or default to Full Disk Access.",
+      "required_result": "Actual refusal/restoration evidence exists; helper says blocked without inventing privacy diagnosis; previous archive safe; restart recovers. Additional access/account needed means blocked.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    },
+    {
+      "id": "08",
+      "title": "Actual notification permission lifecycle",
+      "procedure": "For staging identity request notifications contextually from menu Settings. Actually refuse then grant and revoke through System Settings for staging identity only; restart between states. Trigger synthetic backups throughout.",
+      "required_result": "Accurate denied/allowed states, no repeat auto prompt; interrupted request not stuck; notification refusal never blocks backup.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    },
+    {
+      "id": "09",
+      "title": "Readiness, final cleanup and same-candidate comparison",
+      "procedure": "Recheck source/destination through helper in Settings, background registration/readiness, then restart. Stop staging; inspect watchdog/finally cleanup receipts and daily helper/menu, protected hashes. Compare both hosts matrix/payload digest and exact candidate revision.",
+      "required_result": "All cases passed with native/API/diagnostic references, unchanged protected configuration and restored daily services; missing evidence is blocked, not passed.",
+      "required_evidence": [
+        "native_ui",
+        "api_observation",
+        "diagnostic_reference",
+        "preservation_check"
+      ],
+      "initial_status": "not_run"
+    }
+  ],
+  "acceptance": "All required cases passed on both hosts, same application payload; simulations never substitute actual OS permission evidence."
+}

@@ -371,3 +371,7 @@ regressions cover those combinations; native grant/refusal acceptance stays open
 The bounded offline-frame slot is also compare-and-clear: completion of an older
 POST cannot erase a newer freshness frame queued while that request was in flight.
 A JavaScript concurrency counterexample is required by the gate's delivery suite.
+
+## Two-Mac staging interruption and payload drift (2026-10-10)
+
+Acceptance must not depend on the lifetime of the controlling tool session. A detached watchdog starts before any pause, and durable restore intents precede launchd bootout; locked cleanup resumes/stops only owned test labels and restores daily registrations even on a protected-state mismatch. Payload transfer is verified against a manifest from the exact clean Pro Golden Gate build, not an independent Air compilation. Controlled guard/cleanup/controller-loss regressions are in `test_reliability_acceptance`; actual native interruption and both-host permission evidence remain open. See [two-Mac protocol](../RELIABILITY_TWO_MAC_ACCEPTANCE.md) and GR12.

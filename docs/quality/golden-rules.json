@@ -241,9 +241,13 @@
       "required_behavior": "Compiled native sources and packaged modules/routes must agree; local diagnostics must disclose interrupted runs.",
       "test_ids": [
         "test_backup_lifecycle.LifecycleTests.test_restart_discloses_incomplete_run_without_claiming_recovery",
-        "test_backup_lifecycle.LifecycleTests.test_creation_reuse_and_render_reason_share_archive_run_identity"
+        "test_backup_lifecycle.LifecycleTests.test_creation_reuse_and_render_reason_share_archive_run_identity",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_payload_transfer_change_fails_closed",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_only_known_matching_daily_labels_can_be_paused",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_cleanup_restores_intents_even_when_protected_state_changed",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_watchdog_controller_loss_invokes_cleanup_without_parent"
       ],
-      "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration."
+      "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration. The acceptance harness now hashes a single Pro-built payload, guards staging identities and restores journaled daily jobs independently on controller loss. Actual watchdog interruption and identical two-Mac native matrix remain required."
     },
     {
       "id": "GR13",
