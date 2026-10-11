@@ -8,9 +8,11 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var popoverWebView: WKWebView!
     var lastNotificationData: Data?
     var notificationInFlight = false
+    var permissionRequestInFlight = false
     var unavailableSince: Date?
     var notificationsEnabled: Bool { UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true }
     var polling: Timer?
+    var sourcePicker: NSOpenPanel?
     let address = URL(string: "http://127.0.0.1:8767/")!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -34,7 +36,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         popoverWebView = view
         view.load(URLRequest(url: address.appendingPathComponent("menu.html")))
         UNUserNotificationCenter.current().delegate = self
-        if notificationsEnabled { requestNotifications() }
+        updateNotificationStatus()
         pollStatus()
         polling = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.pollStatus() }
         if !CommandLine.arguments.contains("--background") { showPopover() }
@@ -77,9 +79,16 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func requestNotifications() {
+        guard !permissionRequestInFlight else { return }
+        permissionRequestInFlight = true
+        UserDefaults.standard.set("pending", forKey: "notificationRequest")
+        updateNotificationStatus()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
-            if let error = error { print("Notification authorization:", error.localizedDescription) }
-            DispatchQueue.main.async { self.updateNotificationStatus() }
+            DispatchQueue.main.async {
+                self.permissionRequestInFlight = false
+                UserDefaults.standard.set(error == nil ? "completed" : "failed", forKey: "notificationRequest")
+                self.updateNotificationStatus()
+            }
         }
     }
 
@@ -93,7 +102,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 case .notDetermined: permission = "waiting"
                 default: permission = "unknown"
                 }
-                let status: [String: Any] = ["enabled": self.notificationsEnabled, "permission": permission]
+                let request = BackupReadiness.permissionRequest(saved: UserDefaults.standard.string(forKey: "notificationRequest"), inFlight: self.permissionRequestInFlight)
+                let status: [String: Any] = ["enabled": self.notificationsEnabled, "permission": permission,
+                    "request": request]
                 let path = FileManager.default.homeDirectoryForCurrentUser
                     .appendingPathComponent("Library/Application Support/RepoHub/notifications.json")
                 if let data = try? JSONSerialization.data(withJSONObject: status, options: [.sortedKeys]), data != self.lastNotificationData {
@@ -201,8 +212,18 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         case .openBackups: openBackups()
         case .openRepo:
             if let body = message.body as? [String: Any], let id = body["repo_id"] as? String { openRepository(id) }
+        case .requestNotifications:
+            UserDefaults.standard.set(true, forKey: "notificationsEnabled")
+            requestNotifications()
+        case .notificationSettings: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+        case .privacySettings: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_FilesAndFolders")!)
+        case .loginSettings: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!)
         case .toggleNotifications: toggleNotifications()
         case .connectGitHub: GitHubConnection.configure()
+        case .chooseRepoHome, .chooseRepoFolders:
+            if let body = message.body as? [String: Any], let id = body["request_id"] as? String {
+                chooseSources(multiple: action == .chooseRepoFolders, requestID: id)
+            }
         case .quit: quit()
         }
     }
@@ -221,6 +242,43 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             guard let self = self else { return }
             webView.load(URLRequest(url: self.address.appendingPathComponent("menu.html")))
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if !UserDefaults.standard.bool(forKey: "readinessShown") {
+            webView.evaluateJavaScript("window.dispatchEvent(new Event('repoHubReadinessRequested'))") { _, error in
+                if error == nil { UserDefaults.standard.set(true, forKey: "readinessShown") }
+            }
+        }
+    }
+
+    func chooseSources(multiple: Bool, requestID: String) {
+        guard sourcePicker == nil else { return }
+        let panel = NSOpenPanel()
+        sourcePicker = panel
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = multiple
+        panel.canCreateDirectories = false
+        panel.title = multiple ? "Choose individual repo folders" : "Choose a repo-home folder"
+        panel.message = multiple ? "Each selected folder is one repo. You can add more in setup." : "Immediate subfolders of this folder will be monitored as repos."
+        panel.prompt = "Choose"
+        popover.behavior = .applicationDefined
+        // A popover floats above an independent NSOpenPanel. Hide it while the
+        // picker is active; its WebKit draft survives and is reopened on return.
+        popover.performClose(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] response in
+            guard let self = self else { return }
+            let detail: [String: Any] = ["request_id": requestID, "cancelled": response != .OK,
+                                        "paths": response == .OK ? panel.urls.map { MenuBridge.canonicalSourcePath($0) } : []]
+            self.sourcePicker = nil
+            self.popover.behavior = .transient
+            self.showPopover()
+            guard let data = try? JSONSerialization.data(withJSONObject: detail),
+                  let json = String(data: data, encoding: .utf8) else { return }
+            self.popoverWebView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('repoHubSourcesPicked',{detail:" + json + "}))")
         }
     }
 

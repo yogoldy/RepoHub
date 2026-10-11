@@ -26,6 +26,8 @@ from diagnostics import DiagnosticLog, diagnostic_ref
 from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
+from access_checks import access_failure, probe_source, probe_destination
+from workspace_registry import WorkspaceRegistry, workspace_id, require_source, overlaps
 from report_preview import preview_report
 from report_delivery import send_report, connection_status, delivery_status, case_path, read_private
 
@@ -71,13 +73,9 @@ def atomic_json_if_changed(path, value):
     return True
 
 
-def workspace_id(name):
-    slug = re.sub(r"[^a-zA-Z0-9_-]", "-", name).strip("-")[:45] or "repo"
-    return slug + "-" + hashlib.sha256(name.encode()).hexdigest()[:10]
-
-
 def tree_entries(root):
     root = Path(root)
+    require_source(root)
     found = []
     for current, dirs, files in os.walk(root, followlinks=False, onerror=lambda e: (_ for _ in ()).throw(e)):
         for name in dirs + files:
@@ -285,10 +283,12 @@ def git_info(root):
             "last_commit": run("log", "-1", "--format=%cI")}
 
 
-def snapshot(root, destination, staging, expected=None, after_archive=None, observe=None):
+def snapshot(root, destination, staging, expected=None, after_archive=None, observe=None, source_check=None):
     """Verify source bytes, stored archive contents, and destination checksum before publication."""
     root, destination, staging = map(Path, (root, destination, staging))
     observe = observe or (lambda stage: None)
+    source_check = source_check or (lambda: None)
+    source_check()
     observe("source_hashing")
     before = tree_entries(root)
     if expected is not None and fingerprint(before) != expected:
@@ -305,11 +305,13 @@ def snapshot(root, destination, staging, expected=None, after_archive=None, obse
                 archive.add(root / relative, arcname=root.name + "/" + relative, recursive=False)
         if after_archive:
             after_archive()
+        source_check()
         if before != tree_entries(root):
             raise RuntimeError("Repo changed during the backup; no snapshot was published")
         observe("archive_verification")
         if archive_manifest(temporary, root.name) != contents or content_manifest(root) != contents:
             raise RuntimeError("Repo content changed during the backup; no snapshot was published")
+        source_check()
         digest = sha256(temporary)
         destination.mkdir(parents=True, exist_ok=True)
         filename = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S.%fZ") + ".tar.gz"
@@ -319,6 +321,7 @@ def snapshot(root, destination, staging, expected=None, after_archive=None, obse
         observe("destination_verification")
         if sha256(published) != digest:
             raise RuntimeError("Snapshot checksum verification failed")
+        source_check()
         return {"completed_at": utc_now(), "archive": str(published), "sha256": digest,
                 "signature": fingerprint(before), "content_signature": content_signature(contents),
                 "archive_bytes": published.stat().st_size,
@@ -338,10 +341,12 @@ class Hub:
         self.retention = config.get("retention", "all")
         if self.retention not in {"all", "latest"}:
             raise ValueError("Unknown backup retention policy")
-        self.root = Path(config["repos_root"]).resolve()
+        self.root = Path(config["repos_root"]).resolve() if config.get("repos_root") else None
         self.backups = Path(config["backup_root"]).resolve()
         self.state_dir = Path(config["state_dir"]).resolve()
-        if self.root == self.backups or self.root in self.backups.parents or self.root in self.state_dir.parents:
+        # Once migrated, the registry is authoritative; the legacy repo-home
+        # setting must not block an unrelated saved manual selection.
+        if not (self.state_dir / "data/workspace-registry.json").exists() and self.root is not None and (overlaps(self.root, self.backups) or overlaps(self.root, self.state_dir)):
             raise ValueError("Backups and app state must be outside the source repos")
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.diagnostics = DiagnosticLog(self.state_dir / "diagnostics")
@@ -352,11 +357,16 @@ class Hub:
         self.scan_lock = threading.Lock()
         self.backup_lock = threading.Lock()
         self.csrf = secrets.token_urlsafe(32)
+        self.readiness = None
+        self.readiness_running = False
+        self.readiness_result = 'unchecked'
         self.verifications = {}
         self.cloud_states = {}
         self.index = load_json(self.state_dir / "backups.json", {})
         self.data_dir = self.state_dir / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.registry = WorkspaceRegistry(self.data_dir / "workspace-registry.json", self.root,
+                                          (self.backups, self.state_dir), atomic_json, config.get("sources"))
         self.settings_path = self.data_dir / "settings.json"
         self.settings = validate_settings(load_json(self.settings_path, default_settings()))
         if not self.settings_path.exists():
@@ -379,12 +389,110 @@ class Hub:
         if previous_backup.get("running"):
             self.lifecycle.emit("backup_interrupted", run_id=self.previous_backup_run, reason="helper_restarted", result="unobserved_completion")
         self.status = {"scanned_at": None, "repos": [], "backup": {"running": False},
-                       "repos_root": str(self.root), "backup_root": str(self.backups)}
+                       "repos_root": str(self.root) if self.root else None, "backup_root": str(self.backups)}
         self.scan(deep=False)
 
     def repositories(self):
-        return {workspace_id(p.name): p for p in sorted(self.root.iterdir(), key=lambda p: p.name.lower())
-                if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")}
+        return self.registry.refresh()
+
+    def readiness_status(self):
+        with self.lock:
+            result = json.loads(json.dumps(self.readiness or {'checked_at':None,'sources':[], 'destination':{'state':'unchecked'},'background':{'helper':'running','login':'unknown'}}))
+            result['running'] = self.readiness_running
+            result['result'] = self.readiness_result
+            result['notifications'] = load_json(self.state_dir/'notifications.json', {'permission':'unknown'})
+            return result
+
+    def start_readiness(self):
+        with self.lock:
+            if self.readiness_running:raise FileExistsError('Access check already running')
+            self.readiness_running = True
+            self.readiness_result = "checking"
+        threading.Thread(target=self.check_readiness, daemon=True).start()
+        return self.readiness_status()
+
+    def check_readiness(self):
+        started = time.monotonic()
+        if not self.backup_lock.acquire(blocking=False):
+            with self.lock:self.readiness_running = False;self.readiness_result = "deferred"
+            self.diagnostics.emit('access_readiness', result='deferred', reason='backup_busy')
+            return
+        if not self.scan_lock.acquire(blocking=False):
+            self.backup_lock.release()
+            with self.lock:self.readiness_running = False;self.readiness_result = "deferred"
+            self.diagnostics.emit('access_readiness', result='deferred', reason='scan_error')
+            return
+        try:
+            sources = []
+            for key, path in self.repositories().items():
+                try:
+                    self.registry.require_workspace(key, path);probe_source(path)
+                    self.registry.require_workspace(key, path)
+                    outcome = {'state':'accessible','operation':'source_read'}
+                except OSError as error:outcome = access_failure(error,'source_read')
+                sources.append({'id':key,'name':path.name, **outcome})
+                self.diagnostics.emit('access_readiness', repo_ref=diagnostic_ref(key), state=outcome['state'], operation='source_read', error_code=outcome.get('error_code'),result='complete')
+            try:
+                # Probe the existing destination root; never create a missing mounted path.
+                probe_destination(self.backups if self.backups.exists() else self.backups.parent)
+                destination = {'state':'accessible','operation':'destination_write'}
+            except OSError as error:destination = access_failure(error,'destination_write')
+            login = 'unknown'
+            try:
+                registration = subprocess.run(['/bin/launchctl','print',f'gui/{os.getuid()}/com.leogoldberg.repohub.service'],capture_output=True,text=True,timeout=3)
+                login = 'registered' if registration.returncode == 0 and str(self.state_dir) in registration.stdout else 'not_registered'
+            except (OSError,subprocess.SubprocessError):pass
+            with self.lock:self.readiness_result = 'complete';self.readiness = {'checked_at':utc_now(),'sources':sources,'destination':destination,'background':{'helper':'running','login':login}}
+            self.diagnostics.emit('access_readiness', operation='destination_write',state=destination['state'],result='complete',error_code=destination.get('error_code'),duration_ms=(time.monotonic()-started)*1000)
+        except Exception as error:
+            with self.lock:self.readiness_result = 'failed'
+            self.diagnostics.emit('access_readiness',result='failed',error_type=type(error).__name__)
+        finally:
+            self.scan_lock.release();self.backup_lock.release()
+            with self.lock:self.readiness_running = False
+
+    def workspace_status(self):
+        return self.registry.status()
+
+    def preview_workspaces(self, payload):
+        if set(payload) != {"source", "revision"}:
+            raise ValueError("Invalid workspace review request")
+        try:
+            result = self.registry.review(payload["source"], payload["revision"])
+        except (ValueError, OSError):
+            self.diagnostics.emit("workspace_review", result="failed")
+            raise
+        self.diagnostics.emit("workspace_review", result="complete", mode=payload["source"]["mode"],
+                              repo_count=len(result["workspaces"]))
+        return result
+
+    def save_workspaces(self, payload):
+        try:
+            return self._save_workspaces(payload)
+        except (ValueError, OSError):
+            self.diagnostics.emit("workspace_configuration", result="failed")
+            raise
+
+    def _save_workspaces(self, payload):
+        if set(payload) not in ({"source", "revision"}, {"source", "revision", "review"}):
+            raise ValueError("Invalid workspace configuration request")
+        if "review" in payload and (not isinstance(payload["review"], str) or not re.fullmatch(r"[0-9a-f]{64}", payload["review"])):
+            raise ValueError("Review the folder selection before saving")
+        if not self.backup_lock.acquire(blocking=False):
+            raise FileExistsError("A backup is running. Try after it finishes.")
+        try:
+            if not self.scan_lock.acquire(blocking=False):
+                raise FileExistsError("A scan is running. Try after it finishes.")
+            try:
+                result = self.registry.save(payload["source"], payload["revision"], payload.get("review"))
+                self.diagnostics.emit("workspace_configuration", result="saved", mode=result["configuration"]["source"]["mode"],
+                                      repo_count=sum(r["active"] for r in result["configuration"]["workspaces"]))
+            finally:
+                self.scan_lock.release()
+        finally:
+            self.backup_lock.release()
+        self.scan(deep=False)
+        return result
 
     def retry_check(self, repo_id):
         if not isinstance(repo_id, str) or repo_id not in self.repositories():
@@ -416,6 +524,8 @@ class Hub:
                 verification_performed = False
                 row = {"id": key, "name": root.name, "path": str(root)}
                 try:
+                    require_source(root, canonical_only=True)
+                    if key != "repohub-data":self.registry.require_workspace(key, root)
                     entries = tree_entries(root)
                     actual = [e for e in entries if stat.S_ISREG(e[1])
                               and ".git" not in Path(e[0]).parts
@@ -430,6 +540,9 @@ class Hub:
                                 "signature": fingerprint(entries), "edit_signature": fingerprint(edit_entries(entries))})
                 except Exception as e:
                     row["error"] = str(e)
+                    if isinstance(e, OSError):
+                        row["access"] = access_failure(e, "source_read")
+                        row["error"] = row["access"]["detail"]
                 with self.lock:
                     row["last_backup"] = self.index.get(key)
                     cached = self.verifications.get(key, {})
@@ -460,6 +573,9 @@ class Hub:
                         valid = True
                     except Exception as e:
                         cached = {"state": "error", "checked_at": utc_now(), "error": str(e)}
+                        if isinstance(e, OSError):
+                            cached["access"] = access_failure(e, "verification_read")
+                            cached["error"] = cached["access"]["detail"]
                         valid = True
                 row["verification"] = cached if valid else {"state": "checking"}
                 if row["verification"]["state"] == "matched":
@@ -475,7 +591,10 @@ class Hub:
                 rows.append(row)
             with self.lock:
                 self.scheduler.observe(rows, time.monotonic())
-                self.status.update({"scan_id": scan_id, "repos": rows})
+                self.status.update({"scan_id": scan_id, "repos": rows,
+                                    "source_mode": self.registry.value["source"]["mode"],
+                                    "repos_root": self.registry.value["source"].get("home"),
+                                    "workspace_sources": [{"id": row["id"], "path": row["path"]} for row in rows]})
                 if repo_id is None:
                     self.status["scanned_at"] = utc_now()
                 self.status["verifying"] = None
@@ -689,14 +808,20 @@ class Hub:
         if expected_power is not None and power_source() != expected_power:
             self.lifecycle.emit("backup_deferred", run_id=run_id, reason="power_changed", result="not_started")
             return False
-        repositories = self.repositories()
-        if keys is not None:
-            if not isinstance(keys, (list, tuple, set)) or any(not isinstance(key, str) or key not in repositories for key in keys):
-                raise ValueError("Backup selection must contain current workspace IDs")
-            if not keys:
-                return False
         if not self.backup_lock.acquire(blocking=False):
             self.lifecycle.emit("backup_deferred", run_id=run_id, reason="backup_busy", result="not_started")
+            return False
+        # Select sources under the same lock as configuration saves. Otherwise
+        # a removed source could be archived after the new selection was saved.
+        try:
+            repositories = self.repositories()
+            if keys is not None and (not isinstance(keys, (list, tuple, set)) or any(not isinstance(key, str) or key not in repositories for key in keys)):
+                raise ValueError("Backup selection must contain current workspace IDs")
+        except BaseException:
+            self.backup_lock.release()
+            raise
+        if keys is not None and not keys:
+            self.backup_lock.release()
             return False
         failures = []
         outcome = "complete"
@@ -704,10 +829,10 @@ class Hub:
                             reason=reason, mode="all" if keys is None else "selected")
         try:
             with self.lock:
-                self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "reason": reason, "run_id": run_id}
+                self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "current_repo_id": None, "reason": reason, "run_id": run_id}
                 self.persist_status()
             if not self.backups.parent.is_dir():
-                raise RuntimeError("iCloud Repository Backups folder is unavailable")
+                raise FileNotFoundError(2, "Backup destination unavailable")
             backup_sources = {key: root for key, root in repositories.items() if keys is None or key in keys}
             backup_sources["repohub-data"] = self.data_dir
             for key, root in backup_sources.items():
@@ -720,6 +845,7 @@ class Hub:
                     attempted_keys.append(key)
                 with self.lock:
                     self.status["backup"]["current_repo"] = root.name
+                    self.status["backup"]["current_repo_id"] = key
                     self.persist_status()
                 current_archive = None
                 stage = "source_inspection"
@@ -730,6 +856,8 @@ class Hub:
                     stage = value
                     self.lifecycle.emit("archive_stage", key=key, run_id=run_id, stage=value)
                 try:
+                    require_source(root, canonical_only=True)
+                    if key != "repohub-data":self.registry.require_workspace(key, root)
                     entries = tree_entries(root)
                     signature = fingerprint(entries)
                     with self.lock:
@@ -762,6 +890,7 @@ class Hub:
                             self.lifecycle.emit("archive_repair_needed", key=key, run_id=run_id,
                                                 previous_archive_ref=diagnostic_ref(previous["archive"]), error_type=type(error).__name__)
                             pass  # Replace a corrupt copy from the intact source; do not prune first.
+                    if key != "repohub-data":self.registry.require_workspace(key, root)
                     if verified and (verified["state"] == "matched" or verified.get("ignored_finder_only") is True):
                         with self.lock:
                             self.verifications[key] = verified
@@ -777,7 +906,7 @@ class Hub:
                         self.lifecycle.emit("repo_backup_finished", key=key, run_id=run_id, result="reused",
                                             archive_ref=diagnostic_ref(previous["archive"]), duration_ms=(time.monotonic()-repo_started)*1000)
                         continue
-                    result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature, observe=observe)
+                    result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature, observe=observe, source_check=(lambda: self.registry.require_workspace(key, root)) if key != "repohub-data" else None)
                     current_archive = result["archive"]
                     self.lifecycle.emit("archive_verified", key=key, run_id=run_id, archive_ref=diagnostic_ref(current_archive),
                                         backup_hash_ref=diagnostic_ref(result["sha256"]), result="verified")
@@ -801,8 +930,12 @@ class Hub:
                     outcome = "failed"
                     self.lifecycle.emit("repo_backup_failed", key=key, run_id=run_id, stage=stage, archive_ref=diagnostic_ref(current_archive),
                                         severity="error", result="failed", error_type=type(e).__name__,
-                                        duration_ms=(time.monotonic()-repo_started)*1000)
-                    failures.append({"repo": root.name, "error": str(e)})
+                                        error_code=getattr(e, "errno", None), duration_ms=(time.monotonic()-repo_started)*1000)
+                    failure = {"repo": root.name, "repo_id": key, "error": str(e)}
+                    if isinstance(e, OSError):
+                        failure["access"] = access_failure(e, "destination_write" if stage in {"archive_transfer", "destination_verification", "index_publication", "publication_recovery"} else "verification_read" if stage == "existing_verification" else "source_read")
+                        failure["error"] = failure["access"]["detail"]
+                    failures.append(failure)
             with self.lock:
                 self.status["backup"] = {"running": False, "finished_at": utc_now(), "run_id": run_id, "errors": failures,
                                          "note": "Archives verified locally. macOS manages iCloud upload."}
@@ -882,6 +1015,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path.startswith("/api/repo-settings/"):
                 return self.send(self.hub.repo_settings_status(path.removeprefix("/api/repo-settings/")))
+            if path == "/api/readiness":
+                return self.send(self.hub.readiness_status())
+            if path == "/api/workspaces":
+                return self.send(self.hub.workspace_status())
             if path == "/api/settings":
                 return self.send(self.hub.settings_status())
             if path == "/api/status":
@@ -901,6 +1038,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.serve_view(path)
             routes = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                       "/view-client.js": "view-client.js", "/notes.html": "notes.html",
+                      "/readiness.js": "readiness.js", "/readiness.css": "readiness.css",
+                      "/workspace-setup.js": "workspace-setup.js", "/workspace-setup.css": "workspace-setup.css",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
                       "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:
@@ -961,9 +1100,23 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(self.hub.save_settings(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
+            if path == "/api/readiness/check":
+                if payload:raise ValueError("Unknown access-check field")
+                try:return self.send(self.hub.start_readiness())
+                except FileExistsError as error:return self.send({"error":str(error)},409)
             if path == "/api/diagnostics/presentation":
                 try:
                     return self.send(self.hub.evidence.presentation(payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
+            if path == "/api/workspaces/preview":
+                try:
+                    return self.send(self.hub.preview_workspaces(payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
+            if path == "/api/workspaces":
+                try:
+                    return self.send(self.hub.save_workspaces(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
             if path == "/api/reports/connection":

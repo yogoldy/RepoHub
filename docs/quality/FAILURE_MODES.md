@@ -297,6 +297,22 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 **Remaining exposure:** The automated DOM/API harness does not prove native WebKit layout, modal focus, token onboarding or live GitHub behavior. Verify the installed menu with computer use.
 
+### GR15 — Workspace selection preserves identity and copy scope
+
+**Susceptible boundary:** A new source mode changes existing IDs, aliases duplicate a source, missing folders publish empty replacements, or configuration changes race backup source selection.
+
+**Cause / solution:** Persist a canonical source registry with inactive identity records, retain legacy IDs and validate overlaps/protected locations. Saves require a matching revision and idle scan/backup locks. Take the backup source snapshot under that same lock. Check an approved directory's canonical location before scanning/copying it.
+
+**Required behavior:** Migration preserves backups, saved JSON, schedules and per-repo settings. Same-named folders remain distinct. Removal stops monitoring without deleting sources/current archives. Unavailable/retargeted sources fail safely, and saved manual selections no longer depend on the obsolete home setting. Invalid/stale/busy/failed saves retain the old selection.
+
+**Diagnostic trail:** `workspace_configuration`, `repo_checked`, `repo_backup_failed`, `repo_backup_finished`, `status_repo`, `ui_presented`. Successful configuration events contain only mode/result/count; subsequent repo/run/archive aliases explain copy outcomes. Exporting source paths/names is forbidden.
+
+**Controlled counterexample:** The new interleaving regression was run against the parent implementation's backup method and failed because configuration saving was allowed between taking the old source list and acquiring the backup lock. The fixed implementation rejects that concurrent save. The duplicate-name diagnostic regression also fails against the earlier name-based projection: both same-named rows are falsely marked as copying. Backup activity, errors, UI status and problem episodes now use workspace IDs, with legacy-name fallback only when the ID field is absent. The shared JavaScript policy checks that the other same-named card stays ready and receives no unrelated error. These are synthetic findings, not evidence of personal backup incidents. Private reproduction logs remain outside Git.
+
+**Regression tests:** All 16 `test_workspace_registry.WorkspaceTests` methods are required by [golden-rules.json](golden-rules.json), including migration/persistence, alias/collision handling, source availability, revision/lock/write failures, the controlled interleaving, API authorization and sanitized configuration diagnostics. The macOS gate separately runs the native bridge executable's manual-path approval/rejection checks.
+
+**Remaining exposure:** Native URL checks do not prove actual Finder/picker interaction. Separate-volume remounts, inaccessible-volume recovery, concurrent filesystem replacement and source relocation still need live coverage. Destination migration, naming and setup UI remain separate work. See [the configuration contract](../WORKSPACE_CONFIGURATION.md).
+
 ## Reporting access incident — 2026-10-09
 
 The MacBook Pro authenticated the saved token as the tracker owner, while a submission receipt recorded `failed / github_access_denied`. GitHub token settings showed no selected repositories or repository permissions. The generic UI error did not explain that sign-in and permission to create an issue are separate checks. The user later confirmed successful delivery to [issue #3](https://github.com/yogoldy/RepoHub/issues/3), corroborated by the local `sent` receipt and GitHub issue lookup. The intervening permission save was not directly observed; do not claim a captured end-to-end permission-change trace.
@@ -304,3 +320,127 @@ The MacBook Pro authenticated the saved token as the tracker owner, while a subm
 The UI now identifies access denial and directs the owner to check token validity, selected RepoHub access and Issues read/write; it does not claim that a 401/403 proves missing permissions. Draft bytes and preview identity survive rejection and explicit retry. Operational diagnostics export only the existing enumerated denial code and aliased report identity. No credential or provider error prose is exported.
 
 GR13 additionally requires `test_report_delivery.ReportDeliveryTests.test_sign_in_success_does_not_grant_post_permission_and_retry_keeps_draft`. GR14's existing both-surface controller regression now exercises a successful account check followed by denied submission, actionable feedback, a connection check that does not resend, and explicit retry of the same preview. Native rendering of this new wording and Air onboarding remain pending; automated controller tests do not replace those checks.
+
+## Source-picker and review boundary (GR16)
+
+A repo-home child may appear between review and save, or a late/cancelled native picker callback may belong to an obsolete draft. The native bridge accepts only fixed directory-picker actions with a typed correlation ID on the exact main menu frame. Draft cancellation invalidates that ID. The backend preview validates paths without saving; a reviewed save rechecks both registry revision and the entire candidate fingerprint under the configuration/backup lock. Conflict preserves the approved configuration and asks for a fresh review. `workspace_review` logs bounded outcomes/mode/count, never raw folder paths. Live native focus, cancellation, multi-selection and visible exact-path review require acceptance alongside automated tests.
+
+Native acceptance also found an inaccessible second top-level modal: visually rendered controls were absent from WebKit accessibility. Reuse the existing settings dialog for the setup form; require live accessibility and picker checks, not screenshots or diagnostics alone. See [Pro source-picker acceptance](../PRO_SOURCE_PICKER_TEST.md). Rejected configuration saves produce a bounded failed event without path/prose.
+
+## Client startup freshness — GR06
+
+The menu changed cached backend health when local requests failed or a 20-second timer expired. It then reported stale icons against a fresh original observation. Both HTML surfaces now retain the original snapshot and render a separate client freshness projection. Typed request-failed, timeout and cache-expired contexts explain conservative stale displays; false green still raises disagreement. Native startup/timeout/recovery acceptance remains pending the reliability run.
+
+## Access denial and unavailable storage — GR17
+
+Actual mode-bit restrictions exercise denied root and nested-file reads, denied archive writes and revocation between archive creation and validation. Existing verified bytes/index remain unchanged; accessible independent repos continue and restore of access recovers. Typed errno-based outcomes do not diagnose TCC. Real privacy prompting remains native acceptance work.
+
+## Source substitution — GR18
+
+Canonical path and workspace ID alone cannot distinguish a replacement folder/volume. Add directory file ID and volume UUID when accessible; retain existing IDs. Recheck before reads and publication, block mismatches and require an explicit reviewed selection. Remount testing uses a disposable disk image; physical hot-unplug is not simulated proof.
+
+Live Pro disk-image acceptance passed: unmount retained the prior archive/index, a replacement directory at the former mount path was rejected, and remount of the original HFS+ image recovered with the same volume/directory identity and reused the verified archive. Private receipts are outside Git. This is real separate-volume evidence; physical unplug and privacy prompting remain separate.
+
+## Permission readiness — GR19
+
+Settings shows helper-probed source/destination access, actual notification authorization and installation-matched login registration. An explicit Check access action probes all selected regular files without following links and creates/removes only its own destination test file; it does not verify archives or uploads. Notification requests are contextual, not automatic at every launch. An asynchronous check keeps large trees from timing out the settings request. Native TCC/notification acceptance uses a separate identity; daily permissions are never reset.
+
+Volume checking initially used repeated diskutil subprocesses, making the full regression run unacceptably slow. The helper now reads Apple's persistent volume UUID directly with Core Foundation using a fresh URL for each check, retaining remount/substitution protection without process startup. The slow gate was deliberately interrupted and is not accepted as a pass.
+
+Freshness delivery retains at most one unavailable frame in memory and retries it after reconnect before the current frame. Expired backend observations remain unobserved gaps. Server event timestamps are receipt times, including deferred delivery; they are not proof of the moment pixels changed. Both request timeouts and cache expiry have explicit typed contexts.
+
+### Native picker pathname aliases (reliability acceptance)
+
+The simultaneous-folder picker returned `/tmp/...` for a previously stored
+`/private/tmp/...` folder. The draft deduplicated strings, so both appeared before
+review despite referring to the same directory. Native picker results now use
+POSIX realpath, matching helper canonicalization. Finder resolution uses the same
+comparison for approved registry paths. Native bridge checks cover both aliases
+and a directory symlink; the real multi-selection repeat remains required.
+
+### Notification request is separate from permission
+
+The isolated native readiness screen remained `notDetermined` after an explicit
+request. No grant/refusal prompt was successfully observed, so this is not evidence
+of a macOS permission decision. Calling a request must not continue to display
+“not requested”: the native app now records pending/completed/failed request states
+without exception prose and suppresses duplicate requests while one is pending.
+Only the OS authorization state can say allowed or denied. Readiness JavaScript
+regressions cover those combinations; native grant/refusal acceptance stays open.
+
+The bounded offline-frame slot is also compare-and-clear: completion of an older
+POST cannot erase a newer freshness frame queued while that request was in flight.
+A JavaScript concurrency counterexample is required by the gate's delivery suite.
+
+## Two-Mac staging interruption and payload drift (2026-10-10)
+
+Acceptance must not depend on the lifetime of the controlling tool session. A detached watchdog starts before any pause, and durable restore intents precede launchd bootout; locked cleanup resumes/stops only owned test labels and restores daily registrations even on a protected-state mismatch. Payload transfer is verified against a manifest from the exact clean Pro Golden Gate build, not an independent Air compilation. Controlled guard/cleanup/controller-loss regressions are in `test_reliability_acceptance`; actual native interruption and both-host permission evidence remain open. See [two-Mac protocol](../RELIABILITY_TWO_MAC_ACCEPTANCE.md) and GR12.
+
+## Native picker obscured by the menu (2026-10-10)
+
+The first Air acceptance at be02a30 showed the NSOpenPanel behind the floating menu popover. Helper/API operation and draft-only removals were intact; the private saved registry still matched its initial API snapshot. This is a native window-order failure rather than a backup failure. Close the popover before showing the independent picker and reopen its retained WebKit draft on choose/cancel. The two-host matrix case 02 now explicitly checks unobscured controls and retained drafts. Air cleanup restored its existing launch jobs and matched all protected-file hashes. Native acceptance of the fix remains open; compilation is not proof of window order.
+
+## Temporary staging app is not notification permission evidence (2026-10-10)
+
+Air's notification daemon rejected the random temporary-path identity before a
+permission decision. An existing development signature alone did not fix it.
+Registration of an owned Applications copy allowed the real notification state;
+the unchanged ad-hoc candidate also observed grant/revocation there. This is a
+staging registration fault, not evidence that a user refused notifications.
+The harness now records exact installed assets, refuses existing/redirected paths,
+and unregisters/removes only its matching copy. Changed assets remain for review;
+watchdog restoration of daily jobs still proceeds. GR12 includes preservation
+counterexamples. Air grant/revocation, restart and synthetic backup after denial
+have private evidence, but clean initial-refusal and both-host repeats remain open.
+
+Actual source privacy must be tested through the background helper. Its system
+Python identity is shared with daily work; resetting or revoking that identity's
+permissions in the daily account violates isolation. Case 07 therefore requires a
+separate test account. POSIX denial is still distinct from an actual TCC decision.
+
+
+## Cross-account acceptance must not impersonate the daily installation
+
+A standard permission-test account owns neither the daily launch registrations nor
+its private configuration. The same-user staging command therefore cannot safely
+be used under that account. `reliability_account_guard.py` gives each account its
+own journal and detached watchdog, with a shared read-only flock serializing test
+startup and daily restoration. An active test lease prevents restoration even
+before its helper starts listening. Cleanup releases that lease only after the
+exact owned test jobs are gone; an unknown helper on the fixed native port blocks
+the daily client from restarting against test data. The daily account captures
+its own protected files and rollback, without exposing them to the test account.
+
+Seven required GR12 counterexamples cover ownership/redirects, bounded single-use
+leases, unknown-port rejection, active-before-listen restoration exclusion,
+restoration despite a disclosed baseline change, incomplete test cleanup and
+watchdog retry. Actual cross-account interruption and the native permission matrix
+remain live acceptance; regression simulations are not those results.
+
+
+### launchd shutdown acknowledgement precedes port release
+
+The first real isolated-account hold at 5ec10cf booted out the known daily jobs,
+but its immediate bind check still found the helper port occupied. No test jobs
+started. The detached daily watchdog retried after the exiting helper released
+the port and restored both registrations with matching protected hashes. The hold
+now waits up to five seconds for port release while retaining the coordination
+lock; timeout still fails closed. Two counterexamples cover delayed release and
+an occupied port that never clears. No process is killed based on the port alone.
+
+
+### Fixed-port handoff must be checked by the receiving account
+
+The next real hold passed the daily account's bind check but test admission failed.
+A controlled port-only repeat found no listener, yet the test UID received errno 48
+(address in use) while the daily UID could bind. netstat recorded old 8767 connections
+in TIME_WAIT. The test UID became able to bind after 15.1 seconds of observation;
+no test helper was launched during the probe. Guarded restoration again preserved
+all protected files and restored both daily labels.
+
+Test admission now waits up to 45 seconds as the receiving UID, under the same
+coordination lock, then rechecks expiry. It records each ownership/candidate/lease/
+port check privately in admission.json. Wrong identity or stale hold fails before
+waiting or launching. The guard never changes kernel TCP settings or starts the
+daily client against an unknown helper. Cross-account TIME_WAIT behavior is an
+observed staging constraint here, not an application backup or privacy failure.

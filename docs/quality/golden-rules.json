@@ -116,16 +116,17 @@
         "presentation_disagreement",
         "upload_stale"
       ],
-      "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts.",
+      "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
       "required_behavior": "Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement.",
       "test_ids": [
         "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
         "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
         "test_backup_lifecycle.LifecycleTests.test_green_icon_with_missing_upload_is_logged_as_input_disagreement",
         "test_change_evidence.EvidenceTests.test_no_record_of_second_view_is_not_claimed_as_agreement",
-        "test_change_evidence.EvidenceTests.test_both_views_are_correlated_and_disagreement_is_reported"
+        "test_change_evidence.EvidenceTests.test_both_views_are_correlated_and_disagreement_is_reported",
+        "test_change_evidence.EvidenceTests.test_client_freshness_override_preserves_backend_and_detects_false_green"
       ],
-      "remaining_gap": "Rendered progress percentages, selected-card visibility, pixels and clickability still lack full diagnostic acceptance coverage."
+      "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },
     {
       "id": "GR07",
@@ -240,9 +241,26 @@
       "required_behavior": "Compiled native sources and packaged modules/routes must agree; local diagnostics must disclose interrupted runs.",
       "test_ids": [
         "test_backup_lifecycle.LifecycleTests.test_restart_discloses_incomplete_run_without_claiming_recovery",
-        "test_backup_lifecycle.LifecycleTests.test_creation_reuse_and_render_reason_share_archive_run_identity"
+        "test_backup_lifecycle.LifecycleTests.test_creation_reuse_and_render_reason_share_archive_run_identity",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_payload_transfer_change_fails_closed",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_only_known_matching_daily_labels_can_be_paused",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_cleanup_restores_intents_even_when_protected_state_changed",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_watchdog_controller_loss_invokes_cleanup_without_parent",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_registered_native_cleanup_never_removes_foreign_or_changed_assets",
+        "test_reliability_acceptance.AcceptanceHarnessTests.test_native_registration_refuses_existing_and_redirected_application",
+        "test_reliability_account_guard.AccountGuardTests.test_peer_sharing_is_read_only_and_redirects_are_rejected",
+        "test_reliability_account_guard.AccountGuardTests.test_peer_is_bounded_single_use_and_wrong_owner_fails",
+        "test_reliability_account_guard.AccountGuardTests.test_port_reuse_requires_loaded_daily_helper_and_exact_source",
+        "test_reliability_account_guard.AccountGuardTests.test_daily_restore_waits_for_active_test_even_when_port_is_empty",
+        "test_reliability_account_guard.AccountGuardTests.test_stopped_peer_restores_daily_jobs_and_discloses_changed_baseline",
+        "test_reliability_account_guard.AccountGuardTests.test_test_cleanup_does_not_release_daily_hold_until_jobs_are_gone",
+        "test_reliability_account_guard.AccountGuardTests.test_watchdog_retries_until_daily_restoration_finishes",
+        "test_reliability_account_guard.AccountGuardTests.test_shutdown_wait_accepts_delayed_release_without_starting_any_job",
+        "test_reliability_account_guard.AccountGuardTests.test_shutdown_wait_is_bounded_and_does_not_assume_port_owner",
+        "test_reliability_account_guard.AccountGuardTests.test_admission_rejects_wrong_candidate_account_or_restoring_guard",
+        "test_reliability_account_guard.AccountGuardTests.test_admission_cannot_accept_expired_or_active_peer"
       ],
-      "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration."
+      "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration. The acceptance harness now hashes a single Pro-built payload, guards staging identities and restores journaled daily jobs independently on controller loss. Actual watchdog interruption and identical two-Mac native matrix remain required. Air native permission probes require a uniquely owned Applications copy registered with LaunchServices; temporary-path apps failed notification client validation. Clean two-host permission repeats and real controller-interruption acceptance remain open. Isolated standard-account staging uses separate account-owned watchdogs and a shared read-only lock; the daily restoration guard waits for test-job cleanup and rejects an unknown helper on the fixed port. Real cross-account controller-loss acceptance remains required."
     },
     {
       "id": "GR13",
@@ -282,6 +300,116 @@
         "test_report_entry.ReportEntryTests.test_both_surfaces_support_report_compose_preview_and_explicit_send"
       ],
       "remaining_gap": "A mocked DOM/API regression proves controller wiring, not native WebKit layout, modal focus, secure token onboarding or live GitHub response. Computer-use checks on the installed menu and a narrow viewport remain required."
+    },
+    {
+      "id": "GR15",
+      "title": "Workspace selection preserves identity and copy scope",
+      "breakpoint": "A new source mode changes existing IDs, aliases duplicate a source, missing folders replace good archives with empty copies, or configuration changes race backup source selection.",
+      "diagnostic_events": [
+        "workspace_configuration",
+        "repo_checked",
+        "repo_backup_failed",
+        "repo_backup_finished",
+        "status_repo",
+        "ui_presented"
+      ],
+      "cause_and_solution": "Persist a validated canonical registry with retained inactive identities; preserve legacy IDs; reject overlaps and changed locations; bind revision-safe configuration saves and backup source selection to the same lock.",
+      "required_behavior": "Migration preserves backups, scoped JSON and schedules; only active approved sources can be copied; source removal preserves current archives; unavailable/retargeted sources fail without empty replacements; configuration events export no paths. Copy activity, error attribution, diagnostic projections and problem episodes use workspace IDs so duplicate names cannot share status.",
+      "test_ids": [
+        "test_workspace_registry.WorkspaceTests.test_migration_preserves_ids_archives_json_and_overrides",
+        "test_workspace_registry.WorkspaceTests.test_same_named_manual_folders_have_independent_identity_and_complete_archives",
+        "test_workspace_registry.WorkspaceTests.test_initial_manual_configuration_needs_no_repo_home",
+        "test_workspace_registry.WorkspaceTests.test_saved_manual_selection_is_authoritative_over_legacy_home",
+        "test_workspace_registry.WorkspaceTests.test_removing_and_readding_preserves_identity_backups_and_scoped_settings",
+        "test_workspace_registry.WorkspaceTests.test_missing_folder_cannot_replace_archive_with_empty_backup",
+        "test_workspace_registry.WorkspaceTests.test_dynamic_children_exclude_hidden_symlinks_and_keep_missing_identity",
+        "test_workspace_registry.WorkspaceTests.test_deduplicated_alias_and_retargeted_source_never_change_identity",
+        "test_workspace_registry.WorkspaceTests.test_invalid_overlap_missing_and_protected_sources_do_not_mutate_registry",
+        "test_workspace_registry.WorkspaceTests.test_revision_busy_and_write_failure_leave_prior_selection_intact",
+        "test_workspace_registry.WorkspaceTests.test_backup_source_selection_is_serialized_with_configuration_changes",
+        "test_workspace_registry.WorkspaceTests.test_invalid_saved_registry_fails_closed_without_resetting",
+        "test_workspace_registry.WorkspaceTests.test_configuration_diagnostics_export_no_paths",
+        "test_workspace_registry.WorkspaceTests.test_workspace_api_requires_host_origin_token_and_revision",
+        "test_workspace_registry.WorkspaceTests.test_backup_activity_and_failures_use_workspace_ids",
+        "test_workspace_registry.WorkspaceTests.test_duplicate_names_scope_diagnostics_and_problem_episodes"
+      ],
+      "remaining_gap": "Core source-selection UI is implemented and accepted on Pro at 5e24009. Real disk-image unmount/substitution/remount passed. Corrected native simultaneous selection and isolated TCC acceptance remain open; destination/naming migration is later work."
+    },
+    {
+      "id": "GR16",
+      "title": "Review exact source selections before saving",
+      "breakpoint": "Folder discovery changes after review; cancelled or stale native picker result updates a different draft; selection UI saves without disclosing removal.",
+      "diagnostic_events": [
+        "workspace_review",
+        "workspace_configuration"
+      ],
+      "cause_and_solution": "Keep folder choice local until backend validation, bind the review to the current registry and candidate inventory, and correlate native picker results to a single request. Canonicalize native selections with POSIX realpath so macOS pathname aliases do not duplicate draft entries.",
+      "required_behavior": "Review lists exact canonical paths and removals; stale review is rejected; cancel and failed review never save; picker accepts only exact main menu frame and typed request IDs.",
+      "test_ids": [
+        "test_workspace_registry.WorkspaceTests.test_review_is_read_only_and_requires_same_discovered_folder_list",
+        "test_workspace_registry.WorkspaceTests.test_review_discloses_removal_without_erasing_data_and_rejects_invalid_token",
+        "test_workspace_registry.WorkspaceTests.test_preview_guard_and_diagnostics_exclude_source_prose",
+        "test_workspace_registry.WorkspaceTests.test_unmonitored_home_inventory_drift_rejects_review_without_registry_change"
+      ],
+      "remaining_gap": "Native simultaneous selection exposed a pathname alias duplicate; fixed and regression-tested. Corrected native cancel/removal/review/save/restart repeat remains open after computer-use timeout; native bridge and draft checks run in the gate. Air native acceptance at be02a30 exposed a popover covering the independent NSOpenPanel. The menu now closes only for the picker lifetime and reopens its retained draft; actual choose/cancel/save/restart regression on both Macs is required. Air b97fdf2 native choose/cancel/dedup/remove/review/save/restart checks passed against private registry/archive evidence; the complete re-add/removal sequence and Pro repeat remain open."
+    },
+    {
+      "id": "GR17",
+      "title": "Access failure cannot publish an incomplete backup",
+      "breakpoint": "Denied source reads and destination writes can be confused with empty or changed content.",
+      "diagnostic_events": [
+        "repo_backup_failed",
+        "scan_finished",
+        "verification_deferred"
+      ],
+      "cause_and_solution": "Retain errno and classify access/unavailable/I/O outcomes without claiming a specific macOS privacy decision. Continue independent repos and recover after access returns.",
+      "required_behavior": "No partial archive or replacement of the previous verified backup; access failures remain visible and recoverable.",
+      "test_ids": [
+        "test_access_failures.AccessTests.test_errno_classification_is_not_a_privacy_claim",
+        "test_access_failures.AccessTests.test_unreadable_nested_file_preserves_archive_and_other_repo_recovers",
+        "test_access_failures.AccessTests.test_unreadable_root_scan_keeps_identity_and_previous_archive",
+        "test_access_failures.AccessTests.test_unwritable_destination_preserves_previous_archive",
+        "test_access_failures.AccessTests.test_revocation_during_archive_creation_never_publishes_partial_copy",
+        "test_access_failures.AccessTests.test_missing_destination_is_not_empty_success",
+        "test_access_failures.AccessTests.test_destination_revocation_during_snapshot_keeps_verified_copy"
+      ],
+      "remaining_gap": "Actual macOS privacy refusal/revocation and installed readiness UI require isolated native acceptance; POSIX tests do not establish TCC behavior."
+    },
+    {
+      "id": "GR18",
+      "title": "A source path is not a source identity",
+      "breakpoint": "A different directory or mounted volume can occupy the saved canonical path.",
+      "diagnostic_events": [
+        "repo_backup_failed",
+        "workspace_review",
+        "workspace_configuration"
+      ],
+      "cause_and_solution": "Persist directory file ID and macOS volume UUID, retain stable workspace IDs, and check identity before scan/copy/publication. Explicit reviewed selection adopts replacements.",
+      "required_behavior": "Missing or substituted sources never replace known-good archives. Original volumes recover without resetting schedules.",
+      "test_ids": [
+        "test_source_identity.IdentityTests.test_replacement_at_same_path_requires_review_and_preserves_id",
+        "test_source_identity.IdentityTests.test_original_directory_restores_without_identity_reset",
+        "test_source_identity.IdentityTests.test_volume_mismatch_cannot_be_hidden_by_same_inode",
+        "test_source_identity.IdentityTests.test_legacy_identity_migration_waits_for_accessible_source"
+      ],
+      "remaining_gap": "Real disposable macOS disk-image unmount/replacement/remount passed at 7d21621. Physical hot-unplug is outside this pass; sustained races and unusual/cloned filesystem identities remain untested."
+    },
+    {
+      "id": "GR19",
+      "title": "Readiness reflects the actual helper and optional permissions",
+      "breakpoint": "Native folder choice can succeed while the background process cannot read files; notifications can be mistaken for a backup prerequisite.",
+      "diagnostic_events": [
+        "access_readiness",
+        "repo_backup_failed"
+      ],
+      "cause_and_solution": "Contextual native notification requests and guarded helper-owned access probes expose unchecked/blocked/unavailable/changed states separately from backup/upload success. Track request progress separately from OS authorization and make an interrupted request retryable after restart; native readiness and JavaScript request-state regressions run in the gate.",
+      "required_behavior": "No blanket privilege demand; notification refusal does not prevent backup. Login registration must match this installation.",
+      "test_ids": [
+        "test_readiness.ReadinessTests.test_helper_probe_detects_and_recovers_denial_without_changing_backup",
+        "test_readiness.ReadinessTests.test_notifications_are_optional_and_do_not_gate_backup",
+        "test_readiness.ReadinessTests.test_access_endpoint_requires_origin_token_and_no_path_payload"
+      ],
+      "remaining_gap": "Initial fresh native helper-readiness check passed; explicit notification request remained notDetermined. Real grant/refusal/revocation and TCC acceptance remain open; mocked authorization and POSIX errno are not proof. Air registered-app probe observed real notification grant/revocation and restart with matching menu states; denial did not block a synthetic edit backup. Initial prompt refusal and clean identical-host repeats remain open. Actual helper TCC testing cannot change the shared system Python privacy identity without affecting daily work; use a separate test account."
     }
   ]
 }

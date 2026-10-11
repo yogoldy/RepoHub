@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {create}=require('../web/diagnostics-client.js');
+const {create,displayState}=require('../web/diagnostics-client.js');
 (async()=>{
   let now=0,calls=[],fail=false;
   const fetcher=async(url,options={})=>{calls.push({url,options});if(fail)throw new Error('unreachable');return {ok:true,json:async()=>({token:'test-current-token'})};};
@@ -15,5 +15,32 @@ const {create}=require('../web/diagnostics-client.js');
   rows[0].display_label='Files changed';assert.equal(await client.observe(status,rows),true);
   fail=true;rows[0].display_label='Git data changed';assert.equal(await client.observe(status,rows),false);
   fail=false;assert.equal(await client.observe(status,rows),true);
+  const backend={...status,repos:[{health:{fresh:true},id:'known'}]};
+  const frozen=JSON.stringify(backend);
+  const offline=displayState(backend,'cache_expired');assert.equal(offline.repos[0].health.fresh,false);
+  assert.equal(JSON.stringify(backend),frozen);assert.equal(displayState(backend),backend);
+  assert.equal(await client.observe(backend,[{repo_id:'known',phase:'stale',display_label:'Status outdated',ready:false}],'cache_expired'),true);
+  assert.equal(JSON.parse(calls.at(-1).options.body).client_freshness,'cache_expired');
+  fail=true;
+  const stale=[{repo_id:'known',phase:'stale',display_label:'Status outdated',ready:false}];
+  assert.equal(await client.observe(backend,stale,'response_timeout'),false);
+  fail=false;const at=calls.length;
+  assert.equal(await client.observe(backend,[{repo_id:'known',phase:'changed',display_label:'Files changed',ready:false}]),true);
+  const replay=calls.slice(at).filter(c=>c.url==='/api/diagnostics/presentation').map(c=>JSON.parse(c.options.body));
+  assert.equal(replay[0].client_freshness,'response_timeout');assert.equal(replay[1].client_freshness,'current');
+  assert.equal(JSON.stringify(backend),frozen);
+  let release,announce;const entered=new Promise(resolve=>announce=resolve),blocked=new Promise(resolve=>release=resolve),frames=[];
+  let first=true;
+  const concurrent=create('menu',{native:true,clientId:'c'.repeat(24),fetcher:async(url,options={})=>{
+    if(url==='/api/session')return {ok:true,json:async()=>({token:'test'})};
+    frames.push(JSON.parse(options.body));
+    if(first){first=false;announce();await blocked;}
+    return {ok:true};
+  }});
+  const inFlight=concurrent.observe(backend,stale,'response_timeout');await entered;
+  assert.equal(await concurrent.observe(backend,stale,'cache_expired'),false);
+  release();await inFlight;
+  await concurrent.observe(backend,rows,'current');
+  assert.deepEqual(frames.map(frame=>frame.client_freshness),['response_timeout','cache_expired','current']);
   console.log('Diagnostic delivery checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

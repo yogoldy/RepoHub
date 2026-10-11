@@ -4,12 +4,12 @@
   function view(repo,backup={}){
     const cloud=repo.cloud||{},verification=repo.verification||{},archive=repo.last_backup?.archive;
     const percent=typeof cloud.percent==='number'&&Number.isFinite(cloud.percent)&&cloud.percent>=0&&cloud.percent<=100?cloud.percent:null;
-    const issue=repo.error||verification.error||backup.errors?.find(e=>e.repo===repo.name)?.error|| (cloud.state==='error'?(cloud.detail||'iCloud upload issue'):null);
+    const issue=repo.error||verification.error||backup.errors?.find(e=>'repo_id' in e?e.repo_id===repo.id:e.repo===repo.name)?.error|| (cloud.state==='error'?(cloud.detail||'iCloud upload issue'):null);
     const ready=repo.health?.fresh===true&&repo.needs_backup===false&&!issue&&!!archive&&typeof repo.last_backup?.sha256==='string'&&repo.last_backup.sha256.length>0&&verification.state==='matched'&&verification.archive===archive&&cloud.state==='uploaded'&&cloud.archive===archive;
     if(repo.health?.fresh!==true)return {phase:'stale',label:'Status outdated',detail:repo.health?.reasons?.join(' · ')||'Waiting for fresh checks',ready:false,percent:null};
     if(issue)return {phase:'error',label:'Needs attention',detail:issue,ready:false,percent:null};
     if(verification.state==='changing')return {phase:'verifying',label:'Files changing',detail:'Files changed during verification. We’ll check again on the next scan.',ready:false,percent:null};
-    if(backup.running&&backup.current_repo===repo.name)return {phase:'copying',label:'Backing up',detail:'Building and verifying this backup',ready:false,percent:null};
+    if(backup.running&&('current_repo_id' in backup?backup.current_repo_id===repo.id:backup.current_repo===repo.name))return {phase:'copying',label:'Backing up',detail:'Building and verifying this backup',ready:false,percent:null};
     if(repo.needs_backup){
       if(repo.last_backup&&verification.state==='checking')return {phase:'verifying',label:'Checking for changes',detail:'Comparing hashes before identifying changed files',ready:false,percent:null};
       const counts=verification.state==='different'&&verification.archive===archive?verification.changes?.counts:null;

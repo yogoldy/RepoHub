@@ -2,6 +2,11 @@ import Foundation
 
 @main struct ReadinessTests {
     static func main() {
+        precondition(BackupReadiness.permissionRequest(saved: nil, inFlight: false) == "not_requested")
+        precondition(BackupReadiness.permissionRequest(saved: "pending", inFlight: false) == "failed")
+        precondition(BackupReadiness.permissionRequest(saved: "completed", inFlight: false) == "completed")
+        precondition(BackupReadiness.permissionRequest(saved: "failed", inFlight: true) == "pending")
+        precondition(BackupReadiness.permissionRequest(saved: "arbitrary", inFlight: false) == "not_requested")
         let archive = "/backups/current.tar.gz"
         let good: [String: Any] = ["name":"Example", "needs_backup":false, "health":["fresh":true],
             "last_backup":["archive":archive, "sha256":"abc"],
@@ -31,6 +36,6 @@ import Foundation
         precondition(ProblemAlerts.pending([problem], seen: [], lastNotice: 1900, now: 2000).isEmpty)
         precondition(ProblemAlerts.pending([], seen: [], lastNotice: 0, now: 2000).isEmpty)
         precondition(ProblemAlerts.pending([["id":"bad"]], seen: [], lastNotice: 0, now: 2000).isEmpty)
-        print("15 notification-readiness/problem checks passed")
+        print("20 notification-readiness/problem checks passed")
     }
 }

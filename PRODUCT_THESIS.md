@@ -15,7 +15,7 @@ This document is the product roadmap and completion checklist. Unchecked items a
 - [x] Distinguish Finder metadata, Git data and repo-file changes; avoid timestamp-only replacement backups after hashes match.
 - [x] Ignore ordinary `.DS_Store`-only changes as backup triggers; isolate replacement archives to changed/new/damaged repos and avoid unchanged iCloud-index rewrites.
 
-The tested application release at `f9996ab` was promoted to main and deployed to both Macs on 2026-10-09. It includes the checked foundation items, continuous diagnostics, constrained agent exports and local bug/feature previews. Existing configuration was preserved; installer migration was not run. Earlier hashes below identify implementation milestones, not the current installed state. Green status currently requires a matching archive plus fresh macOS iCloud upload confirmation. The Air staging pilot now includes independent cross-device iCloud reception and restore verification; broader failure and UI coverage remains incomplete.
+Stable main is `08af74f`. The Pro runs the accepted source-picker build `5e24009`; the Air retains its earlier build. Source configuration/pickers are implemented and core native workflows are accepted, but main promotion is pending. The five reliability goals are implemented on `codex/workspace-setup` and remain under acceptance: automated checks and a real disk-image fault/recovery test passed, while corrected native multi-selection and actual permission cases remain open after computer-use connection failures. See [the reliability checkpoint](docs/PRO_RELIABILITY_ACCEPTANCE.md). Green status still requires matching hashes plus fresh macOS upload confirmation; independent Air restore evidence covers only the documented pilot cases.
 
 ## Tier 0 — Publish the direction
 
@@ -67,11 +67,31 @@ There are exactly three entry modes:
 | **2. Manual paths** | Select any number of repo folders, wherever they live. | Each selected folder is one monitored workspace. Allow add/remove and a review list, without forcing a shared parent or an arbitrary small count limit. |
 | **3. AI-assisted** | Ask a connected assistant or supply its proposed path list. | The assistant proposes folders; Repo Hub validates them and shows the same review list before the user activates monitoring. |
 
-- [ ] **3A — Workspace configuration model.** Replace the single-root assumption with explicit source modes and a persisted workspace registry. Preserve existing IDs/backups during migration. Distinguish same-named folders at different paths, deduplicate selections, handle overlapping/nested sources and maintain per-repo settings. Update Finder resolution, scoped JSON APIs, notifications, scanners and backups to use the validated registry.
-- [ ] **3B — Repo-home setup.** Add the containing-folder picker, immediate-child explanation and live preview. Test empty/missing/inaccessible homes, folders without Git, dynamic children and migration from the existing config.
-- [ ] **3C — Manual-path setup.** Add multi-folder selection and an editable review list. Test separate volumes, duplicate basenames, canonical path identity, permissions and removal without deleting source files or backups.
+- [x] **3A — Workspace configuration model.** Replace the single-root assumption with explicit source modes and a persisted workspace registry. Preserve existing IDs/backups during migration. Distinguish same-named folders at different paths, deduplicate selections, handle overlapping/nested sources and maintain per-repo settings. Update Finder resolution, scoped JSON APIs, notifications, scanners and backups to use the validated registry.
+- [x] **3B — Repo-home picker and review.** Native containing-folder selection, immediate-child/future-discovery explanation, exact-path review and drift-checked saving are implemented. Core native flow accepted on the Pro; registry validation/migration regressions remain mandatory. See [source-picker acceptance](docs/PRO_SOURCE_PICKER_TEST.md).
+- [x] **3C — Individual-folder picker and review.** Add/remove across native picker sessions, exact paths, same-name identities and explicit removal review are implemented. Core native flow and restart accepted on the Pro; automated guards/preservation pass.
+- [ ] **3B/3C environmental acceptance.** Exercise simultaneous multiple selection in one native panel, separate volumes, live permission denial and unavailable drives; do not substitute same-volume fixtures for that evidence.
 - [ ] **3D — Output-folder setup.** Add a destination picker and validation. Reject a backup output inside any monitored source, including alias/symlink paths that would cause recursion. Check access and available space; an unavailable drive pauses with a clear error rather than silently writing elsewhere. Changing output must preserve old backups and disclose how a verified copy reaches the new destination.
 - [ ] **3E — Destination-aware status.** Distinguish a verified local copy, a copy in a provider-managed folder and an explicitly confirmed remote upload. A filesystem destination cannot prove Google Drive/Dropbox/OneDrive upload. For non-iCloud folders, show the evidence actually available rather than inventing confirmation or waiting forever for an iCloud signal. Keep the existing iCloud acknowledgement adapter where applicable.
+
+### Setup implementation passes
+
+1. **Workspace foundation (3A):** migrate the current repo home into a validated registry while preserving workspace IDs, existing backups and per-repo schedules.
+2. **Source selection (3B/3C):** offer repo-home immediate children or manual folder selection, with native pickers and a review list before activation.
+3. **Destination selection and evidence (3D/3E):** select and validate an output folder; preserve old backups and accurately disclose local verification versus observed provider upload.
+4. **Guided onboarding (3F):** explain the purpose and flow through a short visual walkthrough after the configuration is usable.
+
+- [ ] **3F — Guided visual onboarding.** Introduce the app as scheduled backup storage for selected workspaces. Use arrows, recognizable folder/archive/cloud icons, brief captions and optional highlight/scale/shake demonstrations to connect instructions with actual controls. Explain source selection, destination selection, schedules, manual backup, hash verification and cloud-upload status. Show the flow “selected folder → complete archive → verified destination copy → observed upload confirmation where supported.” Offer Skip, Back, Next and replay from menu-bar settings; honor reduced motion, support keyboard navigation and never start a backup or change settings just by advancing the walkthrough. Label illustrative states as demonstrations rather than live backup evidence. Cover first launch and existing users without forcing either through onboarding repeatedly.
+
+- [ ] **3G — Readable, customizable backup-folder names.** Default to “{workspace name} Backup” (for example, “HealthFit Backup”), with a naming choice such as workspace name alone, name plus Backup, or a custom per-workspace label. Preview the actual destination folder name before saving. Keep stable workspace IDs, source identity and content/archive verification hashes in metadata, independently of the human-facing name; do not weaken hash verification. Detect duplicate names using the destination filesystem's case/normalization rules, and offer descriptive disambiguation or an editable label rather than exposing an opaque ID suffix by default. Reject empty/reserved names, path separators and traversal; keep the resolved folder inside the selected destination. Persist labels across restarts and source-folder renames. Migrate existing suffixed folders without losing archives, indexes, schedules or pending upload/retention evidence; never overwrite another workspace's folder. Renaming changes presentation/location only, not backup identity or its verification requirements. Test collision handling, safe migration, interrupted renames and retained archive lookup before shipping.
+
+### Rolling backup storage
+
+The product intent is one current complete app-managed backup per workspace after safe replacement, rather than an accumulating collection of dated versions. This is scheduled backup storage; after-edit behavior remains optional. Use “destination folder” in generic setup text and name iCloud only when describing its specific upload evidence.
+
+Today each workspace has a destination subfolder containing dated `.tar.gz` archives. The app already applies latest-only cleanup: a new archive must pass verification and, for iCloud, obtain explicit macOS upload confirmation before older app-managed copies are removed. Two or more archives can temporarily remain while replacement is unconfirmed; failure must preserve the previous backup. Legacy and unmanaged files are left alone. A future simpler presentation or stable “current backup” pointer must preserve these replacement safeguards; never overwrite the only good copy in place.
+
+If the selected folder contains an ordinary self-contained `.git` directory, each complete archive includes its stored Git history alongside current ignored and uncommitted files. Git preserves committed history; discarded older archives do not preserve past uncommitted edits. Git is optional for monitoring and is not currently a retention-policy switch. External Git directories, linked worktrees, submodules and active databases still require the separate restore coverage already listed under Tier 5C. Any future different retention for folders without Git is a separate explicit product decision, not introduced by setup.
 
 Leo's current `install.py` performs a personal migration of an earlier iCloud Desktop backup layout. General setup must replace that assumption before this is presented as an installer for other users.
 
@@ -95,7 +115,7 @@ Folder-based destinations come first. **Do not implement cloud account linking i
 
 ## Completion and commit discipline
 
-1. Pick one unchecked atomic item, next **2E: maintainer review workflow**; submission and conservative delivery recovery are merged into main (`8cbeac6`). MacBook Pro native credential setup and public delivery are confirmed; Air reporting deployment is explicitly deferred. Broader Tier 5C coverage remains open.
+1. Finish the five-goal [reliability acceptance](docs/PRO_RELIABILITY_ACCEPTANCE.md) on `codex/workspace-setup` before adding functionality. Resume corrected native selection, freshness recovery and actual isolated permission checks. Main remains `08af74f`, Pro remains `5e24009`, and Air deployment is deferred. Destination selection/evidence follows acceptance.
 2. Implement it on the authorized work branch, with proportionate checks against synthetic data and a live UI check when behavior changes.
 3. Commit the implementation separately from the next item. Add its SHA and evidence to this checklist; a plan or screenshot alone does not mark a backend feature complete.
 4. Preserve stable main until the completed tier is reviewed for merging. Do not enable cloud/AI accounts, telemetry or scheduled maintainer agents as a side effect.
@@ -151,3 +171,46 @@ Menu/app presentation receipts now link to those run/archive identities. Backend
 **Reporting live acceptance and stopping point — 2026-10-09:** Reporting was merged through [PR #2](https://github.com/yogoldy/RepoHub/pull/2) at `8cbeac6`; its clean macOS gate passed 144 Python tests and the JavaScript/native checks. The user completed native secure token entry on the MacBook Pro. Backend account verification succeeded, and a durable `sent` receipt plus GitHub lookup confirmed [issue #3](https://github.com/yogoldy/RepoHub/issues/3). A preceding access-denied receipt and token-settings inspection exposed the distinction between sign-in and issue-write authorization; [the failure register](docs/quality/FAILURE_MODES.md) records evidence, limits and regression coverage. Tokens, private drafts, alias keys and raw diagnostic receipts stay outside Git.
 
 The follow-up clarifies account-versus-posting permission and explains access-denied retries without changing credential handling or submission policy. It is source work only until separately deployed. The Pro still runs the accepted reporting build `4e8c16e`; Air stays on its prior stable release at Leo's request. Tier 2E (maintainer review workflow), Tier 3 (setup), broader Tier 5C restore coverage and public submission onboarding remain open. No AI/cloud-service integration or scheduled review was enabled.
+
+**Setup roadmap clarification — 2026-10-10:** Setup now has four implementation passes, culminating in optional visual onboarding (3F). The rolling-storage intent and existing verified/upload-gated archive replacement are documented above; this roadmap update changes no app behavior. Main and the MacBook Pro were verified on `08af74f`; the Pro received the permission-feedback deployment after its clean 145-test macOS gate. Air reporting deployment remains deferred. Work continues on `codex/workspace-setup`, starting with 3A; onboarding, new destination selection and AI-assisted import are not shipped.
+
+
+**Tier 3A — `4363423` (2026-10-10):** [The workspace configuration contract](docs/WORKSPACE_CONFIGURATION.md) documents the persisted registry, repo-home/manual modes, preserved legacy identities, independent same-name folders, non-destructive removal, missing-source errors, source-selection locks and guarded revision API. Scanner/scheduler/JSON/backup integrations use the validated registry; the native Finder bridge accepts exact approved ID/path pairs. Copy progress, per-repo failures, displayed state, diagnostic projections and problem episodes use IDs rather than names, preventing cross-attribution for same-named folders. Sixteen targeted regressions pass, and GR15 makes them mandatory in the Golden Gate. A real isolated helper process passed 16 API/archive/restart/removal/diagnostic assertions; its provider observations were deliberately unavailable and are not cloud-upload evidence. Private receipts stay outside Git. Folder pickers, destination selection/evidence, onboarding and readable names remain 3B–3G. Main and installed apps are unchanged by this pass; native manual-path Finder clicks and separate-volume acceptance remain pending.
+
+**Tier 3A native staging — 2026-10-10:** [Pro fresh-state acceptance](docs/PRO_WORKSPACE_STAGING_TEST.md) tested `83c52bd` with computer use: same-name manual sources, native backup/settings/Finder, missing-source preservation, recovery and restart. Complete archives included Git/ignored files and passed manifest/hash checks. Diagnostics exposed an old WebKit renderer contaminating the shared-port test; fully stopping both daily jobs yielded a clean repeat with one UI client and zero status disagreements. Protected production file hashes were preserved and both daily jobs restored. Pro/main stay `08af74f`; Air unchanged. Folder-picker/review (3B/3C), destination selection/provider evidence (3D/3E), onboarding and readable names remain pending. Separate-volume and actual provider acceptance remain open.
+
+**Tier 3B/3C implementation checkpoint — 2026-10-10:** Source selection is reachable through the menu-bar gear, with a native directory picker, home/manual modes, exact-path lists, removal and explicit review/save. Server review binds the registry revision and candidate folder inventory, preventing unreviewed discovery changes from being saved. Golden Gate GR16 covers review drift, preservation and guarded/private review diagnostics; native picker bridge and JavaScript draft regressions are mandatory. Live native acceptance/deployment evidence follows separately. Destination selection, onboarding, readable names, separate-volume and provider testing remain open; Air unchanged.
+
+**Tier 3B/3C Pro acceptance — 2026-10-10:** [Native source-picker record](docs/PRO_SOURCE_PICKER_TEST.md) documents the screen/picker/review/save tests, accessibility failure and fix, stale-review rejection, full ignored/Git archive verification, diagnostics and rollback-protected Pro deployment. Application build `5e24009` passed the clean 165-test macOS Golden Gate and is installed on the Pro. Current 13 sources and schedules are preserved; Air unchanged and main unmerged. Core source-selection UI is complete; external-volume/permission and simultaneous panel multi-selection remain explicit coverage gaps. Next implementation is 3D/3E, then onboarding/readable names.
+
+**Reliability implementation checkpoint — 2026-10-10:** Goals 1, 3, 4 and 5 have separate implementation commits (`03d8ded`, `3d18f05`, `48fb7b1`, `e86a7f0`), with goal 2's native alias counterexample/fix at `a5eb444`. Follow-ups improve volume-probe performance, fixture hygiene, bounded freshness delivery, notification request/restart handling and mid-publication denial coverage. The clean implementation gate at `53ef1d5` passed 180 tests and native/JavaScript checks. Real disk-image loss/substitution/remount passed at `7d21621`. [The checkpoint](docs/PRO_RELIABILITY_ACCEPTANCE.md) records successful and failed attempts, private diagnostic evidence and remaining native acceptance. None of the incomplete OS permission cases is marked complete; no reliability deployment or main promotion occurred.
+
+
+**Two-Mac reliability checkpoint (2026-10-10):** Air-first b97fdf2 native staging
+through Jump Desktop validated picker foreground order, alias deduplication,
+cancel/save/restart persistence, preserved removed archives and visible stale
+cache/recovery against diagnostics. Notification probes exposed temporary-app
+registration rejection; an owned Applications copy allowed real grant/revocation
+and restart, with a synthetic backup continuing after denial. The daily Air jobs
+and all protected hashes were restored. These partial results do not close
+reliability: first-request refusal, actual helper privacy in an isolated account,
+remaining fault/volume cases and the identical Pro run stay open. No main promotion
+or daily deployment occurred. See the [case-by-case checkpoint](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
+
+
+**Isolated permission-test preparation (2026-10-10):** An Air standard test account
+now exists, and its narrowly authorized Remote Login permission is enabled.
+Test-account key installation and native connection remain pending user login.
+The existing Jump connection's daily Auto Logon was preserved; a temporary
+browser session is being prepared. This resolves account creation, not actual
+privacy acceptance. Both-host reliability acceptance, promotion and deployment
+remain open; see the [two-Mac record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
+
+
+**Isolated test connection checkpoint (2026-10-10):** Native control of the Air's
+standard test desktop is established through the separate Jump browser session;
+its approved public-key installer ran in that account. SSH remains blocked by an
+additional server username allowlist, with a narrowly scoped administrator update
+prepared for the user to apply. Daily services and saved Jump credentials are
+unchanged. This closes desktop connection preparation, not actual OS permission
+acceptance or the reliability release. See the [current acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).

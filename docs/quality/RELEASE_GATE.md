@@ -44,3 +44,15 @@ GitHub protects `main`: changes require a pull request and the `automated-contra
 ## Maintaining the contract
 
 When a failure is found, preserve private incident evidence, distinguish the observed cause from a hypothesis, reproduce with a controlled fixture, and add a regression plus diagnostic assertions. Update the rule’s causal explanation and remaining gap. When an intentional behavior changes, review the invariant itself; do not merely weaken the test until it passes. A future export field requires explicit typed policy and adversarial privacy tests even if the local logger already permits it.
+
+## Fixed-port native staging isolation
+
+When testing a candidate against the native app's fixed loopback port, fully stop the daily helper and all daily UI surfaces before starting the candidate; SIGSTOP alone retains the listener or allows WebKit renderer children to keep polling. Preserve daily files/credentials and arrange unconditional job restoration. Count diagnostic UI client IDs and reject unexplained clients before accepting a run. Confirm exact Finder URLs and rendered labels with computer use; diagnostic labels alone do not prove pixels or progress percentages. See [the controlled Pro test and repeat](../PRO_WORKSPACE_STAGING_TEST.md).
+
+## Reliability candidate acceptance
+
+[The five-goal checkpoint](../PRO_RELIABILITY_ACCEPTANCE.md) distinguishes passing
+automated/real disk-image checks from still-open native freshness, corrected
+simultaneous selection and isolated OS permission evidence. A gate pass cannot
+override those missing release conditions. Retain the previous installed Pro
+version until required acceptance succeeds. The approved [two-Mac protocol](../RELIABILITY_TWO_MAC_ACCEPTANCE.md) permits isolated Air staging, followed by identical Pro acceptance; daily deployment still waits for both-host acceptance.
