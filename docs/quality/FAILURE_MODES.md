@@ -444,3 +444,29 @@ port check privately in admission.json. Wrong identity or stale hold fails befor
 waiting or launching. The guard never changes kernel TCP settings or starts the
 daily client against an unknown helper. Cross-account TIME_WAIT behavior is an
 observed staging constraint here, not an application backup or privacy failure.
+
+
+## Remote login is not actual permission acceptance (2026-10-10)
+
+The isolated Air test account had working native control and SSH, yet its actual
+background helper rejected a synthetic Desktop source with EPERM while the SSH
+caller could read it. A native Terminal re-bootstrap of the same owned launch job
+reproduced the denial. Source review failed without changing the saved registry.
+No helper-specific folder-access prompt/entry was observed. Session evidence
+showed the Test account logged in but not on the physical console. That is a
+variable to eliminate, not a diagnosis that console activation will necessarily
+fix the helper's privacy attribution.
+
+Keep caller/picker/background-helper access evidence separate. EPERM alone does
+not prove a user explicitly refused TCC; a successful picker does not grant the
+helper equivalent access. Actual prompt refusal/restoration remains a release
+blocker until reproduced with the correct isolated session/identity. Do not reset
+daily TCC, grant broad access or mark the case passed to make progress appear
+complete. Stop and restore daily services before requesting user-assisted login.
+GR17/GR19 regressions establish fail-closed read handling and optional notification
+behavior, but do not replace this native evidence.
+
+The same staging identity showed real notification grant/revocation and restart
+with successful backup after revocation. Its initial request reported failed,
+not a proved explicit refusal. Record request lifecycle and observed authorization
+separately; do not infer a user decision from the banner or disabled switch.

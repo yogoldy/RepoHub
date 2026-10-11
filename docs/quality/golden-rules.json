@@ -409,7 +409,7 @@
         "test_readiness.ReadinessTests.test_notifications_are_optional_and_do_not_gate_backup",
         "test_readiness.ReadinessTests.test_access_endpoint_requires_origin_token_and_no_path_payload"
       ],
-      "remaining_gap": "Initial fresh native helper-readiness check passed; explicit notification request remained notDetermined. Real grant/refusal/revocation and TCC acceptance remain open; mocked authorization and POSIX errno are not proof. Air registered-app probe observed real notification grant/revocation and restart with matching menu states; denial did not block a synthetic edit backup. Initial prompt refusal and clean identical-host repeats remain open. Actual helper TCC testing cannot change the shared system Python privacy identity without affecting daily work; use a separate test account."
+      "remaining_gap": "Mocked authorization and POSIX errno do not prove macOS privacy behavior. Air isolated-account native grant/revocation/restart and backup after notification denial were observed with the unchanged 36d76c0 payload. Initial explicit refusal and actual helper Desktop refusal/restoration remain open: the helper returned EPERM without a visible prompt, and the remote Test session was not the physical console. Caller/picker access is not equivalent helper evidence. Complete same-candidate repeats on both Macs remain required; daily permissions must not be reset."
     }
   ]
 }

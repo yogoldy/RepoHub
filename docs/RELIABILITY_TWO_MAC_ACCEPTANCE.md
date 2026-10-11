@@ -241,3 +241,54 @@ No source/destination fault was performed during the probe, and no daily backup,
 schedule, credential or launch plist was changed. The accepted app payload remains
 36d76c0; this checkpoint is documentation only. Start a fresh owned run for the
 remaining unchanged matrix, preserving that application payload on both hosts.
+
+
+## Air isolated-account native checkpoint — 2026-10-10
+
+Private run reference: 3cfb181c1e484ad6baba574ef029564d. The unchanged Pro-built
+36d76c0 application payload was staged again under the account watchdogs. The
+documentation-only 7f3f51c head passed a clean 201-test macOS gate and both current
+GitHub automated-contract checks. This is a partial acceptance record.
+
+- Native simultaneous selection of three aliases resolved to two distinct
+  same-named Project paths. The initial mis-targeted picker draft was cancelled;
+  exact registry equality proved it made no saved change. List-view selection
+  then made the intended multi-selection visible before Choose. Draft removal,
+  exact-path review/save, distinct IDs, existing-ID retention and helper/native
+  restart persistence passed. Previous Project/Accessible archive bytes remained
+  unchanged after monitoring removal. The reviewed re-add/removal repeat remains
+  open; this does not close all of case 02.
+- Settings Check access matched the helper for the accessible fixture sources and
+  destination. Custom staging labels correctly did not claim daily login
+  registration. With provider observations disabled, a later verified local
+  backup displayed Awaiting confirmation and cloud status unknown.
+- A synthetic Desktop source was readable to the SSH caller but the actual
+  background helper rejected its review with EPERM. The saved source registry
+  remained unchanged. No visible folder prompt or helper-specific Files & Folders
+  entry was obtained. Restarting that exact owned helper from native Test Terminal
+  retained its program arguments and reproduced the denial. This establishes a
+  helper/caller access difference, not an explicit macOS user refusal.
+- The contextual notification request showed an actual system banner and the
+  staging identity's Notifications page. Authorization was initially denied; the
+  request eventually reported failed. System Settings grant produced allowed;
+  revocation plus native restart produced denied and the menu disclosed macOS
+  permission needed. A subsequent synthetic edit was found inside a newly
+  verified archive. Initial explicit prompt refusal remains unproven; a daemon
+  error or initially disabled switch is not substituted for user refusal.
+- The private diagnostic checkpoint contains 700 events and zero recorded input
+  or presentation disagreements. This is limited to the observed frames, not a
+  claim that the remaining fault cases or every UI state passed.
+
+Read-only session evidence showed a completed remote Test login that was not the
+active console session; the console belonged to the login screen. This is a
+possible permission-prompt variable, not a proven explanation. Ask the user to
+unlock that test account locally before continuing actual privacy acceptance.
+No daily privacy identity was reset and no Full Disk Access was requested.
+
+The owned test jobs stopped and the registered staging copy was removed. Both
+independent cleanup receipts reported protected preservation; the daily watchdog
+restored both original labels with no restore/capture errors. The daily API again
+showed its original five test-only sources and idle backup. Synthetic fixtures and
+private evidence remain available for diagnosis; they are not production data.
+The Pro is unchanged. Cases 03–06, complete 02/07/08, same-candidate Pro acceptance,
+protected merge and deployment remain open.

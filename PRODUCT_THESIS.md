@@ -226,3 +226,17 @@ readiness agreed with observed source/destination states, and two native repo
 frames had no diagnostic disagreements. The full actual-privacy/fault matrix and
 same-candidate Pro repeat remain open; main and daily apps are unchanged. See the
 [two-Mac evidence record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
+
+
+**Air isolated-account native checkpoint (2026-10-10):** The unchanged 36d76c0
+application payload passed native simultaneous alias selection, exact reviewed
+save, distinct same-named IDs and restart persistence, with previous archives
+preserved after monitoring removal. Real notification grant/revocation/restart
+agreed with the menu, and a new edit backed up after revocation. Diagnostic
+checkpoint: 700 events, no recorded presentation/input disagreements. The helper
+rejected a synthetic Desktop source despite SSH caller access; actual folder
+refusal/restoration and initial explicit notification refusal remain unproved.
+The Test session was not the physical console, so local test-account unlock is
+the next controlled permission investigation. Both cleanup receipts preserved
+protected state and restored daily services. Full matrix/Pro repeat/release remain
+open; no broad permissions or daily deployment occurred.
