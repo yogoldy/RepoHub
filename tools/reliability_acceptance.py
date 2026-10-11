@@ -122,7 +122,8 @@ def package(source, gate_path, output):
     runtime = output / "runtime"
     runtime.mkdir()
     groups = [ast.literal_eval(node.iter) for node in ast.walk(ast.parse((source / "install.py").read_text()))
-              if isinstance(node, ast.For) and isinstance(node.iter, (ast.Tuple, ast.List))]
+              if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and node.target.id == "name"
+              and isinstance(node.iter, (ast.Tuple, ast.List))]
     modules = next(group for group in groups if "repohub.py" in group)
     for name in modules:
         shutil.copy2(source / name, runtime / name)

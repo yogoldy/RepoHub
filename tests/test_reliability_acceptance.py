@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 from pathlib import Path
@@ -107,3 +108,10 @@ class AcceptanceHarnessTests(unittest.TestCase):
         self.assertTrue(all(c["initial_status"] == "not_run" for c in matrix["cases"]))
         self.assertTrue(all("native_ui" in c["required_evidence"] for c in matrix["cases"]))
         self.assertIn("Actual macOS", matrix["cases"][6]["title"])
+
+    def test_package_reads_only_literal_runtime_declaration(self):
+        source = Path(__file__).resolve().parents[1]
+        groups = [ast.literal_eval(node.iter) for node in ast.walk(ast.parse((source / "install.py").read_text()))
+                  if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and node.target.id == "name"
+                  and isinstance(node.iter, (ast.Tuple, ast.List))]
+        self.assertEqual(sum("repohub.py" in group for group in groups), 1)
