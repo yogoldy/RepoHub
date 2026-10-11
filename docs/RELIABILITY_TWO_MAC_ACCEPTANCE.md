@@ -106,3 +106,42 @@ cross-account staging must coordinate daily-service restoration before occupying
 the fixed native port; the current same-user stage command must not be invoked
 as if the new account owned the daily installation. No main promotion or daily
 reliability deployment has occurred.
+
+
+## Isolated-account connection checkpoint — 2026-10-10
+
+The user completed browser authentication and the isolated account's first Mac
+login without sharing credentials. A refreshed Jump browser connection displayed
+that account's desktop; Finder navigation and Terminal keystrokes established
+actual native control. Bulk text insertion/clipboard paste did not reach the
+remote Terminal, while individual keyboard events did. This input distinction
+was observed before executing the setup command, rather than treating attempted
+input as completion.
+
+The account-scoped installer executed in the standard test account and confirmed
+installation of the Pro's existing public key with restrictive forwarding options,
+0700 directory and 0600 authorized-key permissions. The existing Jump native
+connection's saved daily credentials remain unchanged. No private key or password
+was copied or read.
+
+SSH still rejected the account after installation. Read-only investigation found
+an additional server-side AllowUsers rule limited to the daily username at the
+Pro's existing Tailscale addresses. The Remote Login selected-user membership and
+public-key fingerprint were correct; those checks alone did not establish usable
+SSH access. A guarded administrator helper is prepared outside Git to add the test
+username at exactly those same addresses, preserving the existing entries, saving
+a rollback copy and checking SSH configuration syntax. Applying it awaits direct
+user administrator authentication. Neither a wider network rule nor administrator
+membership for the test account is requested.
+
+This is a concrete connection-preparation blocker, not application failure or
+permission-test evidence. No staging jobs were launched and no daily services
+were paused. Cross-account restoration coordination remains necessary before
+fixed-port staging. Actual privacy/notification acceptance, the complete matrix
+on both Macs, protected merge and release deployment remain open.
+
+At this checkpoint the clean macOS Golden Gate on fadf1cc passed all 190 Python
+tests and JavaScript/native checks. Both exact-head GitHub automated-contract jobs
+passed. The account/connection evidence changes documentation only; the application
+payload is unchanged. The following documentation commit still requires its own
+clean checks before being used as current evidence.

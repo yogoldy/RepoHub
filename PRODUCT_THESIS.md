@@ -205,3 +205,12 @@ The existing Jump connection's daily Auto Logon was preserved; a temporary
 browser session is being prepared. This resolves account creation, not actual
 privacy acceptance. Both-host reliability acceptance, promotion and deployment
 remain open; see the [two-Mac record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
+
+
+**Isolated test connection checkpoint (2026-10-10):** Native control of the Air's
+standard test desktop is established through the separate Jump browser session;
+its approved public-key installer ran in that account. SSH remains blocked by an
+additional server username allowlist, with a narrowly scoped administrator update
+prepared for the user to apply. Daily services and saved Jump credentials are
+unchanged. This closes desktop connection preparation, not actual OS permission
+acceptance or the reliability release. See the [current acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
