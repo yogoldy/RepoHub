@@ -145,3 +145,40 @@ tests and JavaScript/native checks. Both exact-head GitHub automated-contract jo
 passed. The account/connection evidence changes documentation only; the application
 payload is unchanged. The following documentation commit still requires its own
 clean checks before being used as current evidence.
+
+
+## Cross-account staging protocol — 2026-10-10
+
+After the user's administrator step, BatchMode SSH authenticated as the standard
+Air test account. Its directory/key file modes remain 0700/0600. The separate
+server allowlist was the concrete connection blocker; resolving it does not
+establish macOS folder privacy evidence. The daily helper/app stayed loaded.
+
+The acceptance payload now also includes `reliability_account_guard.py`. The
+same-user `stage` command remains available for same-user cases, but must not be
+used to pretend a standard account owns the daily installation. For isolated
+permission acceptance:
+
+1. In the test account, prepare the verified payload, then run the account guard's
+   `peer --run RUN --seconds SECONDS`. Keep the run private; only its synthetic
+   coordination receipt and read-only lock are readable across accounts.
+2. In the daily account, run `hold --coord COORD --python PYTHON --daily-label
+   APP_LABEL --daily-label SERVICE_LABEL --control-evidence PRIVATE_FILE`. It
+   captures its own protected state/rollback and starts its own detached watchdog
+   before pausing anything. Record the returned daily-hold directory.
+3. In the test account, run `stage --run RUN --hold HOLD --python PYTHON
+   --control-evidence PRIVATE_FILE`. It verifies the held candidate/owner/port,
+   starts its own watchdog and launches only its own fixture helper/native jobs.
+4. Stop the test with its scoped harness `control --run RUN stop` or account-guard
+   `cleanup --run RUN`. Confirm owned jobs are gone and the peer is stopped; the
+   daily hold then restores its own registrations. Inspect both cleanup records,
+   protected hashes and the actual daily helper/menu before continuing.
+
+The same read-only file lock excludes restoration racing test startup. An active
+lease blocks restoration even before the test helper binds the port; a test cleanup
+failure keeps it active. Restoration also refuses an unknown service on that port.
+Neither account runs cross-user launchctl, reads the other's private state, nor
+needs sudo for acceptance. Deadlines are bounded; independent watchdogs continue
+cleanup after controller loss. Real interruption/cleanup checks must run before
+using this guard for destructive fixture cases. Seven scoped regressions pass;
+full clean-gate and live cross-account validation follow this commit.

@@ -145,7 +145,7 @@ def package(source, gate_path, output):
     run(["/usr/bin/codesign", "--force", "--sign", "-", str(app)])
     run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)])
     signing = run(["/usr/bin/codesign", "-dv", "--verbose=4", str(app)]).stderr
-    for name in ["reliability_acceptance.py"]:
+    for name in ["reliability_acceptance.py", "reliability_account_guard.py"]:
         shutil.copy2(source / "tools" / name, output / name)
     shutil.copy2(source / "docs/quality/reliability-matrix.json", output / "matrix.json")
     shutil.copy2(gate_path, output / "golden-gate.json")

@@ -397,3 +397,22 @@ Actual source privacy must be tested through the background helper. Its system
 Python identity is shared with daily work; resetting or revoking that identity's
 permissions in the daily account violates isolation. Case 07 therefore requires a
 separate test account. POSIX denial is still distinct from an actual TCC decision.
+
+
+## Cross-account acceptance must not impersonate the daily installation
+
+A standard permission-test account owns neither the daily launch registrations nor
+its private configuration. The same-user staging command therefore cannot safely
+be used under that account. `reliability_account_guard.py` gives each account its
+own journal and detached watchdog, with a shared read-only flock serializing test
+startup and daily restoration. An active test lease prevents restoration even
+before its helper starts listening. Cleanup releases that lease only after the
+exact owned test jobs are gone; an unknown helper on the fixed native port blocks
+the daily client from restarting against test data. The daily account captures
+its own protected files and rollback, without exposing them to the test account.
+
+Seven required GR12 counterexamples cover ownership/redirects, bounded single-use
+leases, unknown-port rejection, active-before-listen restoration exclusion,
+restoration despite a disclosed baseline change, incomplete test cleanup and
+watchdog retry. Actual cross-account interruption and the native permission matrix
+remain live acceptance; regression simulations are not those results.
