@@ -71,6 +71,16 @@ def port_free():
             return False
 
 
+def wait_for_free_port(seconds=5):
+    deadline = time.monotonic() + seconds
+    while True:
+        if port_free():
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.05)
+
+
 def prepare_peer(base, seconds):
     base, marker = h.guarded_run(base)
     if not 60 <= seconds <= 3600:
@@ -266,7 +276,7 @@ def hold_daily(coord, python, labels, evidence):
                 journal['restore_intents'].append(label)
                 h.write_json(base / 'account-journal.json', journal)
                 h.run(['/bin/launchctl', 'bootout', h.domain() + '/' + label])
-            if h.capture(h.protected_paths(home, labels)) != before or not port_free():
+            if h.capture(h.protected_paths(home, labels)) != before or not wait_for_free_port():
                 raise RuntimeError('Pause baseline changed or fixed port still occupied')
             public_json(base / 'hold.json', {**h.read_json(base / 'hold.json'), 'state': 'held'})
         print(json.dumps({'daily_hold': str(base)}), flush=True)

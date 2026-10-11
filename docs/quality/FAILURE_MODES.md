@@ -416,3 +416,14 @@ leases, unknown-port rejection, active-before-listen restoration exclusion,
 restoration despite a disclosed baseline change, incomplete test cleanup and
 watchdog retry. Actual cross-account interruption and the native permission matrix
 remain live acceptance; regression simulations are not those results.
+
+
+### launchd shutdown acknowledgement precedes port release
+
+The first real isolated-account hold at 5ec10cf booted out the known daily jobs,
+but its immediate bind check still found the helper port occupied. No test jobs
+started. The detached daily watchdog retried after the exiting helper released
+the port and restored both registrations with matching protected hashes. The hold
+now waits up to five seconds for port release while retaining the coordination
+lock; timeout still fails closed. Two counterexamples cover delayed release and
+an occupied port that never clears. No process is killed based on the port alone.

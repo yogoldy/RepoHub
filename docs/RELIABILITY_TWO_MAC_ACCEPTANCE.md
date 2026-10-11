@@ -182,3 +182,20 @@ needs sudo for acceptance. Deadlines are bounded; independent watchdogs continue
 cleanup after controller loss. Real interruption/cleanup checks must run before
 using this guard for destructive fixture cases. Seven scoped regressions pass;
 full clean-gate and live cross-account validation follow this commit.
+
+
+## First cross-account guard run — 2026-10-10
+
+Pro-built candidate 5ec10cf passed the clean 197-test macOS gate. The first transfer
+was rejected before staging because extraction umask changed file modes despite
+matching content hashes. A fresh `tar -xpf` transfer preserved the manifest exactly;
+the rejected copy remains private for diagnosis. Transfer permissions must be
+preserved, not waived in validation.
+
+The first daily-account hold then failed its immediate port-drain check after
+launchctl bootout. Protected hashes matched, and no test-account jobs were launched.
+Its detached watchdog recovered autonomously: both daily labels were restored and
+the protected baseline remained unchanged. This establishes real restoration after
+a failed preflight, not the planned active-test controller-kill or permission cases.
+A bounded five-second port-release wait and two required regressions address this
+shutdown timing race. A fresh clean candidate/lease is required before repeating.

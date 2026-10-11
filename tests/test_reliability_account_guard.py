@@ -56,6 +56,19 @@ class AccountGuardTests(unittest.TestCase):
         with patch.object(g, 'port_free', return_value=True):
             self.assertTrue(g.safe_restore_port(journal))
 
+    def test_shutdown_wait_accepts_delayed_release_without_starting_any_job(self):
+        with patch.object(g, 'port_free', side_effect=[False, False, True]), patch.object(g.time, 'sleep') as sleep, patch.object(g.time, 'monotonic', return_value=100), patch.object(g.h, 'run') as run:
+            self.assertTrue(g.wait_for_free_port())
+            self.assertEqual(sleep.call_count, 2)
+            run.assert_not_called()
+
+    def test_shutdown_wait_is_bounded_and_does_not_assume_port_owner(self):
+        with patch.object(g, 'port_free', return_value=False), patch.object(g.time, 'monotonic', side_effect=[100, 100, 106]), patch.object(g.time, 'sleep') as sleep, patch.object(g.h, 'run') as run:
+            self.assertFalse(g.wait_for_free_port())
+            sleep.assert_called_once()
+            run.assert_not_called()
+
+
     def hold_fixture(self, base):
         labels = ['com.leogoldberg.repohub.app', 'com.leogoldberg.repohub.service']
         protected = base / 'protected'
