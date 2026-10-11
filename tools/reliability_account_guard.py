@@ -287,6 +287,17 @@ def hold_daily(coord, python, labels, evidence):
         print(json.dumps(cleanup_hold(base)), flush=True)
 
 
+def admission_checks(record, hold_owner, record_owner, test_uid, coord, marker, peer):
+    return {'daily_held': record.get('state') == 'held',
+            'daily_owner': record.get('daily_uid') == hold_owner == record_owner,
+            'different_account': hold_owner != test_uid,
+            'coord_matches': record.get('coord') == str(coord),
+            'run_matches': record.get('test_run_id') == marker['id'],
+            'candidate_matches': record.get('source_commit') == marker['source_commit'],
+            'peer_prepared': peer['state'] == 'prepared',
+            'not_expired': time.time() < peer['deadline']}
+
+
 def stage_test(base, hold, python, evidence):
     base, marker = h.guarded_run(base)
     if (base / 'account-journal.json').exists():
@@ -316,12 +327,19 @@ def stage_test(base, hold, python, evidence):
             if hold.parent != h.RUN_PARENT or not hold.name.startswith(h.PREFIX) or hold.is_symlink() or record_file.is_symlink():
                 raise ValueError('Redirected daily hold')
             record = h.read_json(record_file)
-            if (record.get('state') != 'held' or record.get('daily_uid') != hold.stat().st_uid
-                    or record_file.stat().st_uid != hold.stat().st_uid or hold.stat().st_uid == os.getuid()
-                    or record.get('coord') != str(coord) or record.get('test_run_id') != marker['id']
-                    or record.get('source_commit') != marker['source_commit'] or current['state'] != 'prepared'
-                    or time.time() >= current['deadline'] or not port_free()):
-                raise ValueError('Daily restoration guard is not held for this candidate')
+            checks = admission_checks(record, hold.stat().st_uid, record_file.stat().st_uid,
+                                      os.getuid(), coord, marker, current)
+            if all(checks.values()):
+                # A same-user bind can succeed while the other UID still sees
+                # TIME_WAIT address-in-use. Check as the actual receiving account.
+                print(json.dumps({'stage_wait': 'test_account_port_release', 'timeout_seconds': 45}), flush=True)
+                checks['receiving_port_free'] = wait_for_free_port(45)
+                checks['not_expired'] = time.time() < current['deadline']
+            else:
+                checks['receiving_port_free'] = False
+            h.write_json(base / 'admission.json', {'source_commit': marker['source_commit'], 'checks': checks})
+            if not all(checks.values()):
+                raise ValueError('Account admission failed; see owned admission.json')
             app = h.register_native(base, marker, home)
             current['state'] = 'active'
             public_json(coord / 'peer.json', current)  # active BEFORE launching; restoration must wait

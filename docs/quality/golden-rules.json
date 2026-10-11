@@ -256,7 +256,9 @@
         "test_reliability_account_guard.AccountGuardTests.test_test_cleanup_does_not_release_daily_hold_until_jobs_are_gone",
         "test_reliability_account_guard.AccountGuardTests.test_watchdog_retries_until_daily_restoration_finishes",
         "test_reliability_account_guard.AccountGuardTests.test_shutdown_wait_accepts_delayed_release_without_starting_any_job",
-        "test_reliability_account_guard.AccountGuardTests.test_shutdown_wait_is_bounded_and_does_not_assume_port_owner"
+        "test_reliability_account_guard.AccountGuardTests.test_shutdown_wait_is_bounded_and_does_not_assume_port_owner",
+        "test_reliability_account_guard.AccountGuardTests.test_admission_rejects_wrong_candidate_account_or_restoring_guard",
+        "test_reliability_account_guard.AccountGuardTests.test_admission_cannot_accept_expired_or_active_peer"
       ],
       "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration. The acceptance harness now hashes a single Pro-built payload, guards staging identities and restores journaled daily jobs independently on controller loss. Actual watchdog interruption and identical two-Mac native matrix remain required. Air native permission probes require a uniquely owned Applications copy registered with LaunchServices; temporary-path apps failed notification client validation. Clean two-host permission repeats and real controller-interruption acceptance remain open. Isolated standard-account staging uses separate account-owned watchdogs and a shared read-only lock; the daily restoration guard waits for test-job cleanup and rejects an unknown helper on the fixed port. Real cross-account controller-loss acceptance remains required."
     },

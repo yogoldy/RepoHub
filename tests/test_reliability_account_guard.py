@@ -69,6 +69,27 @@ class AccountGuardTests(unittest.TestCase):
             run.assert_not_called()
 
 
+    def test_admission_rejects_wrong_candidate_account_or_restoring_guard(self):
+        marker = {'id': 'a' * 32, 'source_commit': 'b' * 40}
+        record = {'state': 'held', 'daily_uid': 501, 'coord': '/synthetic/coord',
+                  'test_run_id': marker['id'], 'source_commit': marker['source_commit']}
+        peer = {'state': 'prepared', 'deadline': 200}
+        with patch.object(g.time, 'time', return_value=100):
+            self.assertTrue(all(g.admission_checks(record, 501, 501, 502, '/synthetic/coord', marker, peer).values()))
+            for changed in [{'source_commit': 'c' * 40}, {'state': 'restoring'}, {'daily_uid': 502}, {'test_run_id': 'd' * 32}]:
+                self.assertFalse(all(g.admission_checks({**record, **changed}, 501, 501, 502, '/synthetic/coord', marker, peer).values()))
+            self.assertFalse(all(g.admission_checks(record, 501, 501, 501, '/synthetic/coord', marker, peer).values()))
+            self.assertFalse(all(g.admission_checks(record, 501, 502, 502, '/synthetic/coord', marker, peer).values()))
+
+    def test_admission_cannot_accept_expired_or_active_peer(self):
+        marker = {'id': 'a' * 32, 'source_commit': 'b' * 40}
+        record = {'state': 'held', 'daily_uid': 501, 'coord': '/synthetic/coord',
+                  'test_run_id': marker['id'], 'source_commit': marker['source_commit']}
+        with patch.object(g.time, 'time', return_value=200):
+            for peer in [{'state': 'prepared', 'deadline': 200}, {'state': 'active', 'deadline': 300}]:
+                self.assertFalse(all(g.admission_checks(record, 501, 501, 502, '/synthetic/coord', marker, peer).values()))
+
+
     def hold_fixture(self, base):
         labels = ['com.leogoldberg.repohub.app', 'com.leogoldberg.repohub.service']
         protected = base / 'protected'

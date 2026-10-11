@@ -427,3 +427,20 @@ the port and restored both registrations with matching protected hashes. The hol
 now waits up to five seconds for port release while retaining the coordination
 lock; timeout still fails closed. Two counterexamples cover delayed release and
 an occupied port that never clears. No process is killed based on the port alone.
+
+
+### Fixed-port handoff must be checked by the receiving account
+
+The next real hold passed the daily account's bind check but test admission failed.
+A controlled port-only repeat found no listener, yet the test UID received errno 48
+(address in use) while the daily UID could bind. netstat recorded old 8767 connections
+in TIME_WAIT. The test UID became able to bind after 15.1 seconds of observation;
+no test helper was launched during the probe. Guarded restoration again preserved
+all protected files and restored both daily labels.
+
+Test admission now waits up to 45 seconds as the receiving UID, under the same
+coordination lock, then rechecks expiry. It records each ownership/candidate/lease/
+port check privately in admission.json. Wrong identity or stale hold fails before
+waiting or launching. The guard never changes kernel TCP settings or starts the
+daily client against an unknown helper. Cross-account TIME_WAIT behavior is an
+observed staging constraint here, not an application backup or privacy failure.

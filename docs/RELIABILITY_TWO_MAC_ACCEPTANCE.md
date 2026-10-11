@@ -199,3 +199,12 @@ the protected baseline remained unchanged. This establishes real restoration aft
 a failed preflight, not the planned active-test controller-kill or permission cases.
 A bounded five-second port-release wait and two required regressions address this
 shutdown timing race. A fresh clean candidate/lease is required before repeating.
+
+
+The port-only follow-up isolated another cross-account constraint: with no 8767
+listener and old connections in TIME_WAIT, the daily UID could bind but the test
+UID received errno 48. It cleared for the test UID after 15.1 seconds. The probe
+launched no test app; cleanup restored both daily labels with matching protected
+hashes. The receiving account now performs its own bounded 45-second drain check
+and records typed per-condition admission evidence. Corrected native staging and
+active controller-loss acceptance still require a fresh clean candidate.
