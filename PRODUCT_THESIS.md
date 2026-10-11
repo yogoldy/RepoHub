@@ -196,3 +196,12 @@ and all protected hashes were restored. These partial results do not close
 reliability: first-request refusal, actual helper privacy in an isolated account,
 remaining fault/volume cases and the identical Pro run stay open. No main promotion
 or daily deployment occurred. See the [case-by-case checkpoint](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
+
+
+**Isolated permission-test preparation (2026-10-10):** An Air standard test account
+now exists, and its narrowly authorized Remote Login permission is enabled.
+Test-account key installation and native connection remain pending user login.
+The existing Jump connection's daily Auto Logon was preserved; a temporary
+browser session is being prepared. This resolves account creation, not actual
+privacy acceptance. Both-host reliability acceptance, promotion and deployment
+remain open; see the [two-Mac record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).

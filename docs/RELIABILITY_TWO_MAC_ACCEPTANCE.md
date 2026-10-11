@@ -81,3 +81,28 @@ initial clean-gate attempt was correctly rejected because this checkpoint's
 three documentation files were still uncommitted; it executed no test suite and
 is not a test failure or accepted receipt. Commit the checkpoint before rerunning
 the clean macOS gate. Both-host native acceptance remains pending.
+
+
+## Isolated-account preparation — 2026-10-10
+
+The user created an isolated standard account on Air. Read-only account/group
+checks confirmed it has no administrator membership. With explicit authorization,
+Remote Login's selected-user list was extended only to that account. An installer
+for the Pro's existing public SSH key is staged outside Git; it has not yet run
+in the test account. No private key or password was copied.
+
+Jump Desktop Connect is already installed machine-wide. Native inspection found
+that the existing Air connection has Auto Logon saved for the daily account;
+trying to switch at the lock screen returned the connection to that session.
+Its saved settings were inspected and cancelled without edits. A temporary Jump
+browser login is the next controlled connection attempt, with user-entered
+credentials, preserving that existing connection. Native control of the isolated
+account has not yet been established and is not counted as passed.
+
+The current daily services have not been paused for this account preparation.
+Actual helper privacy refusal/restoration, the full notification repeat and both
+host acceptance remain open. Once test-account login and SSH are verified,
+cross-account staging must coordinate daily-service restoration before occupying
+the fixed native port; the current same-user stage command must not be invoked
+as if the new account owned the daily installation. No main promotion or daily
+reliability deployment has occurred.
