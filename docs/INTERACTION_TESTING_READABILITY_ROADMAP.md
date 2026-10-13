@@ -1,6 +1,6 @@
 # RepoHub interaction testing and readability roadmap
 
-Approved for documentation by Leo on 2026-10-13. **Implementation is not authorized by this approval.** Obtain Leo's explicit go-ahead before installing/configuring tools, changing application code or tests, altering agent configuration, or deploying. This is the agreed local plan for Leo and the development agent to follow.
+Initially approved for documentation by Leo on 2026-10-13. Leo subsequently authorized **Step 1 only**, establishing readability standards and their documentation/instruction pointer. **Steps 2-9 are not authorized yet.** Obtain Leo's explicit go-ahead before starting another stage, installing/configuring tools, changing application code or tests, making broader agent-configuration changes, or deploying. This is the agreed local plan for Leo and the development agent to follow.
 
 ## Purpose
 
@@ -16,11 +16,13 @@ The current stack is HTML, plain CSS and JavaScript, a Python helper, native Swi
 
 ## Ordered work and completion criteria
 
-All implementation stages remain open. Tick a stage only after its criteria are evidenced; planned tests and previous-version results are not completion.
+Step 1 is documented under its separate authorization; Steps 2-9 remain open. Tick a stage only after its criteria are evidenced; planned tests and previous-version results are not completion.
 
 ### 1. Agree on readability standards
 
-- [ ] Establish clear names, sensible formatting, small functions with recognizable responsibilities, and selective comments explaining decisions.
+- [x] Establish clear names, sensible formatting, small functions with recognizable responsibilities, and selective comments explaining decisions.
+
+The [initial readability standard](READABILITY_STANDARDS.md) defines conventions, representative JavaScript/CSS examples and separate formatting/cleanup/fix verification. Existing application code is unchanged. Teacher review before broad cleanup remains Step 7.
 
 **Why:** New work should follow understandable conventions from the beginning. Separate mechanical formatting, structural cleanup and behavior changes. Do not start a broad rewrite before stronger browser coverage exists.
 
@@ -137,5 +139,6 @@ For example, a browser test can establish the visible Show me effect; native che
 | Date | Record |
 |---|---|
 | 2026-10-13 | Leo approved formalizing this nine-stage local roadmap and linking it from the product thesis. Implementation remains unapproved; no setup, application/test/configuration edits or deployment are implied. |
+| 2026-10-13 | Leo explicitly authorized Step 1. Established the initial readability standard with representative examples and a narrow AGENTS.md pointer. No application/test code, tools, .toml settings or installed apps were changed. Steps 2-9 remain unstarted and require authorization. Evidence: local links checked, three JavaScript examples syntax-checked, and the formatting example matched the current function for six representative inputs. Commit reference: `docs: establish readable coding conventions`. |
 
 At implementation start, append the explicitly approved scope here. For completed stages, record the stage number, commit, test/evidence references and unresolved limitations. Do not copy personal logs, paths, credentials or course material into the public repository.
