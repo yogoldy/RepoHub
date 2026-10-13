@@ -4,6 +4,10 @@ Repo Hub should make it easy to answer: **Are my chosen repos safely backed up, 
 
 This document is the product roadmap and completion checklist. Unchecked items are proposals, not shipped functionality. Implement one atomic item per commit; tick it off only after its acceptance checks run, and record the commit and verification evidence here. Keep the stable main branch separate from work awaiting review.
 
+## Agreed next development roadmap
+
+Leo approved [the interaction-testing and readability roadmap](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md) for documentation on 2026-10-13. It defines nine ordered stages: readability standards, a verified baseline, an interaction checklist, Playwright MCP and saved tests, Show me dogfooding, Golden Gate coverage, review with Leo's AI teacher and readability cleanup, Markdown/agent-configuration audit, then final Air/Pro release acceptance. **Implementation still requires Leo's explicit go-ahead.** Tailwind and TestSprite remain deferred. The existing two-Mac reliability protocol and protected release requirements still apply; no roadmap stage is marked complete by documenting it.
+
 ## Current foundation
 
 - [x] Monitor immediate folders inside a configured repo home, including folders without Git.
