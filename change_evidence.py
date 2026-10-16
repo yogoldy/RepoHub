@@ -13,6 +13,41 @@ LABELS = {'Project files match', 'Status outdated', 'Needs attention', 'Backing 
           'Uploading', 'Waiting for iCloud', 'Awaiting confirmation'}
 
 
+# Fixed, shareable UI vocabulary. No repo names, paths or exception text enter it.
+PRESENTATION_TEXT = {
+    'ready': ('backed_up', 'Backed up', 'Your files are backed up.'),
+    'background': ('backed_up', 'Files match', 'Your project files and Git match the backup.'),
+    'first': ('backup_pending', 'First backup pending', 'Your first backup is pending.'),
+    'edits': ('backup_pending', 'Edits confirmed', 'RepoHub confirmed edits.'),
+    'changed': ('backup_pending', 'Backup pending', 'RepoHub is waiting to back up this repo.'),
+    'changing': ('working', 'Checking again', 'Files changed during the scan.'),
+    'verifying': ('working', 'Scanning', 'RepoHub is scanning for changes…'),
+    'copying': ('working', 'Creating backup', 'RepoHub is creating your backup…'),
+    'uploading': ('working', 'Uploading', 'macOS is uploading your backup…'),
+    'pending': ('upload_unconfirmed', 'Awaiting upload confirmation', 'macOS hasn’t confirmed the upload yet.'),
+    'stale': ('status_unavailable', 'Current status unavailable', 'RepoHub can’t get current backup status.'),
+    'error': ('failure', 'Needs attention — failure', 'Needs attention — failure.'),
+    'unknown': ('upload_unconfirmed', 'Upload status unavailable', 'RepoHub can’t read the upload status.'),
+}
+
+
+def presentation_text(facts, phase):
+    code = phase
+    if phase in {'uploading', 'pending'} and (not facts['archive_ref']
+            or facts['cloud_archive_ref'] != facts['archive_ref']):
+        code = 'unknown'
+    if phase == 'changed':
+        same_archive = facts['verification_archive_ref'] == facts['archive_ref']
+        counts = facts['counts']
+        confirmed = (facts['verification_state'] == 'different' and same_archive
+                     and (counts['repo_files'] > 0 or counts['git_data'] > 0))
+        code = 'first' if not facts['has_backup'] else 'edits' if confirmed else 'changed'
+    elif phase == 'verifying' and facts['verification_state'] == 'changing':
+        code = 'changing'
+    category, label, headline = PRESENTATION_TEXT.get(code, PRESENTATION_TEXT['unknown'])
+    return {'category': category, 'display_label': label, 'display_headline': headline}
+
+
 def repo_facts(row):
     backup, verification, cloud = row.get('last_backup') or {}, row.get('verification') or {}, row.get('cloud') or {}
     counts = verification.get('changes', {}).get('counts', {})
@@ -185,7 +220,7 @@ class ChangeEvidence:
         if (not isinstance(payload['surface'], str) or payload['surface'] not in {'menu', 'app'} or type(payload['native']) is not bool
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
-                or payload['policy_version'] != 'change-evidence-2'
+                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1'}
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
         freshness = payload.get('client_freshness', 'current')
@@ -196,12 +231,22 @@ class ChangeEvidence:
             if snapshot is None:
                 raise FileExistsError('Observed status expired; request fresh status')
             rows = payload['rows']
+            modern = payload['policy_version'] == 'status-clarity-1'
+            row_fields = {'repo_id', 'phase', 'display_label', 'ready'}
+            if modern:
+                row_fields |= {'category', 'display_headline'}
+            labels = LABELS | {value[1] for value in PRESENTATION_TEXT.values()}
             for row in rows:
-                if (not isinstance(row, dict) or set(row) != {'repo_id', 'phase', 'display_label', 'ready'}
+                if (not isinstance(row, dict) or set(row) != row_fields
                         or not isinstance(row['repo_id'], str) or row['repo_id'] not in snapshot
                         or not isinstance(row['phase'], str) or row['phase'] not in PHASES
-                        or not isinstance(row['display_label'], str) or row['display_label'] not in LABELS or type(row['ready']) is not bool):
+                        or not isinstance(row['display_label'], str) or row['display_label'] not in labels or type(row['ready']) is not bool):
                     raise ValueError('Invalid rendered diagnostic row')
+                if modern and (not isinstance(row['category'], str)
+                               or row['category'] not in {value[0] for value in PRESENTATION_TEXT.values()}
+                               or not isinstance(row['display_headline'], str)
+                               or row['display_headline'] not in {value[2] for value in PRESENTATION_TEXT.values()}):
+                    raise ValueError('Invalid presentation text')
             if len(rows) != len(snapshot) or len({r['repo_id'] for r in rows}) != len(snapshot):
                 raise ValueError('Presentation must describe the observed repo list')
             client, observation = payload['client_id'], payload['observation_id']
@@ -212,26 +257,32 @@ class ChangeEvidence:
             displays = self.displays.setdefault(observation, {})
             for row in rows:
                 key = row['repo_id']
-                signature = (observation, freshness, row['phase'], row['display_label'], row['ready'])
+                signature = (observation, freshness, payload['policy_version'], row['phase'], row['display_label'], row['ready'], row.get('category'), row.get('display_headline'))
                 current[key] = signature
                 repo_ref = snapshot[key]['repo_ref']
                 if previous.get(key) != signature:
                     reason = (icon_reason(row, snapshot[key]) if freshness == 'current' else
-                              ('client_' + freshness if row['phase'] == 'stale' and row['ready'] is False and row['display_label'] == 'Status outdated' else 'presentation_inputs_disagree'))
+                              ('client_' + freshness if row['phase'] == 'stale' and row['ready'] is False and row['display_label'] == ('Current status unavailable' if modern else 'Status outdated') else 'presentation_inputs_disagree'))
+                    if modern:
+                        expected = presentation_text(snapshot[key], row['phase'])
+                        if any(row[field] != value for field, value in expected.items()):
+                            reason = 'presentation_inputs_disagree'
+                    text_fields = ({field: row[field] for field in ('category', 'display_headline')}
+                                   if modern else {})
                     if reason == 'presentation_inputs_disagree':
                         self.log.emit('presentation_input_disagreement', severity='warning', repo_ref=repo_ref,
                                       observation_id=observation, surface=payload['surface'], native=payload['native'],
                                       phase=row['phase'], display_label=row['display_label'], reason=reason)
                     self.log.emit('ui_presented', repo_ref=repo_ref, client_id=client, observation_id=observation,
                                   surface=payload['surface'], native=payload['native'], policy_version=payload['policy_version'],
-                                  client_freshness=freshness, phase=row['phase'], display_label=row['display_label'], result='ready' if row['ready'] else 'not_ready',
+                                  client_freshness=freshness, **text_fields, phase=row['phase'], display_label=row['display_label'], result='ready' if row['ready'] else 'not_ready',
                                   run_id=snapshot[key]['active_run_id'] or snapshot[key]['run_id'], archive_ref=snapshot[key]['archive_ref'],
                                   reason=reason)
                 peers = displays.setdefault(key, {})
-                view = (payload['surface'], payload['native'], freshness)
-                rendered = (row['phase'], row['display_label'], row['ready'])
+                view = (payload['surface'], payload['native'], freshness, payload['policy_version'])
+                rendered = (row['phase'], row['display_label'], row['ready'], row.get('category'), row.get('display_headline'))
                 for peer, peer_value in peers.items():
-                    if peer != view and peer[2] == freshness and peer_value != rendered and previous.get(key) != signature:
+                    if peer != view and peer[2:] == view[2:] and peer_value != rendered and previous.get(key) != signature:
                         self.log.emit('presentation_disagreement', severity='warning', repo_ref=repo_ref,
                                       observation_id=observation, client_id=client, surface=payload['surface'], native=payload['native'],
                                       phase=row['phase'], display_label=row['display_label'], result='views_differ')

@@ -508,3 +508,13 @@ same-PID SIGTERM ownership. Detached watchdogs include the builder dependency.
 These checks prevent lifecycle/packaging regressions; only actual native reads
 can prove TCC permission behavior. A new candidate must repeat the full matrix
 on both Macs, including refusal/restoration/restart.
+
+
+## Status wording must not become backup evidence — October 16, 2026
+
+Presentation grouping can accidentally promote a Finder-only exception, a stale
+frame or a different archive's upload into success. Keep the existing internal
+policy intact; independently validate the new category and sentence against the
+original observation. GR06 and GR09 require cross-language mapping/counterexample
+and export-privacy regressions. Unknown evidence stays unknown. Native pixel,
+wrapping and installed-menu checks remain separate from diagnostic agreement.

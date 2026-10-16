@@ -33,6 +33,91 @@
     if(cloud.state==='pending')return {phase:'pending',label:'Waiting for iCloud',detail:'Hashes verified · upload not yet confirmed',ready:false,percent};
     return {phase:'unknown',label:'Awaiting confirmation',detail:'Hashes verified · iCloud status unknown',ready:false,percent:null};
   }
+  // Describe the existing policy result without changing its safety decisions.
+  function present(repo, backup = {}) {
+    const original = view(repo, backup);
+    const verification = repo.verification || {};
+    let category, label, headline, detail;
+    const archive = repo.last_backup?.archive;
+    const sameUpload = !!archive && repo.cloud?.archive === archive;
+    const verified = !!repo.last_backup?.sha256 && !!archive
+      && verification.archive === archive
+      && (verification.state === 'matched' || finderOnly(repo));
+    const displayPhase = ['uploading', 'pending'].includes(original.phase) && !sameUpload
+      ? 'unknown' : original.phase;
+    switch (displayPhase) {
+      case 'ready':
+        category = 'backed_up'; label = 'Backed up';
+        headline = 'Your files are backed up.';
+        detail = 'Your files match the verified archive, and macOS confirms that same archive uploaded.';
+        break;
+      case 'background':
+        category = 'backed_up'; label = 'Files match';
+        headline = 'Your project files and Git match the backup.';
+        detail = 'macOS confirmed the saved archive uploaded. See technical details for the verification exception.';
+        break;
+      case 'changed': {
+        category = 'backup_pending';
+        const confirmed = verification.state === 'different'
+          && verification.archive === repo.last_backup?.archive
+          && ((verification.changes?.counts?.repo_files || 0) > 0
+            || (verification.changes?.counts?.git_data || 0) > 0);
+        label = !repo.last_backup ? 'First backup pending' : confirmed ? 'Edits confirmed' : 'Backup pending';
+        headline = !repo.last_backup ? 'Your first backup is pending.'
+          : confirmed ? 'RepoHub confirmed edits.' : 'RepoHub is waiting to back up this repo.';
+        detail = confirmed ? 'Your files or Git data contain confirmed changes since the saved backup.'
+          : 'Use Back up now or review this repo’s schedule. A pending backup is not a failed status check.';
+        break;
+      }
+      case 'verifying':
+        category = 'working';
+        label = verification.state === 'changing' ? 'Checking again' : 'Scanning';
+        headline = verification.state === 'changing' ? 'Files changed during the scan.'
+          : 'RepoHub is scanning for changes…';
+        detail = verification.state === 'changing' ? 'RepoHub will check again on the next scan.'
+          : 'RepoHub is comparing your files with the saved backup.';
+        break;
+      case 'copying':
+        category = 'working'; label = 'Creating backup';
+        headline = 'RepoHub is creating your backup…';
+        detail = 'RepoHub is packaging your files and verifying the archive.';
+        break;
+      case 'uploading':
+        category = 'working'; label = 'Uploading';
+        headline = 'macOS is uploading your backup…';
+        detail = verified ? 'RepoHub created and verified the backup file. Upload progress is separate from completion confirmation.'
+          : 'macOS reports an upload. RepoHub has not established all verification evidence for this archive.';
+        break;
+      case 'pending':
+        category = 'upload_unconfirmed'; label = 'Awaiting upload confirmation';
+        headline = 'macOS hasn’t confirmed the upload yet.';
+        detail = verified ? 'RepoHub created and verified the backup file.'
+          : 'RepoHub is waiting for verification and upload evidence for this archive.';
+        break;
+      case 'stale':
+        category = 'status_unavailable'; label = 'Current status unavailable';
+        headline = 'RepoHub can’t get current backup status.';
+        detail = 'Expected checks are not providing fresh evidence. This is separate from your backup schedule.';
+        break;
+      case 'error':
+        category = 'failure'; label = 'Needs attention — failure';
+        headline = 'Needs attention — failure.';
+        detail = original.detail;
+        break;
+      default:
+        category = 'upload_unconfirmed'; label = 'Upload status unavailable';
+        headline = 'RepoHub can’t read the upload status.';
+        detail = 'RepoHub cannot confirm that the current archive uploaded. See technical details for the available verification evidence.';
+    }
+    return {...original, category, label, headline, detail, technicalDetail: original.detail};
+  }
+
+  function categoryIcon(state) {
+    const phases = {backed_up: state.ready ? 'ready' : 'background', backup_pending: 'changed',
+      working: 'copying', upload_unconfirmed: 'unknown', status_unavailable: 'stale', failure: 'error'};
+    return icon(phases[state.category]);
+  }
+
   const paths={
     background:'<circle cx="12" cy="12" r="8"/><path d="M12 11v6m0-10h.01"/>',
     ready:'<path d="m5 12 4 4L19 6"/>',
@@ -47,5 +132,5 @@
   };
   function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
   function legend(){return '<span>'+icon('ready')+' Verified + uploaded</span><span>'+icon('background')+' Project/Git match; Finder-only difference</span><span>'+icon('pending')+' Waiting for iCloud</span><span>'+icon('changed')+' Files or background data changed</span><span>'+icon('uploading')+' Uploading</span><span>'+icon('copying')+' Backing up</span><span>'+icon('verifying')+' Checking hashes</span><span>'+icon('stale')+' Status outdated</span><span>'+icon('error')+' Needs attention</span><span>'+icon('unknown')+' Unconfirmed</span>';}
-  const policy={view,icon,legend,finderOnly,version:'change-evidence-2'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,categoryIcon,icon,legend,finderOnly,version:'status-clarity-1'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);
