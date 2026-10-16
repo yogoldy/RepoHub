@@ -12,6 +12,16 @@ Leo authorized [a one-time PR #6 integration exception](docs/MAIN_INTEGRATION_EX
 
 Leo approved [the interaction-testing and readability roadmap](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md) for documentation on 2026-10-13. It defines nine ordered stages: readability standards, a verified baseline, an interaction checklist, Playwright MCP and saved tests, Show me dogfooding, Golden Gate coverage, review with Leo's AI teacher and readability cleanup, Markdown/agent-configuration audit, then final Air/Pro release acceptance. **Implementation still requires Leo's explicit go-ahead.** Tailwind and TestSprite remain deferred. The existing two-Mac reliability protocol and protected release requirements still apply; no roadmap stage is marked complete by documenting it.
 
+## Timing and location branch checkpoint — October 16, 2026
+
+Evidence-backed Git/metadata descriptions, read-only scheduling/location
+projection, selected-menu diagnostic receipts and larger timing lines are
+implemented on `codex/status-clarity`. [Acceptance and Leo's pending event/display
+review](docs/BACKUP_TIMING_ACCEPTANCE_2026-10-16.md) record the clean 220-test
+macOS gate and controlled browser results. This is not a deployed release;
+installed native acceptance, protected promotion and Leo's personal review stay
+open. Current backup decisions and daily configuration are preserved.
+
 ## Current foundation
 
 - [x] Monitor immediate folders inside a configured repo home, including folders without Git.

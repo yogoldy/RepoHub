@@ -245,3 +245,12 @@ Cross-language tests cover state/location variants, all inclusion categories,
 errors, stale clients and active backups. Delivery tests verify selected identity.
 No daily state or installed assets are changed by this commit. Final browser and
 clean macOS Golden Gate evidence is recorded in the following acceptance stage.
+
+
+## Timing goal acceptance checkpoint
+
+[The acceptance record](BACKUP_TIMING_ACCEPTANCE_2026-10-16.md) lists staged
+commits, the event/evidence-to-display matrix, final 220-test clean macOS gate,
+16-case browser/diagnostic evidence, countdown correction and open native work.
+Leo's informed-ownership review of actual event states versus displayed meaning
+is explicitly next and remains pending. Neither Mac was deployed.
