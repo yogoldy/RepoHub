@@ -1,5 +1,7 @@
 # Repo Hub agent instructions
 
+- Use `/Users/leogoldberg/Desktop/repos/RepoHub` as the single working checkout. Switch regular branches there; do not create another worktree unless Leo requests one. See [working-copy guidance](docs/WORKING_COPY.md).
+
 - This is the app foundation. Source repos and saved workspace JSON are user data; never change or commit their contents as part of app development.
 - Keep the backend on loopback. Maintain Host/Origin/token write checks, safe path resolution, and revision checks.
 - Preserve all existing backups. Do not introduce automatic retention deletion without Leo's authorization.
