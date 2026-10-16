@@ -16,3 +16,46 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 .things-key{margin-top:9px}.things-key #things-panel{display:grid;gap:14px;padding:12px 0 18px}.things-key #things-panel[hidden]{display:none}.things-key #things-panel p{margin:0;line-height:1.6}.things-key #things-panel .folder-tip-row{margin-bottom:4px}
 
 .background .status-mark,.pill.background{color:#b1c9e7;background:#293b50}.background .card-status{color:#b1c9e7}
+
+
+/* Information lives beside Settings, leaving the backup view focused on repos. */
+.header-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+#info-dialog .status-key {
+  margin-top: 22px;
+}
+
+#info-dialog h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#info-dialog .status-legend {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+#info-dialog .status-legend span {
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+#info-dialog .status-legend svg {
+  margin-top: 1px;
+}
+
+@media (max-width: 400px) {
+  .header-actions {
+    gap: 4px;
+  }
+
+  #info-dialog .status-legend {
+    grid-template-columns: 1fr;
+  }
+}

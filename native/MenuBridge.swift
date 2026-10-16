@@ -1,10 +1,20 @@
 import Foundation
 
 enum MenuAction: String {
-    case openBackups, openRepo, toggleNotifications, connectGitHub, quit
+    case requestNotifications, notificationSettings, privacySettings, loginSettings, openBackups, openRepo, toggleNotifications, connectGitHub, chooseRepoHome, chooseRepoFolders, quit
 }
 
 enum MenuBridge {
+    // Foundation may rewrite /private/tmp to /tmp on macOS. Match the helper's
+    // real filesystem spelling so a picked alias cannot duplicate a saved path.
+    static func canonicalSourcePath(_ url: URL) -> String {
+        guard let resolved = realpath(url.path, nil) else {
+            return url.resolvingSymlinksInPath().path
+        }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+
     // Only the exact top-level menu page gets fixed actions. Repo IDs are resolved
     // from fresh helper status; page-supplied paths/URLs/commands are never accepted.
     static func action(body: Any, frameURL: URL?, isMainFrame: Bool) -> MenuAction? {
@@ -15,6 +25,9 @@ enum MenuBridge {
         if action == .openRepo {
             guard Set(payload.keys) == ["action", "repo_id"], let id = payload["repo_id"] as? String,
                   id.range(of: "^[a-zA-Z0-9_-]{1,128}$", options: .regularExpression) != nil else { return nil }
+        } else if action == .chooseRepoHome || action == .chooseRepoFolders {
+            guard Set(payload.keys) == ["action", "request_id"], let id = payload["request_id"] as? String,
+                  id.range(of: "^[a-f0-9]{24}$", options: .regularExpression) != nil else { return nil }
         } else if payload.count != 1 { return nil }
         return action
     }
@@ -26,17 +39,27 @@ enum MenuBridge {
     }
 
     static func repositoryURL(id: String, status: [String: Any]) -> URL? {
-        guard let rootPath = status["repos_root"] as? String, rootPath.hasPrefix("/"),
-              let repos = status["repos"] as? [[String: Any]],
+        guard let repos = status["repos"] as? [[String: Any]],
               let repo = repos.first(where: { $0["id"] as? String == id }),
               let path = repo["path"] as? String, path.hasPrefix("/"),
               let name = repo["name"] as? String, !name.isEmpty,
               name != ".", name != "..", !name.contains("/") else { return nil }
-        let root = URL(fileURLWithPath: rootPath).standardizedFileURL
         let item = URL(fileURLWithPath: path).standardizedFileURL
-        guard item == root.appendingPathComponent(name).standardizedFileURL,
-              item.resolvingSymlinksInPath().deletingLastPathComponent() == root.resolvingSymlinksInPath(),
-              let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+        if status["workspace_sources"] != nil {
+            // Registry-backed status resolves exact approved IDs; arbitrary
+            // paths from web messages are still never accepted.
+            guard let sources = status["workspace_sources"] as? [[String: Any]] else { return nil }
+            let approved = sources.filter { $0["id"] as? String == id }
+            guard approved.count == 1, approved[0]["path"] as? String == path,
+                  canonicalSourcePath(item) == path else { return nil }
+        } else {
+            // Compatibility with the installed single-root helper.
+            guard let rootPath = status["repos_root"] as? String, rootPath.hasPrefix("/") else { return nil }
+            let root = URL(fileURLWithPath: rootPath).standardizedFileURL
+            guard item == root.appendingPathComponent(name).standardizedFileURL,
+                  item.resolvingSymlinksInPath().deletingLastPathComponent() == root.resolvingSymlinksInPath() else { return nil }
+        }
+        guard let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
               values.isDirectory == true, values.isSymbolicLink != true else { return nil }
         return item
     }

@@ -55,12 +55,12 @@ class ProblemTracker:
                                                (cloud.get("archive"), cloud.get("percent")))
         for error in status.get("backup", {}).get("errors", []):
             name = error.get("repo", "Repo Hub")
-            observed["backup:" + name] = (name, "Backup failed; open Repo Hub for details", 120, None)
+            observed["backup:" + error.get("repo_id", name)] = (name, "Backup failed; open Repo Hub for details", 120, None)
         backup = status.get("backup", {})
         if backup.get("running"):
             observed["copy:running"] = (backup.get("current_repo") or "Repo Hub",
                                         "Copying the same repo for 30 minutes; check backup progress", 1800,
-                                        (backup.get("started_at"), backup.get("current_repo")))
+                                        (backup.get("started_at"), backup.get("current_repo_id", backup.get("current_repo"))))
         data = status.get("data_cloud", {})
         if data.get("state") == "error":
             observed["saved-data"] = ("Saved app data", "iCloud reports an upload problem", 120, data.get("archive"))

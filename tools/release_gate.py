@@ -169,18 +169,20 @@ def main():
         node = shutil.which('node') or 'node'
         for file in sorted((ROOT/'web').glob('*.js')):
             command('syntax-'+file.stem,[node,'--check',str(file)])
-        for file in ['menu-status.cjs','diagnostics-client.cjs']:
+        for file in ['menu-status.cjs','diagnostics-client.cjs','workspace-setup.cjs','readiness.cjs']:
             command(file.split('.')[0],[node,str(ROOT/'tests'/file)])
         if args.profile=='macos':
             if platform.system()!='Darwin':
                 raise ValueError('macOS profile requires macOS; native checks may not be silently skipped')
             swift=['/usr/bin/xcrun','swiftc','-module-cache-path',str(evidence/'swift-cache'),'-target',platform.machine()+'-apple-macos13.0']
-            command('native-app-build',swift+[str(ROOT/'native'/name) for name in ['RepoHub.swift','BackupReadiness.swift','ProblemAlerts.swift','MenuBridge.swift','GitHubConnection.swift']]+['-o',str(evidence/'RepoHub'),'-framework','AppKit','-framework','WebKit','-framework','UserNotifications'])
+            command('native-app-build',swift+[str(ROOT/'native'/name) for name in ['RepoHub.swift','HelperLaunch.swift','BackupReadiness.swift','ProblemAlerts.swift','MenuBridge.swift','GitHubConnection.swift']]+['-o',str(evidence/'RepoHub'),'-framework','AppKit','-framework','WebKit','-framework','UserNotifications'])
             command('cloud-helper-build',swift+[str(ROOT/'native/CloudStatus.swift'),'-o',str(evidence/'cloud-status')])
             command('readiness-build',swift+[str(ROOT/'native/BackupReadiness.swift'),str(ROOT/'native/ProblemAlerts.swift'),str(ROOT/'tests/readiness.swift'),'-o',str(evidence/'readiness')])
             command('readiness-checks',[str(evidence/'readiness')])
             command('bridge-build',swift+[str(ROOT/'native/MenuBridge.swift'),str(ROOT/'tests/menu_bridge_checks.swift'),'-o',str(evidence/'bridge')])
             command('bridge-checks',[str(evidence/'bridge')])
+            command('helper-launch-build',swift+[str(ROOT/'native/HelperLaunch.swift'),str(ROOT/'tests/helper_launch_checks.swift'),'-o',str(evidence/'helper-launch')])
+            command('helper-launch-checks',[str(evidence/'helper-launch')])
         report['source_unchanged'] = source_fingerprint(ROOT)==source
         good = good and report['source_unchanged']
         report['result'] = ('passed' if args.profile=='macos' else 'partial') if good else 'failed'

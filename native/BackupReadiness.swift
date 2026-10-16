@@ -6,6 +6,13 @@ struct ReadyBackup {
 }
 
 enum BackupReadiness {
+    static func permissionRequest(saved: String?, inFlight: Bool) -> String {
+        if inFlight { return "pending" }
+        // An interrupted native request must become retryable after restart.
+        if saved == "pending" { return "failed" }
+        return ["completed", "failed"].contains(saved ?? "") ? saved! : "not_requested"
+    }
+
     // The receipt must belong to the exact locally verified archive. Neither a
     // progress percentage nor an old archive's acknowledgement is sufficient.
     static func pendingNotifications(_ repos: [[String: Any]], seen: Set<String>) -> [ReadyBackup] {

@@ -138,11 +138,14 @@ class ChangeEvidence:
 
     def observe_status(self, status):
         projection = {}
+        backup = status.get('backup', {})
         for row in status['repos']:
             verification, cloud = row.get('verification', {}), row.get('cloud', {})
+            copying = bool(backup.get('running') and (backup.get('current_repo_id') == row['id']
+                           if 'current_repo_id' in backup else backup.get('current_repo') == row['name']))
             projection[row['id']] = {**repo_facts(row),
                 'change_reason': change_reason(row, repo_facts(row)),
-                'active_run_id': status.get('backup', {}).get('run_id') if status.get('backup', {}).get('running') and status['backup'].get('current_repo') == row['name'] else None,
+                'active_run_id': backup.get('run_id') if copying else None,
                 'verification_archive_ref': diagnostic_ref(verification.get('archive')),
                 'verification_signature': verification.get('signature'),
                 'verification_checked_at': verification.get('checked_at'),
@@ -151,8 +154,9 @@ class ChangeEvidence:
                 'fresh': row.get('health', {}).get('fresh'),
                 'cloud_state': cloud.get('state'), 'cloud_archive_ref': diagnostic_ref(cloud.get('archive')),
                 'percent': cloud.get('percent'), 'has_error': bool(row.get('error') or verification.get('error') or any(
-                    error.get('repo') == row['name'] and error.get('error') for error in status.get('backup', {}).get('errors', []))),
-                'copying': bool(status.get('backup', {}).get('running') and status['backup'].get('current_repo') == row['name'])}
+                    (error.get('repo_id') == row['id'] if 'repo_id' in error else error.get('repo') == row['name'])
+                    and error.get('error') for error in backup.get('errors', []))),
+                'copying': copying}
         identity = hashlib.sha256(json.dumps(projection, sort_keys=True, separators=(',', ':')).encode()).hexdigest()[:24]
         with self.lock:
             if identity not in self.snapshots:
@@ -176,7 +180,7 @@ class ChangeEvidence:
 
     def presentation(self, payload):
         import re
-        if not isinstance(payload, dict) or set(payload) != {'surface', 'native', 'client_id', 'observation_id', 'policy_version', 'rows'}:
+        if not isinstance(payload, dict) or set(payload) not in ({'surface', 'native', 'client_id', 'observation_id', 'policy_version', 'rows'}, {'surface', 'native', 'client_id', 'observation_id', 'policy_version', 'rows', 'client_freshness'}):
             raise ValueError('Invalid presentation diagnostic fields')
         if (not isinstance(payload['surface'], str) or payload['surface'] not in {'menu', 'app'} or type(payload['native']) is not bool
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
@@ -184,6 +188,9 @@ class ChangeEvidence:
                 or payload['policy_version'] != 'change-evidence-2'
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
+        freshness = payload.get('client_freshness', 'current')
+        if not isinstance(freshness, str) or freshness not in {'current','request_failed','response_timeout','cache_expired'}:
+            raise ValueError('Invalid client freshness')
         with self.lock:
             snapshot = self.snapshots.get(payload['observation_id'])
             if snapshot is None:
@@ -199,31 +206,32 @@ class ChangeEvidence:
                 raise ValueError('Presentation must describe the observed repo list')
             client, observation = payload['client_id'], payload['observation_id']
             self.log.emit('ui_frame', client_id=client, observation_id=observation,
-                          surface=payload['surface'], native=payload['native'], policy_version=payload['policy_version'], repo_count=len(rows))
+                          surface=payload['surface'], native=payload['native'], policy_version=payload['policy_version'], client_freshness=freshness, repo_count=len(rows))
             previous = self.clients.pop(client, {})
             current = {}
             displays = self.displays.setdefault(observation, {})
             for row in rows:
                 key = row['repo_id']
-                signature = (observation, row['phase'], row['display_label'], row['ready'])
+                signature = (observation, freshness, row['phase'], row['display_label'], row['ready'])
                 current[key] = signature
                 repo_ref = snapshot[key]['repo_ref']
                 if previous.get(key) != signature:
-                    reason = icon_reason(row, snapshot[key])
+                    reason = (icon_reason(row, snapshot[key]) if freshness == 'current' else
+                              ('client_' + freshness if row['phase'] == 'stale' and row['ready'] is False and row['display_label'] == 'Status outdated' else 'presentation_inputs_disagree'))
                     if reason == 'presentation_inputs_disagree':
                         self.log.emit('presentation_input_disagreement', severity='warning', repo_ref=repo_ref,
                                       observation_id=observation, surface=payload['surface'], native=payload['native'],
                                       phase=row['phase'], display_label=row['display_label'], reason=reason)
                     self.log.emit('ui_presented', repo_ref=repo_ref, client_id=client, observation_id=observation,
                                   surface=payload['surface'], native=payload['native'], policy_version=payload['policy_version'],
-                                  phase=row['phase'], display_label=row['display_label'], result='ready' if row['ready'] else 'not_ready',
+                                  client_freshness=freshness, phase=row['phase'], display_label=row['display_label'], result='ready' if row['ready'] else 'not_ready',
                                   run_id=snapshot[key]['active_run_id'] or snapshot[key]['run_id'], archive_ref=snapshot[key]['archive_ref'],
                                   reason=reason)
                 peers = displays.setdefault(key, {})
-                view = (payload['surface'], payload['native'])
+                view = (payload['surface'], payload['native'], freshness)
                 rendered = (row['phase'], row['display_label'], row['ready'])
                 for peer, peer_value in peers.items():
-                    if peer != view and peer_value != rendered and previous.get(key) != signature:
+                    if peer != view and peer[2] == freshness and peer_value != rendered and previous.get(key) != signature:
                         self.log.emit('presentation_disagreement', severity='warning', repo_ref=repo_ref,
                                       observation_id=observation, client_id=client, surface=payload['surface'], native=payload['native'],
                                       phase=row['phase'], display_label=row['display_label'], result='views_differ')

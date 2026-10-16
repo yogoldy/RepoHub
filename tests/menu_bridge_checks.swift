@@ -11,7 +11,7 @@ import Foundation
                     "https://user@github.com/yogoldy/RepoHub/issues/12", "https://github.com:443/yogoldy/RepoHub/issues/12"] {
             precondition(!MenuBridge.isReportIssueURL(URL(string:bad)!)); count += 1
         }
-        for action in ["openBackups", "toggleNotifications", "connectGitHub", "quit"] {
+        for action in ["requestNotifications", "notificationSettings", "privacySettings", "loginSettings", "openBackups", "toggleNotifications", "connectGitHub", "quit"] {
             precondition(MenuBridge.action(body: ["action":action], frameURL: url, isMainFrame: true)?.rawValue == action)
             count += 1
         }
@@ -30,6 +30,16 @@ import Foundation
         precondition(MenuBridge.action(body: ["action":"quit"], frameURL: nil, isMainFrame: true) == nil)
         count += 2
         precondition(MenuBridge.action(body:["action":"connectGitHub", "token":"forbidden"], frameURL:url, isMainFrame:true) == nil)
+        for picker in ["chooseRepoHome", "chooseRepoFolders"] {
+            let valid: [String:Any] = ["action":picker, "request_id":String(repeating:"a",count:24)]
+            precondition(MenuBridge.action(body:valid,frameURL:url,isMainFrame:true)?.rawValue == picker); count += 1
+            for bad: Any in [["action":picker], ["action":picker,"request_id":"../path"],
+                             ["action":picker,"request_id":42], ["action":picker,"request_id":String(repeating:"a",count:24),"path":"/outside"]] {
+                precondition(MenuBridge.action(body:bad,frameURL:url,isMainFrame:true) == nil); count += 1
+            }
+            precondition(MenuBridge.action(body:valid,frameURL:url,isMainFrame:false) == nil); count += 1
+            precondition(MenuBridge.action(body:valid,frameURL:URL(string:"http://127.0.0.1:8767/views/test/index.html"),isMainFrame:true) == nil); count += 1
+        }
         let repoBody: [String: Any] = ["action":"openRepo", "repo_id":"Example-1234567890"]
         precondition(MenuBridge.action(body: repoBody, frameURL: url, isMainFrame: true) == .openRepo)
         count += 1
@@ -65,6 +75,27 @@ import Foundation
         }
         precondition(MenuBridge.repositoryURL(id:"missing",status:status("Example",repo.path)) == nil)
         count += 1
+        let manualPath = MenuBridge.canonicalSourcePath(outside)
+        precondition(MenuBridge.canonicalSourcePath(linked) == manualPath)
+        let aliasRoot = URL(fileURLWithPath: "/tmp").appendingPathComponent("repohub-picker-" + UUID().uuidString)
+        try! files.createDirectory(at: aliasRoot, withIntermediateDirectories: true)
+        defer { try? files.removeItem(at: aliasRoot) }
+        precondition(MenuBridge.canonicalSourcePath(aliasRoot) == "/private" + aliasRoot.path)
+        count += 2
+        var manual: [String: Any] = ["source_mode":"manual", "repos":[["id":"Outside-id", "name":"Outside", "path":manualPath]],
+                                    "workspace_sources":[["id":"Outside-id", "path":manualPath]]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual).map(MenuBridge.canonicalSourcePath) == manualPath)
+        manual["workspace_sources"] = [["id":"Other-id", "path":manualPath]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        manual["workspace_sources"] = [["id":"Outside-id", "path":repo.path]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        manual["workspace_sources"] = [["id":"Outside-id", "path":manualPath], ["id":"Outside-id", "path":manualPath]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        manual["workspace_sources"] = [["id":"Outside-id", "path":manualPath], ["id":"Outside-id", "path":repo.path]]
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        manual["workspace_sources"] = "invalid"
+        precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
+        count += 6
         print("\(count) menu bridge checks passed")
     }
 }

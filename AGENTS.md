@@ -1,5 +1,7 @@
 # Repo Hub agent instructions
 
+- Use `/Users/leogoldberg/Desktop/repos/RepoHub` as the single working checkout. Switch regular branches there; do not create another worktree unless Leo requests one. See [working-copy guidance](docs/WORKING_COPY.md).
+
 - This is the app foundation. Source repos and saved workspace JSON are user data; never change or commit their contents as part of app development.
 - Keep the backend on loopback. Maintain Host/Origin/token write checks, safe path resolution, and revision checks.
 - Preserve all existing backups. Do not introduce automatic retention deletion without Leo's authorization.
@@ -15,3 +17,7 @@
 - An automated pass does not approve a deployment: perform the changed-boundary live checks described in `docs/quality/RELEASE_GATE.md`, and explicitly record any unchecked hardware/provider/UI conditions. Do not silently replace missing evidence with an old release’s receipt.
 
 - GitHub `main` promotion must use a pull request with the required up-to-date `automated-contract` check from GitHub Actions. Do not bypass or disable protection to merge a failing version; no additional approving review is required.
+
+## Readability for new and deliberately changed code
+
+- Follow [the readability standard](docs/READABILITY_STANDARDS.md): clear names, multiline formatting, recognizable function responsibilities and comments explaining important decisions. Keep formatting, structural cleanup and behavior fixes in separate commits. This pointer does not authorize broad refactoring; use the [approved roadmap and stage authorization](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md).
