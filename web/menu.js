@@ -102,7 +102,8 @@ function renderDetail() {
         <div class="fact"><small>Archive size</small>${bytes(repo.last_backup?.archive_bytes)}</div>
       </div>
       ${repo.health?.fresh !== true ? `<p>${escape((repo.health?.reasons || ['Fresh evidence unavailable']).join(' · '))}</p>` : ''}
-    </details>`;
+    </details>
+    <button id="report-status" type="button" class="report-status">Report this status</button>`;
   if ($('#detail').innerHTML !== markup) {
     const focused = $('#detail').contains(document.activeElement) ? document.activeElement.id : null;
     $('#detail').innerHTML = markup;
@@ -113,6 +114,10 @@ function renderDetail() {
     else technicalOpen.delete(repo.id);
   };
   $('#repo-schedule').onclick = () => openSettings(repo.id);
+  $('#report-status').onclick = () => {
+    if (window.RepoHubReports) void window.RepoHubReports.openStatus(state);
+    else $('#notice').textContent = 'Reporting is not available yet. Please reload this view.';
+  };
   if ($('#retry-check')) $('#retry-check').onclick = async () => {
     retryingRepo = repo.id;
     renderDetail();

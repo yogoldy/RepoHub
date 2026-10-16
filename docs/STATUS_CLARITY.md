@@ -50,3 +50,28 @@ Computer use verified live read-only status, technical expansion surviving polls
 580×640 and 360×640 browser layouts with no horizontal overflow or headline
 clipping. These browser dimensions approximate the native footprint; they are
 not evidence of installed WebKit acceptance. Temporary viewport overrides reset.
+
+
+## Step 3 — report the selected status
+
+Report this status opens the existing glitch composer. Only fixed presentation
+label/headline text is suggested for a fresh draft. It does not inject the repo
+name, filesystem path, exact dates, hashes or exception prose. Existing glitch
+prose is preserved when another selected status is reported; the composer shows
+the newly selected status separately. Diagnostics remain optional and bounded by
+the typed export contract. The exact preview and explicit Send are unchanged;
+opening or checking a report does not submit anything. This retains the current
+owner GitHub connection, not a public submission service.
+
+The real shared controller regression covers both surfaces, status prefill,
+private-context exclusion, existing-draft preservation, no automatic preview or
+send, and the existing denied/ambiguous/explicit-send flow.
+
+Step 3 browser validation used a fresh synthetic helper/state/destination on a
+separate port, with Keychain access, provider reads and external Send disabled.
+Clicked the actual Report this status button, edited synthetic prose and prepared
+the real local report preview with typed diagnostic attachments. It showed
+Nothing sent; disconnected Send remained disabled. Logs recorded the expected
+new UI vocabulary with zero presentation disagreements and no delivery events.
+The shared controller tests separately cover explicit simulated successful Send,
+permission denial and draft preservation; no public issue was posted.

@@ -145,3 +145,19 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 .progress-line progress {
   min-width: 80px;
 }
+
+
+.report-status {
+  margin-top: 12px;
+  padding: 5px 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.report-status:hover {
+  background: transparent;
+  color: var(--text);
+}
