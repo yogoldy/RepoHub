@@ -46,7 +46,7 @@ console.log(JSON.stringify(next));"""
                'category': rendered['category'], 'display_label': rendered['label'],
                'display_headline': rendered['headline']}
         payload = {'surface': 'menu', 'native': False, 'client_id': 'c' * 24,
-                   'observation_id': observation, 'policy_version': 'status-clarity-1',
+                   'observation_id': observation, 'policy_version': 'status-clarity-2',
                    'client_freshness': freshness, 'rows': [row]}
         self.evidence.presentation(payload)
         return payload
@@ -93,6 +93,42 @@ console.log(JSON.stringify(next));"""
         finder_pending['verification']['changes'] = {'counts': {'finder_metadata': 1}}
         self.assertNotEqual(self.render(finder_pending)['label'], 'Edits confirmed')
 
+
+    def test_only_labels_require_complete_current_comparison(self):
+        for finder, git, expected in [
+            (1, 0, 'Only Finder metadata changed'),
+            (0, 1, 'Only Git data changed'),
+            (1, 1, 'Only Git and Finder metadata changed'),
+        ]:
+            row = copy.deepcopy(self.good)
+            row['needs_backup'] = True
+            counts = {'repo_files': 0, 'git_data': git, 'finder_metadata': finder}
+            row['verification'].update(state='different', changes={'counts': counts})
+            self.assertEqual(self.render(row)['label'], expected)
+            self.report(row)
+            for malformed in [{'git_data': git, 'finder_metadata': finder},
+                              dict(counts, repo_files=1), dict(counts, repo_files=-1)]:
+                row['verification']['changes']['counts'] = malformed
+                self.assertFalse(self.render(row)['label'].startswith('Only '))
+            row['verification']['changes']['counts'] = counts
+            row['verification']['archive'] = '/private/old'
+            self.assertFalse(self.render(row)['label'].startswith('Only '))
+        self.assertFalse([e for e in read_events(self.root/'logs')
+                          if e['event'] == 'presentation_input_disagreement'])
+
+    def test_previous_presentation_version_keeps_its_original_wording(self):
+        row = copy.deepcopy(self.good)
+        row['needs_backup'] = True
+        row['verification'].update(state='different', changes={'counts': {
+            'repo_files': 0, 'git_data': 1, 'finder_metadata': 0}})
+        payload = self.report(row)
+        payload['policy_version'] = 'status-clarity-1'
+        payload['rows'][0].update(display_label='Edits confirmed',
+                                  display_headline='RepoHub confirmed edits.')
+        self.evidence.presentation(payload)
+        self.assertFalse([e for e in read_events(self.root/'logs')
+                          if e['event'] == 'presentation_input_disagreement'])
+
     def test_wrong_category_sentence_and_false_green_are_detected(self):
         for changes in [{'category': 'failure'}, {'display_headline': 'RepoHub confirmed edits.'},
                         {'phase': 'ready', 'ready': True}]:
@@ -120,7 +156,7 @@ console.log(JSON.stringify(next));"""
         bundle = export_bundle(self.root/'logs', self.root/'exports')
         shared = (bundle/'share/events.jsonl').read_text()
         rows = [json.loads(line) for line in shared.splitlines()]
-        actual = next(e for e in rows if e.get('policy_version') == 'status-clarity-1' and e['event'] == 'ui_presented')
+        actual = next(e for e in rows if e.get('policy_version') == 'status-clarity-2' and e['event'] == 'ui_presented')
         self.assertEqual(actual['category'], 'backed_up')
         self.assertEqual(actual['display_headline'], 'Your files are backed up.')
         for text in ['private-name', '/Users/private', '/private/current', 'private-repo', 'private-sha']:

@@ -246,3 +246,8 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 .technical-explanation[data-category="backup_pending"] {
   color: var(--green);
 }
+
+/* Specific metadata labels can wrap without colliding with the repo name. */
+.repo-card {
+  height: 156px;
+}

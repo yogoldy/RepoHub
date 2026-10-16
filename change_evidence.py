@@ -17,6 +17,10 @@ LABELS = {'Project files match', 'Status outdated', 'Needs attention', 'Backing 
 PRESENTATION_TEXT = {
     'ready': ('backed_up', 'Backed up', 'Your files are backed up.'),
     'background': ('backed_up', 'Files match', 'Your project files and Git match the backup.'),
+    'finder': ('backed_up', 'Only Finder metadata changed', 'Only Finder metadata changed.'),
+    'finder_pending': ('backup_pending', 'Only Finder metadata changed', 'Only Finder metadata changed.'),
+    'git': ('backup_pending', 'Only Git data changed', 'Only Git data changed.'),
+    'git_finder': ('backup_pending', 'Only Git and Finder metadata changed', 'Only Git and Finder metadata changed.'),
     'first': ('backup_pending', 'First backup pending', 'Your first backup is pending.'),
     'edits': ('backup_pending', 'Edits confirmed', 'RepoHub confirmed edits.'),
     'changed': ('backup_pending', 'Backup pending', 'RepoHub is waiting to back up this repo.'),
@@ -31,7 +35,7 @@ PRESENTATION_TEXT = {
 }
 
 
-def presentation_text(facts, phase):
+def presentation_text(facts, phase, version='status-clarity-1'):
     code = phase
     if phase in {'uploading', 'pending'} and (not facts['archive_ref']
             or facts['cloud_archive_ref'] != facts['archive_ref']):
@@ -44,6 +48,18 @@ def presentation_text(facts, phase):
         code = 'first' if not facts['has_backup'] else 'edits' if confirmed else 'changed'
     elif phase == 'verifying' and facts['verification_state'] == 'changing':
         code = 'changing'
+    if version == 'status-clarity-2':
+        if phase == 'background':
+            code = 'finder'
+        elif (phase == 'changed' and facts['has_backup'] and facts['archive_ref']
+              and facts['verification_state'] == 'different'
+              and facts['verification_archive_ref'] == facts['archive_ref']
+              and facts['counts_complete'] and facts['counts']['repo_files'] == 0):
+            counts = facts['counts']
+            if counts['git_data'] > 0:
+                code = 'git_finder' if counts['finder_metadata'] > 0 else 'git'
+            elif counts['finder_metadata'] > 0:
+                code = 'finder_pending'
     category, label, headline = PRESENTATION_TEXT.get(code, PRESENTATION_TEXT['unknown'])
     return {'category': category, 'display_label': label, 'display_headline': headline}
 
@@ -178,7 +194,10 @@ class ChangeEvidence:
             verification, cloud = row.get('verification', {}), row.get('cloud', {})
             copying = bool(backup.get('running') and (backup.get('current_repo_id') == row['id']
                            if 'current_repo_id' in backup else backup.get('current_repo') == row['name']))
-            projection[row['id']] = {**repo_facts(row),
+            raw_counts = verification.get('changes', {}).get('counts', {})
+            counts_complete = all(type(raw_counts.get(kind)) is int and raw_counts[kind] >= 0
+                                  for kind in ('finder_metadata', 'git_data', 'repo_files'))
+            projection[row['id']] = {**repo_facts(row), 'counts_complete': counts_complete,
                 'change_reason': change_reason(row, repo_facts(row)),
                 'active_run_id': backup.get('run_id') if copying else None,
                 'verification_archive_ref': diagnostic_ref(verification.get('archive')),
@@ -221,7 +240,7 @@ class ChangeEvidence:
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
                 or not isinstance(payload['policy_version'], str)
-                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1'}
+                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2'}
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
         freshness = payload.get('client_freshness', 'current')
@@ -232,7 +251,7 @@ class ChangeEvidence:
             if snapshot is None:
                 raise FileExistsError('Observed status expired; request fresh status')
             rows = payload['rows']
-            modern = payload['policy_version'] == 'status-clarity-1'
+            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2'}
             row_fields = {'repo_id', 'phase', 'display_label', 'ready'}
             if modern:
                 row_fields |= {'category', 'display_headline'}
@@ -265,7 +284,7 @@ class ChangeEvidence:
                     reason = (icon_reason(row, snapshot[key]) if freshness == 'current' else
                               ('client_' + freshness if row['phase'] == 'stale' and row['ready'] is False and row['display_label'] == ('Current status unavailable' if modern else 'Status outdated') else 'presentation_inputs_disagree'))
                     if modern:
-                        expected = presentation_text(snapshot[key], row['phase'])
+                        expected = presentation_text(snapshot[key], row['phase'], payload['policy_version'])
                         if any(row[field] != value for field, value in expected.items()):
                             reason = 'presentation_inputs_disagree'
                     text_fields = ({field: row[field] for field in ('category', 'display_headline')}

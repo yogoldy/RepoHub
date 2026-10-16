@@ -141,3 +141,35 @@ reported problem; reviewing the OBS recording was unnecessary.
 Leo reports Show me works and the report composer UX looks good; he did not
 verify delivery in this review. These changes are preview-only: no installed
 app update, Air operation, full Golden Gate or native acceptance was performed.
+
+
+## Specific Git and Finder descriptions — October 16, 2026
+
+The approved card/headline wording now distinguishes Only Finder metadata
+changed, Only Git data changed, and Only Git and Finder metadata changed.
+Pending differences require a complete nonnegative-integer count set from a
+current-archive comparison showing zero project-file changes. Missing counts,
+stale archive references, or actual project edits retain the broader wording.
+The existing ignored Finder exception names the metadata difference and explains
+that no new backup is needed; pending Git or metadata changes explain inclusion
+in the next backup. Original phase, ready flag and backup decisions are unchanged.
+Cards are taller to accommodate the longer labels; the shared information guide
+explains them. Presentation policy status-clarity-2 keeps independent expected
+wording, while the backend still accepts the previous status-clarity-1 vocabulary.
+The typed diagnostic export permits only the fixed new labels/headlines/version.
+Comparison completeness stays in the private presentation snapshot rather than
+adding an unapproved field to existing diagnostic events.
+
+Validation: 210 Python tests passed, including explicit complete/incomplete count
+and archive mismatch cases, original-policy preservation and legacy wording
+compatibility. JavaScript syntax, original 54 menu status checks plus schedule
+and guide checks, diagnostic delivery, report-entry checks and whitespace checks
+passed. The first full run exposed a rejected repo_checked event caused by an
+extra field; keeping it private fixed the failure and the full repeat passed.
+Browser review confirmed the live Finder-only label, matching expanded sentence,
+no clipped card labels and no horizontal overflow at 611px. Private screenshot:
+/private/tmp/repohub-metadata-label-review.png.
+
+No full macOS Golden Gate, native installation or Air changes were made in this
+wording pass. Both installed apps retain their previous versions; native final-
+candidate acceptance and protected release promotion remain open.
