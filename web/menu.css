@@ -267,3 +267,9 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 .backup-timing .backup-inclusion {
   font-size: 13px;
 }
+
+/* Explanatory prose uses a consistent reading color; status icons carry state. */
+.status-explanation,
+.technical-explanation {
+  color: var(--green);
+}
