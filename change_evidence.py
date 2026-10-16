@@ -21,6 +21,10 @@ PRESENTATION_TEXT = {
     'finder_pending': ('backup_pending', 'Only Finder metadata changed', 'Only Finder metadata changed.'),
     'git': ('backup_pending', 'Only Git data changed', 'Only Git data changed.'),
     'git_finder': ('backup_pending', 'Only Git and Finder metadata changed', 'Only Git and Finder metadata changed.'),
+    'view_settings': ('backed_up', 'Only Finder view settings changed', 'Only Finder view settings changed.'),
+    'metadata': ('backup_pending', 'Only file metadata changed', 'Only file metadata changed.'),
+    'git_metadata': ('backup_pending', 'Only Git and file metadata changed', 'Only Git and file metadata changed.'),
+    'unclassified': ('backup_pending', 'Changes need verification', 'RepoHub hasn’t established which files changed.'),
     'first': ('backup_pending', 'First backup pending', 'Your first backup is pending.'),
     'edits': ('backup_pending', 'Edits confirmed', 'RepoHub confirmed edits.'),
     'changed': ('backup_pending', 'Backup pending', 'RepoHub is waiting to back up this repo.'),
@@ -60,6 +64,18 @@ def presentation_text(facts, phase, version='status-clarity-1'):
                 code = 'git_finder' if counts['finder_metadata'] > 0 else 'git'
             elif counts['finder_metadata'] > 0:
                 code = 'finder_pending'
+    if version == 'status-clarity-3':
+        if phase == 'background':
+            code = 'view_settings'
+        elif phase == 'changed' and facts['has_backup']:
+            counts = facts['counts']
+            complete = (facts['counts_complete'] and facts['archive_ref']
+                        and facts['verification_archive_ref'] == facts['archive_ref']
+                        and facts['verification_state'] == 'different' and any(counts.values()))
+            if not complete:
+                code = 'unclassified'
+            elif counts['repo_files'] == 0:
+                code = ('git_metadata' if counts['finder_metadata'] else 'git') if counts['git_data'] else 'metadata'
     category, label, headline = PRESENTATION_TEXT.get(code, PRESENTATION_TEXT['unknown'])
     return {'category': category, 'display_label': label, 'display_headline': headline}
 
@@ -240,7 +256,7 @@ class ChangeEvidence:
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
                 or not isinstance(payload['policy_version'], str)
-                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2'}
+                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3'}
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
         freshness = payload.get('client_freshness', 'current')
@@ -251,7 +267,7 @@ class ChangeEvidence:
             if snapshot is None:
                 raise FileExistsError('Observed status expired; request fresh status')
             rows = payload['rows']
-            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2'}
+            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3'}
             row_fields = {'repo_id', 'phase', 'display_label', 'ready'}
             if modern:
                 row_fields |= {'category', 'display_headline'}

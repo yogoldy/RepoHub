@@ -46,7 +46,7 @@ console.log(JSON.stringify(next));"""
                'category': rendered['category'], 'display_label': rendered['label'],
                'display_headline': rendered['headline']}
         payload = {'surface': 'menu', 'native': False, 'client_id': 'c' * 24,
-                   'observation_id': observation, 'policy_version': 'status-clarity-2',
+                   'observation_id': observation, 'policy_version': 'status-clarity-3',
                    'client_freshness': freshness, 'rows': [row]}
         self.evidence.presentation(payload)
         return payload
@@ -96,9 +96,9 @@ console.log(JSON.stringify(next));"""
 
     def test_only_labels_require_complete_current_comparison(self):
         for finder, git, expected in [
-            (1, 0, 'Only Finder metadata changed'),
+            (1, 0, 'Only file metadata changed'),
             (0, 1, 'Only Git data changed'),
-            (1, 1, 'Only Git and Finder metadata changed'),
+            (1, 1, 'Only Git and file metadata changed'),
         ]:
             row = copy.deepcopy(self.good)
             row['needs_backup'] = True
@@ -109,7 +109,12 @@ console.log(JSON.stringify(next));"""
             for malformed in [{'git_data': git, 'finder_metadata': finder},
                               dict(counts, repo_files=1), dict(counts, repo_files=-1)]:
                 row['verification']['changes']['counts'] = malformed
-                self.assertFalse(self.render(row)['label'].startswith('Only '))
+                rendered = self.render(row)
+                self.assertFalse(rendered['label'].startswith('Only '))
+                if malformed.get('repo_files') != 1:
+                    self.assertNotIn('still match', rendered['technicalDetail'])
+                    self.assertNotIn('files match', rendered['technicalDetail'])
+                    self.assertEqual(rendered['label'], 'Changes need verification')
             row['verification']['changes']['counts'] = counts
             row['verification']['archive'] = '/private/old'
             self.assertFalse(self.render(row)['label'].startswith('Only '))
@@ -156,7 +161,7 @@ console.log(JSON.stringify(next));"""
         bundle = export_bundle(self.root/'logs', self.root/'exports')
         shared = (bundle/'share/events.jsonl').read_text()
         rows = [json.loads(line) for line in shared.splitlines()]
-        actual = next(e for e in rows if e.get('policy_version') == 'status-clarity-2' and e['event'] == 'ui_presented')
+        actual = next(e for e in rows if e.get('policy_version') == 'status-clarity-3' and e['event'] == 'ui_presented')
         self.assertEqual(actual['category'], 'backed_up')
         self.assertEqual(actual['display_headline'], 'Your files are backed up.')
         for text in ['private-name', '/Users/private', '/private/current', 'private-repo', 'private-sha']:

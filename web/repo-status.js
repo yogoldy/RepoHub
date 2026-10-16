@@ -52,9 +52,9 @@
         detail = 'Your files match the verified archive, and macOS confirms that same archive uploaded.';
         break;
       case 'background':
-        category = 'backed_up'; label = 'Only Finder metadata changed';
-        headline = 'Only Finder metadata changed.';
-        detail = 'Your project files and Git match the uploaded backup. Finder changed folder metadata; no new backup is needed.';
+        category = 'backed_up'; label = 'Only Finder view settings changed';
+        headline = 'Only Finder view settings changed.';
+        detail = 'Your project files and Git match the uploaded backup. Only ordinary .DS_Store view-setting files differ; no new backup is needed.';
         break;
       case 'changed': {
         category = 'backup_pending';
@@ -74,19 +74,25 @@
         if (repo.last_backup && archive && verification.state === 'different'
             && verification.archive === archive && complete && counts.repo_files === 0) {
           if (counts.git_data > 0 && counts.finder_metadata > 0) {
-            label = 'Only Git and Finder metadata changed';
+            label = 'Only Git and file metadata changed';
           } else if (counts.git_data > 0) {
             label = 'Only Git data changed';
           } else if (counts.finder_metadata > 0) {
-            label = 'Only Finder metadata changed';
+            label = 'Only file metadata changed';
           }
           if (counts.git_data > 0 || counts.finder_metadata > 0) {
             headline = label + '.';
             detail = counts.git_data > 0
               ? 'Your project files match the saved backup. The next backup will include the changed Git version-control data'
-                + (counts.finder_metadata > 0 ? ' and Finder folder metadata.' : '.')
-              : 'Your project files and Git match the saved backup. Finder folder metadata is pending in the next backup.';
+                + (counts.finder_metadata > 0 ? ' and file metadata.' : '.')
+              : 'Your project files and Git match the saved backup. The next backup will include the changed file metadata.';
           }
+        }
+        if (repo.last_backup && (!complete || !archive || verification.archive !== archive
+            || verification.state !== 'different' || !Object.values(counts).some(value => value > 0))) {
+          label = 'Changes need verification';
+          headline = 'RepoHub hasn’t established which files changed.';
+          detail = 'A complete comparison is needed before RepoHub can identify all changed files.';
         }
         break;
       }
@@ -130,7 +136,7 @@
         headline = 'RepoHub can’t read the upload status.';
         detail = 'RepoHub cannot confirm that the current archive uploaded. See technical details for the available verification evidence.';
     }
-    return {...original, category, label, headline, detail, technicalDetail: original.detail};
+    return {...original, category, label, headline, detail, technicalDetail: original.phase === 'changed' ? detail : original.detail};
   }
 
   function describeSchedule(repo, power) {
@@ -177,13 +183,13 @@
   function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
   function legend() {
     const groups = [
-      {category: 'backed_up', icon: 'ready', title: 'Backed up', labels: 'Backed up · Only Finder metadata changed',
+      {category: 'backed_up', icon: 'ready', title: 'Backed up', labels: 'Backed up · Only Finder view settings changed',
         explanation: 'Backed up means fresh checks match your files to the verified archive, and macOS confirms that exact archive uploaded.',
-        note: 'Only Finder metadata changed uses the information icon instead of a green check when the uploaded archive matches project files and Git. Finder folder metadata differs; no new backup is needed in this exception. It is not full byte-for-byte equality.'},
+        note: 'Only Finder view settings changed uses the information icon instead of a green check when the uploaded archive matches project files and Git. Only ordinary .DS_Store view settings differ; no new backup is needed in this exception. It is not full byte-for-byte equality.'},
       {category: 'backup_pending', icon: 'changed', title: 'A backup is waiting to run',
-        labels: 'First backup pending · Edits confirmed · Backup pending · Only Git data changed · Only Git and Finder metadata changed · Only Finder metadata changed',
+        labels: 'First backup pending · Edits confirmed · Backup pending · Changes need verification · Only Git data changed · Only Git and file metadata changed · Only file metadata changed',
         explanation: 'First backup pending means no archive exists yet. Edits confirmed means a hash comparison found project or Git changes against the saved archive. Backup pending means a backup is needed without that confirmed-edit evidence.',
-        note: 'The Only labels require a complete comparison showing no project-file changes. Git data includes version-control history and still needs a backup. A pending Finder-only difference follows the existing backup policy; the expanded explanation distinguishes it from the ignored Finder exception. Review the separate Schedule row or use Back up now. Waiting for a scheduled attempt is normal and does not mean status checks failed.'},
+        note: 'The Only labels require a complete comparison showing no project-file changes. Git data includes version-control history and still needs a backup. Other file metadata remains eligible for backup; the expanded explanation distinguishes it from the ignored Finder exception. Review the separate Schedule row or use Back up now. Waiting for a scheduled attempt is normal and does not mean status checks failed.'},
       {category: 'working', icon: 'copying', title: 'RepoHub or macOS is working',
         labels: 'Scanning · Checking again · Creating backup · Uploading',
         explanation: 'Scanning compares files with the archive. Checking again means files changed during that scan; RepoHub retries on the next scan. Creating backup packages and verifies the archive. Uploading means macOS reports transfer activity for that archive.',
@@ -206,5 +212,5 @@
         <h4>${group.title}</h4></div><p class="guide-labels">${group.labels}</p>
       <p>${group.explanation}</p><p class="guide-note">${group.note}</p></section>`).join('');
   }
-  const policy={view,present,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-2'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-3'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

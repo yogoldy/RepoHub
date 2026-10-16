@@ -173,3 +173,19 @@ no clipped card labels and no horizontal overflow at 611px. Private screenshot:
 No full macOS Golden Gate, native installation or Air changes were made in this
 wording pass. Both installed apps retain their previous versions; native final-
 candidate acceptance and protected release promotion remain open.
+
+
+## Timing goal stage 1 — conservative descriptions
+
+The ignored exception now says Only Finder view settings changed and explicitly
+names ordinary .DS_Store files. Other metadata remains eligible for backup and
+is described as file metadata. Incomplete/invalid counts or a wrong archive
+produce Changes need verification, without implying an active scan. Changed
+technical prose follows the guarded explanation instead of the old missing-zero
+fallback. Existing view phase/ready decisions and actual backup policy are intact.
+Presentation vocabulary version 3 retains prior diagnostic version support.
+
+Stage validation: original menu status/schedule/guide assertions, six clarity
+regressions (including unsupported-match prose) and scoped metadata backup
+safety tests. No installation. Leo’s event-state versus displayed-UI review
+remains a required follow-up after the combined implementation is validated.
