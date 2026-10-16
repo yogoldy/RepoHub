@@ -36,6 +36,13 @@ class TimingTests(unittest.TestCase):
                         if plan:
                             self.assertEqual(projection['reason'], 'periodic' if plan.get('periodic_keys') else 'edits')
 
+    def test_countdown_does_not_round_float_noise_into_an_extra_minute(self):
+        for wall_now, monotonic_now in [(1792179000.429823, 38000.14357),
+                                        (10000.1, 0.3), (20000.9, 125.4)]:
+            result = project_schedule(self.scheduler, self.settings, 'adapter', self.row,
+                                      wall_now, monotonic_now, wall_now - 1800, {})
+            self.assertEqual(result['due_in_seconds'], 1800)
+
     def test_overrides_retry_busy_and_unobserved_edits(self):
         custom = default_settings()
         custom['adapter'].update(frequency_minutes=0, after_edits=True, edit_delay_minutes=2)

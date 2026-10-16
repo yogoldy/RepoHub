@@ -546,3 +546,13 @@ Drop that sampling field and bucket remaining time to displayed whole minutes
 for identity; retain original snapshots unchanged. Periodic due dates use the
 saved wall-clock anchor directly, avoiding floating subtraction drift.
 Native countdown readability and actual sleep/power behavior remain unproven.
+
+
+### Whole-minute countdown boundary
+
+Browser acceptance found a nominal 30-minute wait displaying 31 minutes. Tiny
+monotonic/wall-clock floating-point conversion noise rounded upward twice: once
+to seconds and again to minutes. Derive remaining seconds from the projected
+wall due time and remove sub-millisecond noise before the existing upward
+rounding. A deterministic fractional-clock counterexample protects the boundary;
+scheduler eligibility itself is unchanged.

@@ -150,5 +150,5 @@ def project_schedule(scheduler, settings, source, row, wall_now, monotonic_now,
         wall_due = max(anchor, wall_now) + frequency if anchor > wall_now else anchor + frequency
     result.update(state=("busy" if busy else "due") if eligible else "scheduled",
                   reason=reason, due_at=datetime.fromtimestamp(wall_due, timezone.utc).isoformat(),
-                  due_in_seconds=max(0, math.ceil(due - monotonic_now)))
+                  due_in_seconds=max(0, math.ceil(round(wall_due - wall_now, 4))))
     return result
