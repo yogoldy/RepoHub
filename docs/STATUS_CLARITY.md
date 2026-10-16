@@ -112,3 +112,32 @@ installed application source, preserved configuration, guarded rollback finding,
 actual native smoke evidence and remaining checks. This supersedes the earlier
 no-deployment implementation scope only for that explicit Pro test installation;
 it does not close two-Mac acceptance or authorize an Air deployment.
+
+
+## Pro visual feedback — fixed guide header and larger reading text
+
+Leo reported that the installed information title stayed visible but guide text
+scrolled above and behind it. The header is now outside the scrollable guide
+body, with an opaque background and full-width divider. Layout/paint containment
+prevents keyboard focus in the guide from scrolling the dialog itself. A browser
+keyboard check caught that second failure before containment was added; the
+repeat kept dialog scroll at zero and the title in place while the body scrolled.
+
+Reading text is larger in cards, selected details and the guide. Pending-backup
+explanations and their technical sentence use the requested green treatment;
+icons, categories, verification and upload decisions are unchanged. This color
+is a visual experiment, not new success evidence. Failure/unknown prose does not
+inherit the green treatment. The proposed Git/Finder-specific label change
+remains unimplemented.
+
+Validation: JavaScript syntax, 54 original menu status checks plus schedule and
+guide checks, shared report-entry checks, four status-clarity Python tests and
+git diff whitespace checks passed. Browser checks confirmed 14px main prose,
+both selected sentences green, no horizontal overflow at the current 611px
+viewport, and keyboard scrolling of the guide with the header remaining visible.
+Private screenshots are outside Git. The supplied screenshots established the
+reported problem; reviewing the OBS recording was unnecessary.
+
+Leo reports Show me works and the report composer UX looks good; he did not
+verify delivery in this review. These changes are preview-only: no installed
+app update, Air operation, full Golden Gate or native acceptance was performed.

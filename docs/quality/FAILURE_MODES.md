@@ -518,3 +518,15 @@ policy intact; independently validate the new category and sentence against the
 original observation. GR06 and GR09 require cross-language mapping/counterexample
 and export-privacy regressions. Unknown evidence stays unknown. Native pixel,
 wrapping and installed-menu checks remain separate from diagnostic agreement.
+
+
+## Information guide title overlaps scrolling text — October 16, 2026
+
+A sticky heading inside a padded scrolling dialog left an exposed strip above
+it. Separating the full-width header from the guide scroll container removes
+that overlap. Keyboard focus can also scroll an overflow-hidden ancestor when
+descendant content contributes to its scroll area: layout/paint containment on
+the guide body prevents that second failure. Browser keyboard-to-bottom evidence
+kept the outer dialog at scroll zero. Native WebKit scrolling, narrow-window
+wrapping and keyboard/Escape remain release acceptance checks; this browser
+result does not close that backlog.

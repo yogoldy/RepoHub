@@ -86,7 +86,7 @@ function renderDetail() {
   const markup = `
     <p class="detail-context">${escape(repo.name)}</p>
     <h2 class="status-headline" data-category="${state.category}">${escape(state.headline)}</h2>
-    <p class="status-explanation">${escape(state.detail)}</p>
+    <p class="status-explanation" data-category="${state.category}">${escape(state.detail)}</p>
     ${progress}${retry}
     <p class="last-backup"><span>Last backup created</span> ${when(repo.last_backup?.completed_at)}</p>
     <button id="repo-schedule" class="repo-schedule" aria-label="Schedule for ${escape(repo.name)}">
@@ -95,7 +95,7 @@ function renderDetail() {
     </button>
     <details id="technical-details" ${technicalOpen.has(repo.id) ? 'open' : ''}>
       <summary id="technical-toggle">Technical details</summary>
-      <p>${escape(state.technicalDetail)}</p>
+      <p class="technical-explanation" data-category="${state.category}">${escape(state.technicalDetail)}</p>
       <div class="facts">
         <div class="fact"><small>Hashes last checked</small>${when(repo.verification?.checked_at)}</div>
         <div class="fact"><small>Upload last checked</small>${when(cloud.checked_at)}</div>

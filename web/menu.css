@@ -168,11 +168,10 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   gap: 16px;
 }
 #info-dialog > .settings-heading {
-  position: sticky;
-  top: 0;
+  flex: none;
   background: var(--bg);
-  padding-bottom: 10px;
-  z-index: 1;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
 }
 .status-guide-item {
   border-bottom: 1px solid var(--line);
@@ -210,4 +209,40 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 }
 .status-guide-item[data-category="failure"] .guide-symbol svg {
   color: var(--red);
+}
+
+
+/* Scroll only the guide body: no text can pass behind or above its title. */
+#info-dialog {
+  padding: 0;
+  overflow: hidden;
+}
+#info-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.info-content {
+  min-height: 0;
+  contain: layout paint;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+
+/* Larger reading text without changing status evidence or success icons. */
+.card-name { font-size: 13px; }
+.card-status, #summary { font-size: 12px; }
+.detail-context, .last-backup, .report-status { font-size: 12px; }
+.status-explanation { font-size: 14px; }
+#technical-details, #technical-details .facts { font-size: 12px; }
+#technical-details .fact small, .schedule-copy small { font-size: 11px; }
+#repo-schedule { font-size: 12px; }
+#info-dialog .settings-heading h2 { font-size: 20px; }
+#info-dialog h3, .guide-heading h4 { font-size: 14px; }
+.status-guide-item p, #info-dialog .things-key p { font-size: 13px; }
+.status-guide-item .guide-labels { font-size: 12px; }
+
+/* Green is a prose treatment here; pending work keeps its existing icon. */
+.status-explanation[data-category="backup_pending"],
+.technical-explanation[data-category="backup_pending"] {
+  color: var(--green);
 }
