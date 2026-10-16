@@ -220,6 +220,7 @@ class ChangeEvidence:
         if (not isinstance(payload['surface'], str) or payload['surface'] not in {'menu', 'app'} or type(payload['native']) is not bool
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
+                or not isinstance(payload['policy_version'], str)
                 or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1'}
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')

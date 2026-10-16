@@ -161,3 +161,53 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   background: transparent;
   color: var(--text);
 }
+
+
+#info-dialog .status-legend {
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+#info-dialog > .settings-heading {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  padding-bottom: 10px;
+  z-index: 1;
+}
+.status-guide-item {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 15px;
+}
+.guide-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.guide-heading h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.status-guide-item p {
+  font-size: 11px;
+  line-height: 1.65;
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
+.status-guide-item .guide-labels {
+  color: var(--gold);
+  font-size: 10px;
+}
+.status-guide-item .guide-note {
+  color: var(--muted);
+}
+.status-legend .status-guide-item .guide-symbol svg {
+  color: var(--gold);
+}
+.status-guide-item[data-category="backed_up"] .guide-symbol svg {
+  color: var(--green);
+}
+.status-guide-item[data-category="failure"] .guide-symbol svg {
+  color: var(--red);
+}

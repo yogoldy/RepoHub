@@ -75,3 +75,31 @@ Nothing sent; disconnected Send remained disabled. Logs recorded the expected
 new UI vocabulary with zero presentation disagreements and no delivery events.
 The shared controller tests separately cover explicit simulated successful Send,
 permission denial and draft preservation; no public issue was posted.
+
+
+## Step 4 — explanations and remaining work
+
+The shared information guide explains every current label, the six categories,
+normal waiting, independent status freshness, the two-stage local/archive and
+macOS upload process, 100%-progress uncertainty, the Finder exception and report
+consent. It does not add a tutorial or claim cloud observation is a restore test.
+The standalone page uses the same labels/sentences; menu layout remains primary.
+
+Required native two-Mac acceptance remains explicitly open. No installed app,
+launch registration, real workspace, schedule or backup destination is changed.
+Failure investigation and the first-launch/repeatable tutorial remain backlogged;
+the status report is the existing owner-authenticated reporting flow, not a public
+submission service. Final clean Golden Gate receipt is generated after this
+commit and retained privately; the final report states its actual outcome.
+
+
+Final browser evidence used 13 controlled situations: strict success, confirmed
+edits, scanning, changing-file retry, archive creation, upload at 42% and 100%,
+pending confirmation, unknown upload, unavailable checks, actual failure, first
+backup and Finder-only matching. All expected sentences, progress visibility and
+menu-width overflow checks passed. The fixture logged all 12 distinct sentences
+(upload percentages share a sentence), with zero diagnostic disagreements.
+Real provider/permission behavior was not simulated into an acceptance claim.
+The guide's six groups, Show me return/highlight, keyboard opening and Escape
+were checked. Shared reporting tests cover preserved drafts and explicit Send;
+real local preview with typed diagnostic attachments was separately exercised.

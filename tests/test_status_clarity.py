@@ -104,6 +104,16 @@ console.log(JSON.stringify(next));"""
             events = list(read_events(self.root/'logs'))
             self.assertEqual(events[-1]['reason'], 'presentation_inputs_disagree')
 
+    def test_untyped_version_category_and_headline_fail_closed(self):
+        payload = self.report(self.good)
+        for location, field in [('frame', 'policy_version'), ('row', 'category'), ('row', 'display_headline')]:
+            for value in [[], {}, True, None, 'private unapproved prose']:
+                bad = copy.deepcopy(payload)
+                target = bad if location == 'frame' else bad['rows'][0]
+                target[field] = value
+                with self.assertRaises(ValueError):
+                    self.evidence.presentation(bad)
+
     def test_new_export_fields_are_typed_and_never_copy_exception_prose(self):
         self.report(self.good)
         self.log.emit('ui_presented', category='private-name', display_headline='/Users/private/secret.env')

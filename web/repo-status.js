@@ -154,6 +154,36 @@
     error:'<path d="m12 3 10 18H2zm0 6v5m0 3h.01"/>'
   };
   function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
-  function legend(){return '<span>'+icon('ready')+' Verified + uploaded</span><span>'+icon('background')+' Project/Git match; Finder-only difference</span><span>'+icon('pending')+' Waiting for iCloud</span><span>'+icon('changed')+' Files or background data changed</span><span>'+icon('uploading')+' Uploading</span><span>'+icon('copying')+' Backing up</span><span>'+icon('verifying')+' Checking hashes</span><span>'+icon('stale')+' Status outdated</span><span>'+icon('error')+' Needs attention</span><span>'+icon('unknown')+' Unconfirmed</span>';}
+  function legend() {
+    const groups = [
+      {category: 'backed_up', icon: 'ready', title: 'Backed up', labels: 'Backed up · Files match',
+        explanation: 'Backed up means fresh checks match your files to the verified archive, and macOS confirms that exact archive uploaded.',
+        note: 'Files match uses the information icon instead of a green check: project files and Git match, but Finder metadata differs. Technical details explain the exception; it is not full byte-for-byte equality.'},
+      {category: 'backup_pending', icon: 'changed', title: 'A backup is waiting to run',
+        labels: 'First backup pending · Edits confirmed · Backup pending',
+        explanation: 'First backup pending means no archive exists yet. Edits confirmed means a hash comparison found project or Git changes against the saved archive. Backup pending means a backup is needed without that confirmed-edit evidence.',
+        note: 'Review the separate Schedule row or use Back up now. Waiting for a scheduled attempt is normal and does not mean status checks failed.'},
+      {category: 'working', icon: 'copying', title: 'RepoHub or macOS is working',
+        labels: 'Scanning · Checking again · Creating backup · Uploading',
+        explanation: 'Scanning compares files with the archive. Checking again means files changed during that scan; RepoHub retries on the next scan. Creating backup packages and verifies the archive. Uploading means macOS reports transfer activity for that archive.',
+        note: 'The expanded sentence names the current step. A progress bar, even at 100%, does not establish upload completion.'},
+      {category: 'upload_unconfirmed', icon: 'unknown', title: 'Cloud upload completion is not confirmed',
+        labels: 'Awaiting upload confirmation · Upload status unavailable',
+        explanation: 'Awaiting upload confirmation means macOS has not acknowledged completion. Upload status unavailable means RepoHub cannot establish upload status for the current archive.',
+        note: 'RepoHub creates the archive on this Mac; macOS uploads the iCloud Drive file separately. Neither state proves that uploading failed, and a local file alone is not cloud confirmation.'},
+      {category: 'status_unavailable', icon: 'stale', title: 'RepoHub cannot get current information',
+        labels: 'Current status unavailable',
+        explanation: 'Expected checks are not supplying fresh evidence, or the interface cannot reach the helper. Technical details show available timestamps and reasons.',
+        note: 'This is separate from backup frequency. An hourly backup schedule does not make status outdated between backups.'},
+      {category: 'failure', icon: 'error', title: 'An operation failed',
+        labels: 'Needs attention — failure',
+        explanation: 'RepoHub or macOS reported a failure. The expanded view shows the available error; Technical details retain supporting evidence.',
+        note: 'Use Retry check now when offered, or Report this status to describe the issue and optionally attach sanitized diagnostics. Review the preview and explicitly Send; opening a report sends nothing.'}
+    ];
+    return groups.map(group => `<section class="status-guide-item" data-category="${group.category}">
+      <div class="guide-heading"><span class="guide-symbol" aria-hidden="true">${icon(group.icon)}</span>
+        <h4>${group.title}</h4></div><p class="guide-labels">${group.labels}</p>
+      <p>${group.explanation}</p><p class="guide-note">${group.note}</p></section>`).join('');
+  }
   const policy={view,present,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-1'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

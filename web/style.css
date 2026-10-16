@@ -40,3 +40,43 @@ select{background:#202734;color:var(--text);border:1px solid var(--line);border-
 .things-key{margin-top:9px}.things-key #things-panel{display:grid;gap:14px;padding:12px 0 18px}.things-key #things-panel[hidden]{display:none}.things-key #things-panel p{margin:0;line-height:1.6}.things-key #things-panel .folder-tip-row{margin-bottom:4px}
 
 .match-icon.background{color:#b1c9e7;background:#293b50}
+
+
+/* The standalone status page shares the menu's explanatory vocabulary. */
+.status-legend:has(.status-guide-item) {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: start;
+  gap: 20px;
+}
+.status-guide-item {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+.guide-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.guide-heading h4 {
+  font-size: 14px;
+  margin: 0;
+}
+.status-guide-item p {
+  line-height: 1.6;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.status-guide-item .guide-labels {
+  color: var(--gold);
+}
+
+.status-legend .status-guide-item .guide-symbol svg {
+  color: var(--gold);
+}
+.status-legend .status-guide-item[data-category="backed_up"] .guide-symbol svg {
+  color: var(--green);
+}
+.status-legend .status-guide-item[data-category="failure"] .guide-symbol svg {
+  color: #f3a5b1;
+}
