@@ -103,3 +103,12 @@ Real provider/permission behavior was not simulated into an acceptance claim.
 The guide's six groups, Show me return/highlight, keyboard opening and Escape
 were checked. Shared reporting tests cover preserved drafts and explicit Send;
 real local preview with typed diagnostic attachments was separately exercised.
+
+## Pro test installation after implementation
+
+Leo subsequently authorized a Pro-only preview installation to try the work.
+[The deployment record](PRO_STATUS_CLARITY_PREVIEW_2026-10-16.md) identifies the
+installed application source, preserved configuration, guarded rollback finding,
+actual native smoke evidence and remaining checks. This supersedes the earlier
+no-deployment implementation scope only for that explicit Pro test installation;
+it does not close two-Mac acceptance or authorize an Air deployment.
