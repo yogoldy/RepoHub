@@ -112,6 +112,29 @@
     return {...original, category, label, headline, detail, technicalDetail: original.detail};
   }
 
+  function describeSchedule(repo, power) {
+    const policy = repo.backup_settings?.[power];
+    const scope = repo.schedule_override ? 'Custom schedule' : 'Default schedule';
+    if (!['battery', 'adapter'].includes(power) || !policy) {
+      return {label: 'Schedule unavailable', detail: scope + ' · Power or policy information is unavailable.'};
+    }
+    const frequency = policy.frequency_minutes;
+    const delay = policy.edit_delay_minutes;
+    if (![0, 15, 30, 60, 120, 240].includes(frequency)
+        || typeof policy.after_edits !== 'boolean'
+        || ![2, 5, 10, 15, 30].includes(delay)) {
+      return {label: 'Schedule unavailable', detail: scope + ' · Waiting for valid scheduling information.'};
+    }
+    const source = power === 'battery' ? 'On battery' : 'On power adapter';
+    const parts = [];
+    if (frequency) {
+      parts.push(frequency < 60 ? `Every ${frequency} minutes`
+        : frequency === 60 ? 'Every hour' : `Every ${frequency / 60} hours`);
+    }
+    if (policy.after_edits) parts.push(`${delay} minutes after edits settle`);
+    return {label: parts.length ? parts.join(' or ') : 'Manual only', detail: scope + ' · ' + source};
+  }
+
   function categoryIcon(state) {
     const phases = {backed_up: state.ready ? 'ready' : 'background', backup_pending: 'changed',
       working: 'copying', upload_unconfirmed: 'unknown', status_unavailable: 'stale', failure: 'error'};
@@ -132,5 +155,5 @@
   };
   function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
   function legend(){return '<span>'+icon('ready')+' Verified + uploaded</span><span>'+icon('background')+' Project/Git match; Finder-only difference</span><span>'+icon('pending')+' Waiting for iCloud</span><span>'+icon('changed')+' Files or background data changed</span><span>'+icon('uploading')+' Uploading</span><span>'+icon('copying')+' Backing up</span><span>'+icon('verifying')+' Checking hashes</span><span>'+icon('stale')+' Status outdated</span><span>'+icon('error')+' Needs attention</span><span>'+icon('unknown')+' Unconfirmed</span>';}
-  const policy={view,present,categoryIcon,icon,legend,finderOnly,version:'status-clarity-1'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-1'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

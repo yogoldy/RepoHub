@@ -31,3 +31,22 @@ this work. Final-candidate native acceptance remains in
 
 First-launch tutorial and interactive failure investigation remain future work.
 The information page's tutorial content is not being implemented in this pass.
+
+
+## Step 2 — menu hierarchy
+
+Cards show identity, one category icon and a compact label. The selected panel
+leads with the active explanation, then evidence, observed progress and last
+created archive time. Schedule reads the existing effective per-repo policy and
+power source; it never fabricates an exact next-run time. Unknown/invalid inputs
+stay unavailable. Technical details preserve Finder exceptions, last hash/upload
+checks and archive size. Expansion survives polling and per-repo selection.
+Only actual current-archive upload activity receives a progress bar; pending,
+unknown, changed and failed states do not borrow another archive's progress.
+
+Step 2 validation: schedule-policy assertions, original status checks, report
+controller checks, workspace draft checks and cross-language diagnostics passed.
+Computer use verified live read-only status, technical expansion surviving polls,
+580×640 and 360×640 browser layouts with no horizontal overflow or headline
+clipping. These browser dimensions approximate the native footprint; they are
+not evidence of installed WebKit acceptance. Temporary viewport overrides reset.

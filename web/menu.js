@@ -1,5 +1,6 @@
 let observedMenuState=null,clientFreshness='current';
 let retryingRepo=null;
+const technicalOpen = new Set();
 const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
 let menuState=null,selectedId=null,sessionToken='',loading=false,lastResponseAt=0,settingsRevision='',settingsRepo=null,defaultsRevision='',settingsDefaults=null;
 const $=s=>document.querySelector(s);
@@ -33,8 +34,8 @@ function render(){
   const repos=menuState.repos||[];
   if(!repos.some(r=>r.id===selectedId))selectedId=repos[0]?.id||null;
   const ready=repos.filter(r=>view(r).ready).length;
-  const ignored=repos.filter(r=>view(r).phase==='background').length;
-  $('#summary').textContent=repos.length?(ignored?`${ready} fully matched · ${ignored} Finder-only · ${repos.length} repos`:`${ready} of ${repos.length} repos backed up`):'No repos found';
+  $('#summary').textContent = repos.length
+    ? `${ready} of ${repos.length} repos fully verified and uploaded` : 'No repos found';
   $('#backup').disabled=!!menuState.backup?.running;
   $('#backup').lastElementChild.textContent=menuState.backup?.running?'Backing up…':'Back up now';
   const problems=menuState.problems||[];
@@ -59,19 +60,71 @@ function render(){
   $('#checked').textContent='Live · Checked '+when(menuState.cloud_checked_at);
   for(const id of ['open-backups','notifications','quit']){$('#'+id).disabled=!window.webkit?.messageHandlers?.repoHub;if($('#'+id).disabled)$('#'+id).title='Available in the Mac menu-bar panel';}
 }
-function renderDetail(){
-  const repo=menuState.repos.find(r=>r.id===selectedId);if(!repo){$('#detail').innerHTML='<p class="empty">Select a repo to see its backup.</p>';return;}
-  const state=view(repo),cloud=repo.cloud||{},copying=state.phase==='copying',uploading=cloud.state==='uploading'||cloud.state==='pending';
-  const showProgress=repo.health?.fresh===true&&(copying||uploading),label=copying?'Building backup':state.percent===null?'Waiting for upload progress':state.percent===100?'100% · awaiting confirmation':percentLabel(state.percent);
-  const progress=showProgress?`<div class="progress-line"><progress max="100" ${!copying&&state.percent!==null?`value="${state.percent}"`:''} aria-label="${escape(repo.name)} ${copying?'backup':'upload'} progress"></progress><span>${escape(label)}</span></div>`:'';
-  const markup=`<div class="detail-top"><h2>${escape(repo.name)}</h2><span class="pill ${escape(state.phase)}">${escape(state.label)}</span></div><p class="detail-note" title="${escape(state.detail)}">${escape(state.headline)} ${escape(state.detail)}</p>${progress}${['changing','error'].includes(repo.verification?.state)?`<button id="retry-check" class="repo-schedule" ${retryingRepo===repo.id?'disabled':''}>${retryingRepo===repo.id?'Check requested…':'Retry check now'}</button>`:''}<div class="facts"><div class="fact"><small>Last backup saved</small>${when(repo.last_backup?.completed_at)}</div><div class="fact"><small>Hashes checked</small>${when(repo.verification?.checked_at)}</div><div class="fact"><small>Backup size</small>${bytes(repo.last_backup?.archive_bytes)}</div></div><button id="repo-schedule" class="repo-schedule" aria-label="Schedule for ${escape(repo.name)}">Schedule <span>${repo.schedule_override?'Custom':'Default'}</span><span aria-hidden="true">›</span></button>`;
-  if($('#detail').innerHTML!==markup)$('#detail').innerHTML=markup;
-  $('#repo-schedule').onclick=()=>openSettings(repo.id);
-  if($('#retry-check'))$('#retry-check').onclick=async()=>{
-    retryingRepo=repo.id;renderDetail();
-    try{sessionToken=(await api('/api/session')).token;await api('/api/retry-check',{repo_id:repo.id});$('#notice').textContent='Check requested for '+repo.name+'.';}
-    catch(e){$('#notice').textContent=e.message;}
-    finally{setTimeout(()=>{retryingRepo=null;void load();},1000);}
+function renderDetail() {
+  const repo = menuState.repos.find(row => row.id === selectedId);
+  if (!repo) {
+    $('#detail').innerHTML = '<p class="empty">Select a repo to see its backup.</p>';
+    return;
+  }
+  const state = view(repo);
+  const cloud = repo.cloud || {};
+  const copying = state.phase === 'copying';
+  const uploading = state.phase === 'uploading'
+    && cloud.archive === repo.last_backup?.archive;
+  const showProgress = repo.health?.fresh === true && (copying || uploading);
+  const progressLabel = copying ? 'Creating and verifying the archive'
+    : state.percent === null ? 'macOS has not supplied a percentage'
+    : state.percent === 100 ? '100% · waiting for completion confirmation' : percentLabel(state.percent);
+  const progress = showProgress ? `<div class="progress-line"><progress max="100"
+    ${!copying && state.percent !== null ? `value="${state.percent}"` : ''}
+    aria-label="${escape(repo.name)} ${copying ? 'backup' : 'upload'} progress"></progress>
+    <span>${escape(progressLabel)}</span></div>` : '';
+  const retry = ['changing', 'error'].includes(repo.verification?.state)
+    ? `<button id="retry-check" class="repo-schedule" ${retryingRepo === repo.id ? 'disabled' : ''}>
+      ${retryingRepo === repo.id ? 'Check requested…' : 'Retry check now'}</button>` : '';
+  const schedule = RepoStatus.describeSchedule(repo, menuState.power_source);
+  const markup = `
+    <p class="detail-context">${escape(repo.name)}</p>
+    <h2 class="status-headline" data-category="${state.category}">${escape(state.headline)}</h2>
+    <p class="status-explanation">${escape(state.detail)}</p>
+    ${progress}${retry}
+    <p class="last-backup"><span>Last backup created</span> ${when(repo.last_backup?.completed_at)}</p>
+    <button id="repo-schedule" class="repo-schedule" aria-label="Schedule for ${escape(repo.name)}">
+      <span class="schedule-copy"><strong>${escape(schedule.label)}</strong>
+        <small>${escape(schedule.detail)}</small></span><span aria-hidden="true">›</span>
+    </button>
+    <details id="technical-details" ${technicalOpen.has(repo.id) ? 'open' : ''}>
+      <summary id="technical-toggle">Technical details</summary>
+      <p>${escape(state.technicalDetail)}</p>
+      <div class="facts">
+        <div class="fact"><small>Hashes last checked</small>${when(repo.verification?.checked_at)}</div>
+        <div class="fact"><small>Upload last checked</small>${when(cloud.checked_at)}</div>
+        <div class="fact"><small>Archive size</small>${bytes(repo.last_backup?.archive_bytes)}</div>
+      </div>
+      ${repo.health?.fresh !== true ? `<p>${escape((repo.health?.reasons || ['Fresh evidence unavailable']).join(' · '))}</p>` : ''}
+    </details>`;
+  if ($('#detail').innerHTML !== markup) {
+    const focused = $('#detail').contains(document.activeElement) ? document.activeElement.id : null;
+    $('#detail').innerHTML = markup;
+    if (focused) document.getElementById(focused)?.focus({preventScroll: true});
+  }
+  $('#technical-details').ontoggle = () => {
+    if ($('#technical-details').open) technicalOpen.add(repo.id);
+    else technicalOpen.delete(repo.id);
+  };
+  $('#repo-schedule').onclick = () => openSettings(repo.id);
+  if ($('#retry-check')) $('#retry-check').onclick = async () => {
+    retryingRepo = repo.id;
+    renderDetail();
+    try {
+      sessionToken = (await api('/api/session')).token;
+      await api('/api/retry-check', {repo_id: repo.id});
+      $('#notice').textContent = 'Check requested for ' + repo.name + '.';
+    } catch (error) {
+      $('#notice').textContent = error.message;
+    } finally {
+      setTimeout(() => {retryingRepo = null; void load();}, 1000);
+    }
   };
 }
 function selectRepo(id){selectedId=id;render();}
