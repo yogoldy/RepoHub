@@ -1,5 +1,7 @@
 # Reliability acceptance checkpoint — 2026-10-10
 
+**Current integration amendment (2026-10-16):** [The one-time PR #6 exception](MAIN_INTEGRATION_EXCEPTION_2026-10-16.md) permits main integration before the still-open native validation below. This checkpoint remains historical evidence; merging does not make its pending cases pass or authorize deployment.
+
 ## Release state
 
 Implementation is on `codex/workspace-setup`; the five-goal acceptance pass is

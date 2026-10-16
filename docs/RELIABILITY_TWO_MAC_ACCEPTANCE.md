@@ -2,6 +2,8 @@
 
 This is the approved Air-first release protocol. No release acceptance is implied by the automated gate or harness preparation.
 
+**One-time PR #6 exception (2026-10-16):** Leo authorized code integration into main before native acceptance finishes. [The exception and validation backlog](MAIN_INTEGRATION_EXCEPTION_2026-10-16.md) supersede the main-merge timing below for this PR only. Deployment and release approval remain blocked on their required evidence.
+
 The fixed numbered matrix is [quality/reliability-matrix.json](quality/reliability-matrix.json). Run it unchanged on Air, then Pro, on the same Pro-built payload. Record each case as not_run, passed, failed or blocked in private evidence, with actual native UI observations, API snapshots, diagnostic references and protected-state checks. Any application fix produces a new candidate and restarts both host matrices.
 
 ## Guarded staging

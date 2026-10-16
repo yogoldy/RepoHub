@@ -51,6 +51,8 @@ When testing a candidate against the native app's fixed loopback port, fully sto
 
 ## Reliability candidate acceptance
 
+For PR #6 only, Leo authorized [a one-time integration exception](../MAIN_INTEGRATION_EXCEPTION_2026-10-16.md): passing protected automated checks permits main integration while the native validation backlog remains open. This does not authorize deployment or full release approval; the default requirements below continue to apply otherwise.
+
 [The five-goal checkpoint](../PRO_RELIABILITY_ACCEPTANCE.md) distinguishes passing
 automated/real disk-image checks from still-open native freshness, corrected
 simultaneous selection and isolated OS permission evidence. A gate pass cannot
