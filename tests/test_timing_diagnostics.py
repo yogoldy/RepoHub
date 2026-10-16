@@ -3,6 +3,7 @@ import copy
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from change_evidence import ChangeEvidence, presentation_text, timing_receipt
 from diagnostics import DiagnosticLog, read_events
@@ -61,6 +62,48 @@ class TimingDiagnosticTests(unittest.TestCase):
         self.assertEqual(original, self.evidence.snapshots[first['observation_id']])
         self.repo['schedule_evidence']['due_in_seconds'] = 120
         self.assertNotEqual(first['observation_id'], self.payload()['observation_id'])
+
+    def test_actual_javascript_timing_matches_original_receipts(self):
+        root = Path(__file__).resolve().parents[1]
+        cases = []
+        for state in ['scheduled', 'due', 'busy', 'manual', 'unavailable', 'awaiting_edits', 'blocked']:
+            row = copy.deepcopy(self.repo)
+            row['schedule_evidence']['state'] = state
+            cases.append((row, {}, 'current'))
+        for state in ['cloud_confirmed', 'local', 'none', 'unavailable']:
+            row = copy.deepcopy(self.repo)
+            row['backup_location']['state'] = state
+            cases.append((row, {}, 'current'))
+        for counts in [{'repo_files': 1, 'git_data': 0, 'finder_metadata': 0},
+                       {'repo_files': 0, 'git_data': 1, 'finder_metadata': 0},
+                       {'repo_files': 0, 'git_data': 1, 'finder_metadata': 1},
+                       {'repo_files': 0, 'git_data': 0, 'finder_metadata': 1}, {'git_data': 1}]:
+            row = copy.deepcopy(self.repo)
+            row['needs_backup'] = True
+            row['verification'].update(state='different', changes={'counts': counts})
+            cases.append((row, {}, 'current'))
+            error = copy.deepcopy(row)
+            error['cloud']['state'] = 'error'
+            cases.append((error, {}, 'current'))
+        cases.extend([(self.repo, {'running': True, 'current_repo_id': 'private-id'}, 'current'),
+                      (self.repo, {}, 'cache_expired')])
+        stale = copy.deepcopy(self.repo)
+        stale['health']['fresh'] = False
+        cases.append((stale, {}, 'current'))
+        for repo, backup, freshness in cases:
+            with self.subTest(state=repo['schedule_evidence']['state'], backup=backup, freshness=freshness):
+                observation = self.evidence.observe_status({'repos': [repo], 'backup': backup})
+                facts = self.evidence.snapshots[observation]['private-id']
+                script = "const p=require('./web/repo-status.js');const i=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(JSON.stringify(p.timing(i.repo,i.backup,i.freshness)));"
+                actual = json.loads(subprocess.check_output(['node', '-e', script], cwd=root, text=True,
+                    input=json.dumps({'repo': repo, 'backup': backup, 'freshness': freshness})))
+                self.assertEqual(actual['receipt'], timing_receipt(facts, freshness))
+                if freshness != 'current':
+                    self.assertNotIn('confirmed in iCloud', actual['lastLine'])
+                    self.assertEqual(actual['nextLine'], 'Next check time unavailable.')
+                if repo['backup_location']['state'] == 'cloud_confirmed' and freshness == 'current':
+                    self.assertIn('Created', actual['lastLine'])
+                    self.assertNotIn('uploaded at', actual['lastLine'])
 
     def test_new_exports_are_bounded_and_exclude_private_calendar_evidence(self):
         self.evidence.presentation(self.payload())

@@ -251,3 +251,19 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 .repo-card {
   height: 156px;
 }
+
+
+/* Dates describe a saved archive; the next line describes scheduler eligibility. */
+.backup-timing {
+  margin: 14px 0;
+}
+.backup-timing p {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  margin: 7px 0;
+}
+.backup-timing .backup-inclusion {
+  font-size: 13px;
+}

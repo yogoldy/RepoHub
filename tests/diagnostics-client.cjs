@@ -42,5 +42,16 @@ const {create,displayState}=require('../web/diagnostics-client.js');
   release();await inFlight;
   await concurrent.observe(backend,rows,'current');
   assert.deepEqual(frames.map(frame=>frame.client_freshness),['response_timeout','cache_expired','current']);
+  globalThis.RepoStatus = {version: 'status-clarity-4'};
+  const timingFrames = [];
+  const timingClient = create('menu', {clientId: 'd'.repeat(24), fetcher: async (url, options = {}) => {
+    if (url === '/api/session') return {ok: true, json: async () => ({token: 'test'})};
+    timingFrames.push(JSON.parse(options.body));
+    return {ok: true};
+  }});
+  await timingClient.observe(backend, rows, 'current', 'known');
+  assert.equal(timingFrames[0].selected_repo_id, 'known');
+  assert.equal(timingFrames[0].policy_version, 'status-clarity-4');
+  delete globalThis.RepoStatus;
   console.log('Diagnostic delivery checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

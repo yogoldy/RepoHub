@@ -224,3 +224,24 @@ timing diagnostic/privacy/selection/correlation tests, nine export tests and
 four forecast tests passed. Critical new tests are registered in Golden Gate
 GR06/GR07/GR09. The workflow already discovers them, so YAML is unchanged.
 The UI will opt into version 4 in the next stage. No deployment.
+
+
+## Timing goal stage 4 — evidence-driven menu lines
+
+The menu renders larger white local-creation/cloud-confirmation and next-due
+lines with short due/busy/manual/blocked/unavailable variants. Cloud confirmation
+still refers to the saved archive, not newer project edits; the accompanying
+date is creation, not upload finish. Inclusion sentences require complete fresh
+current-archive comparisons. Client timeout/cache failure suppresses cloud/time
+claims. Source/hash staleness suppresses schedule claims while an independently
+fresh saved-archive cloud receipt can remain visible. Countdown minutes refresh
+with helper polls instead of inventing a second scheduler in the browser.
+
+Only the selected repo's actually rendered receipt enters version 4 diagnostics;
+nonselected cards do not claim secondary-line visibility. The standalone page
+still reports primary states and does not claim timing-line coverage. Legacy
+helpers without new evidence display unavailable rather than inferred dates.
+Cross-language tests cover state/location variants, all inclusion categories,
+errors, stale clients and active backups. Delivery tests verify selected identity.
+No daily state or installed assets are changed by this commit. Final browser and
+clean macOS Golden Gate evidence is recorded in the following acceptance stage.

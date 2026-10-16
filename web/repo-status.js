@@ -139,6 +139,81 @@
     return {...original, category, label, headline, detail, technicalDetail: original.phase === 'changed' ? detail : original.detail};
   }
 
+  function timing(repo, backup = {}, freshness = 'current') {
+    const schedule = repo.schedule_evidence || {};
+    const location = repo.backup_location || {};
+    const receipt = {
+      schedule_state: schedule.state || 'unavailable',
+      timing_reason: schedule.reason || 'power_unknown',
+      location_state: location.state || 'unavailable',
+      created_at: location.created_at || null,
+      due_at: schedule.due_at || null,
+      remaining_minutes: Number.isFinite(schedule.due_in_seconds)
+        && schedule.due_in_seconds >= 0 && schedule.due_in_seconds <= 86400
+        ? Math.ceil(schedule.due_in_seconds / 60) : null,
+      inclusion_state: 'none',
+    };
+    const copying = !!backup.running && ('current_repo_id' in backup
+      ? backup.current_repo_id === repo.id : backup.current_repo === repo.name);
+    if (copying) Object.assign(receipt, {
+      schedule_state: 'creating', timing_reason: 'active_backup', due_at: null, remaining_minutes: null,
+    });
+    if (repo.health?.fresh !== true) Object.assign(receipt, {
+      schedule_state: 'unavailable', timing_reason: 'checks_unavailable', due_at: null, remaining_minutes: null,
+    });
+    if (freshness !== 'current') Object.assign(receipt, {
+      schedule_state: 'unavailable', timing_reason: 'checks_unavailable', due_at: null,
+      remaining_minutes: null, location_state: 'unavailable', created_at: null,
+    });
+    const verification = repo.verification || {};
+    const counts = verification.changes?.counts;
+    const complete = counts && ['repo_files', 'git_data', 'finder_metadata'].every(
+      key => Number.isInteger(counts[key]) && counts[key] >= 0);
+    const phase = view(repo, backup).phase;
+    if (freshness === 'current' && repo.health?.fresh === true && phase === 'changed'
+        && repo.needs_backup && repo.last_backup?.archive && complete
+        && verification.state === 'different' && verification.archive === repo.last_backup.archive) {
+      if (counts.repo_files > 0) receipt.inclusion_state = 'confirmed_changes';
+      else if (counts.git_data > 0) receipt.inclusion_state = counts.finder_metadata > 0 ? 'git_metadata' : 'git_data';
+      else if (counts.finder_metadata > 0) receipt.inclusion_state = 'metadata';
+    }
+    const formatDate = value => new Date(value).toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+    let lastLine = 'Backup location unavailable.';
+    if (receipt.location_state === 'none') lastLine = 'No backup created yet.';
+    else if (receipt.created_at && Number.isFinite(Date.parse(receipt.created_at))) {
+      if (receipt.location_state === 'cloud_confirmed') {
+        lastLine = 'Latest backup confirmed in iCloud · Created ' + formatDate(receipt.created_at);
+      } else if (receipt.location_state === 'local') {
+        lastLine = 'Last backup created locally: ' + formatDate(receipt.created_at);
+      }
+    }
+    const nextLabels = {
+      due: 'Next scheduled check: due now.',
+      busy: 'Check due · waiting for current backup.',
+      manual: 'Next backup: manual only.',
+      awaiting_edits: 'Next backup: after edits settle.',
+      blocked: 'Next backup: source needs attention.',
+      creating: 'Backup in progress.',
+      unavailable: 'Next check time unavailable.',
+    };
+    let nextLine = nextLabels[receipt.schedule_state] || nextLabels.unavailable;
+    if (receipt.schedule_state === 'scheduled' && receipt.due_at && Number.isFinite(Date.parse(receipt.due_at))) {
+      nextLine = 'Next scheduled check due: ' + formatDate(receipt.due_at);
+      if (receipt.remaining_minutes !== null) nextLine += ' · in ' + receipt.remaining_minutes + ' min';
+    }
+    const inclusionLabels = {
+      none: '', confirmed_changes: 'The next backup will include the confirmed changes.',
+      git_data: 'The next backup will include the changed Git data.',
+      metadata: 'The next backup will include the changed file metadata.',
+      git_metadata: 'The next backup will include the changed Git data and file metadata.',
+    };
+    let inclusionLine = inclusionLabels[receipt.inclusion_state];
+    if (freshness === 'current' && phase === 'background') inclusionLine = 'No new backup needed.';
+    return {receipt, lastLine, nextLine, inclusionLine};
+  }
+
   function describeSchedule(repo, power) {
     const policy = repo.backup_settings?.[power];
     const scope = repo.schedule_override ? 'Custom schedule' : 'Default schedule';
@@ -212,5 +287,5 @@
         <h4>${group.title}</h4></div><p class="guide-labels">${group.labels}</p>
       <p>${group.explanation}</p><p class="guide-note">${group.note}</p></section>`).join('');
   }
-  const policy={view,present,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-3'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,timing,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-4'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

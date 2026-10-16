@@ -129,7 +129,8 @@
         "test_status_clarity.ClarityTests.test_wrong_category_sentence_and_false_green_are_detected",
         "test_status_clarity.ClarityTests.test_only_labels_require_complete_current_comparison",
         "test_backup_timing.TimingTests.test_cloud_location_requires_same_archive_fresh_observation_and_valid_creation",
-        "test_timing_diagnostics.TimingDiagnosticTests.test_secondary_receipts_detect_wrong_date_location_and_countdown"
+        "test_timing_diagnostics.TimingDiagnosticTests.test_secondary_receipts_detect_wrong_date_location_and_countdown",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_actual_javascript_timing_matches_original_receipts"
       ],
       "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },

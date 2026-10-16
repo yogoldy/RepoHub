@@ -53,7 +53,15 @@ function render(){
   const oldIds=[...existing.keys()].join('|'),newIds=repos.map(r=>r.id).join('|');
   if(oldIds!==newIds||!repos.length){const offset=rail.scrollLeft;rail.replaceChildren(...buttons);rail.scrollLeft=offset;if(!repos.length)rail.innerHTML='<p class="empty">Repos will appear here when added to your repos folder.</p>';}
   renderDetail();updatePosition();
-  void diagnosticView.observe(observedMenuState,[...rail.querySelectorAll('.repo-card')].map(button=>({repo_id:button.dataset.repoId,phase:button.className.split(' ')[1],display_label:button.querySelector('.card-status').textContent.split(' · ')[0],ready:button.classList.contains('ready'),category:button.dataset.category,display_headline:button.dataset.headline})),clientFreshness);
+  const displayedRows = [...rail.querySelectorAll('.repo-card')].map(button => {
+    const row = {repo_id: button.dataset.repoId, phase: button.className.split(' ')[1],
+      display_label: button.querySelector('.card-status').textContent.split(' · ')[0],
+      ready: button.classList.contains('ready'), category: button.dataset.category,
+      display_headline: button.dataset.headline};
+    if (row.repo_id === selectedId) row.timing = JSON.parse($('#backup-timing').dataset.receipt);
+    return row;
+  });
+  void diagnosticView.observe(observedMenuState, displayedRows, clientFreshness, selectedId);
   const notifications=menuState.notifications||{},enabled=notifications.enabled===true;
   $('#notifications').setAttribute('aria-pressed',String(enabled));
   $('#notification-caption').textContent=notifications.permission==='denied'?'macOS permission needed':enabled?'On':'Off';
@@ -83,12 +91,17 @@ function renderDetail() {
     ? `<button id="retry-check" class="repo-schedule" ${retryingRepo === repo.id ? 'disabled' : ''}>
       ${retryingRepo === repo.id ? 'Check requested…' : 'Retry check now'}</button>` : '';
   const schedule = RepoStatus.describeSchedule(repo, menuState.power_source);
+  const timing = RepoStatus.timing(repo, menuState.backup, clientFreshness);
   const markup = `
     <p class="detail-context">${escape(repo.name)}</p>
     <h2 class="status-headline" data-category="${state.category}">${escape(state.headline)}</h2>
     <p class="status-explanation" data-category="${state.category}">${escape(state.detail)}</p>
     ${progress}${retry}
-    <p class="last-backup"><span>Last backup created</span> ${when(repo.last_backup?.completed_at)}</p>
+    <div id="backup-timing" class="backup-timing" data-receipt="${escape(JSON.stringify(timing.receipt))}">
+      <p class="last-backup">${escape(timing.lastLine)}</p>
+      <p class="next-backup">${escape(timing.nextLine)}</p>
+      ${timing.inclusionLine ? `<p class="backup-inclusion">${escape(timing.inclusionLine)}</p>` : ''}
+    </div>
     <button id="repo-schedule" class="repo-schedule" aria-label="Schedule for ${escape(repo.name)}">
       <span class="schedule-copy"><strong>${escape(schedule.label)}</strong>
         <small>${escape(schedule.detail)}</small></span><span aria-hidden="true">›</span>

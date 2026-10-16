@@ -114,6 +114,7 @@ def timing_receipt(facts, freshness='current'):
                       remaining_minutes=None, location_state='unavailable', created_at=None)
     counts = facts['counts']
     confirmed = (freshness == 'current' and facts['fresh'] and not facts['has_error'] and facts['needs_backup']
+                 and facts['cloud_state'] != 'error'
                  and facts['has_backup'] and facts['archive_ref'] and facts['counts_complete']
                  and facts['verification_state'] == 'different'
                  and facts['verification_archive_ref'] == facts['archive_ref'])
