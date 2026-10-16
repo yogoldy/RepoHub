@@ -530,3 +530,19 @@ the guide body prevents that second failure. Browser keyboard-to-bottom evidence
 kept the outer dialog at scroll zero. Native WebKit scrolling, narrow-window
 wrapping and keyboard/Escape remain release acceptance checks; this browser
 result does not close that backlog.
+
+
+## Timing evidence must agree without destroying observation identity
+
+Secondary location/due/date/countdown claims now have independent selected-repo
+receipts. Private date strings are compared against the original observation;
+only fixed codes and bounded whole minutes enter logs/exports. Unknown types,
+missing selected receipts and arbitrary dates fail closed. GR06/GR07/GR09 name
+the new regressions. Existing CI test discovery needs no YAML modification.
+
+A first implementation included each poll's observed_at in snapshot identity,
+breaking cross-view correlation even when meaningful evidence was unchanged.
+Drop that sampling field and bucket remaining time to displayed whole minutes
+for identity; retain original snapshots unchanged. Periodic due dates use the
+saved wall-clock anchor directly, avoiding floating subtraction drift.
+Native countdown readability and actual sleep/power behavior remain unproven.

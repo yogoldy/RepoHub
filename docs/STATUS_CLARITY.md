@@ -206,3 +206,21 @@ Four new timing tests (including a broad eligibility boundary matrix) and all
 33 existing policy/health tests passed. No schedule files are written by the
 projection; tests assert scheduler state remains unchanged. The interface does
 not consume these fields until the later UI commit. No deployment performed.
+
+
+## Timing goal stage 3 — independent secondary receipts and release rules
+
+Version 4 menu clients must identify the selected repo and provide its secondary
+receipt. The helper compares location, creation date, due date, reason, countdown
+minute and inclusion meaning to its original snapshot. A wrong receipt emits
+timing_disagreement. Raw dates are not logged; exports accept only specific code
+enums and 0–1440 whole remaining minutes. Old presentation versions remain valid.
+
+Equivalent polls share an observation within the same displayed-minute bucket;
+observed_at is not backend evidence and does not change identity. Original
+snapshots remain immutable. A cross-view regression caught and corrected an
+initial violation of this rule. Nine existing change-evidence tests, the new
+timing diagnostic/privacy/selection/correlation tests, nine export tests and
+four forecast tests passed. Critical new tests are registered in Golden Gate
+GR06/GR07/GR09. The workflow already discovers them, so YAML is unchanged.
+The UI will opt into version 4 in the next stage. No deployment.

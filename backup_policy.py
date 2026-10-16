@@ -144,8 +144,11 @@ def project_schedule(scheduler, settings, source, row, wall_now, monotonic_now,
     if selected and selected.get("periodic_keys"):
         due, reason = next(candidate for candidate in candidates if candidate[1] == "periodic")
     eligible = selected is not None
+    wall_due = wall_now + due - monotonic_now
+    if reason == "periodic":
+        anchor = repo_periodic_at.get(row["id"], last_periodic_at)
+        wall_due = max(anchor, wall_now) + frequency if anchor > wall_now else anchor + frequency
     result.update(state=("busy" if busy else "due") if eligible else "scheduled",
-                  reason=reason, due_at=datetime.fromtimestamp(
-                      wall_now + due - monotonic_now, timezone.utc).isoformat(),
+                  reason=reason, due_at=datetime.fromtimestamp(wall_due, timezone.utc).isoformat(),
                   due_in_seconds=max(0, math.ceil(due - monotonic_now)))
     return result

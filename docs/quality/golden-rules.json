@@ -117,7 +117,7 @@
         "upload_stale"
       ],
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
-      "required_behavior": "Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement.",
+      "required_behavior": "Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics.",
       "test_ids": [
         "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
         "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
@@ -126,7 +126,10 @@
         "test_change_evidence.EvidenceTests.test_both_views_are_correlated_and_disagreement_is_reported",
         "test_change_evidence.EvidenceTests.test_client_freshness_override_preserves_backend_and_detects_false_green",
         "test_status_clarity.ClarityTests.test_actual_js_mapping_preserves_policy_and_matches_evidence",
-        "test_status_clarity.ClarityTests.test_wrong_category_sentence_and_false_green_are_detected"
+        "test_status_clarity.ClarityTests.test_wrong_category_sentence_and_false_green_are_detected",
+        "test_status_clarity.ClarityTests.test_only_labels_require_complete_current_comparison",
+        "test_backup_timing.TimingTests.test_cloud_location_requires_same_archive_fresh_observation_and_valid_creation",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_secondary_receipts_detect_wrong_date_location_and_countdown"
       ],
       "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },
@@ -147,7 +150,10 @@
         "test_policy_health.SettingsHTTPTests.test_after_edit_plan_only_archives_selected_repo",
         "test_policy_health.SettingsHTTPTests.test_power_change_finishes_current_archive_and_stops_next_repo",
         "test_policy_health.SettingsHTTPTests.test_partial_automatic_run_does_not_advance_unattempted_repo_clock",
-        "test_policy_health.SettingsHTTPTests.test_repo_cadence_survives_restart_and_only_backs_up_due_repo"
+        "test_policy_health.SettingsHTTPTests.test_repo_cadence_survives_restart_and_only_backs_up_due_repo",
+        "test_backup_timing.TimingTests.test_projection_matches_actual_eligibility_and_does_not_mutate",
+        "test_backup_timing.TimingTests.test_overrides_retry_busy_and_unobserved_edits",
+        "test_backup_timing.TimingTests.test_saved_cadence_manual_reset_and_power_are_respected"
       ],
       "remaining_gap": "Physical battery transitions, full sleep/wake and logout/login cycles still require hardware smoke tests."
     },
@@ -190,7 +196,9 @@
         "test_diagnostic_export.ExportTests.test_adversarial_types_and_huge_numbers_do_not_escape_or_crash",
         "test_diagnostic_export.ExportTests.test_namespaces_are_fresh_and_relative_order_preserved",
         "test_report_preview.ReportPreviewTests.test_bug_has_exact_share_files_and_private_local_draft",
-        "test_status_clarity.ClarityTests.test_new_export_fields_are_typed_and_never_copy_exception_prose"
+        "test_status_clarity.ClarityTests.test_new_export_fields_are_typed_and_never_copy_exception_prose",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_new_exports_are_bounded_and_exclude_private_calendar_evidence",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_malformed_or_missing_selected_timing_receipts_fail_closed"
       ],
       "remaining_gap": "Operational patterns remain bounded facts. User-written report prose is separate; a preview and confidentiality reminder cannot guarantee it contains no personal information."
     },

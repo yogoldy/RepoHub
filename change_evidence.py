@@ -2,6 +2,8 @@
 from collections import OrderedDict
 import hashlib
 import json
+import math
+from datetime import datetime
 from pathlib import Path
 import threading
 from diagnostics import diagnostic_ref
@@ -64,7 +66,7 @@ def presentation_text(facts, phase, version='status-clarity-1'):
                 code = 'git_finder' if counts['finder_metadata'] > 0 else 'git'
             elif counts['finder_metadata'] > 0:
                 code = 'finder_pending'
-    if version == 'status-clarity-3':
+    if version in {'status-clarity-3', 'status-clarity-4'}:
         if phase == 'background':
             code = 'view_settings'
         elif phase == 'changed' and facts['has_backup']:
@@ -78,6 +80,73 @@ def presentation_text(facts, phase, version='status-clarity-1'):
                 code = ('git_metadata' if counts['finder_metadata'] else 'git') if counts['git_data'] else 'metadata'
     category, label, headline = PRESENTATION_TEXT.get(code, PRESENTATION_TEXT['unknown'])
     return {'category': category, 'display_label': label, 'display_headline': headline}
+
+
+TIMING_STATES = {'scheduled', 'due', 'busy', 'manual', 'unavailable', 'awaiting_edits', 'blocked', 'creating'}
+TIMING_REASONS = {'periodic', 'edits', 'manual', 'power_unknown', 'awaiting_edits', 'blocked', 'checks_unavailable', 'active_backup'}
+LOCATION_STATES = {'cloud_confirmed', 'local', 'none', 'unavailable'}
+INCLUSION_STATES = {'none', 'confirmed_changes', 'git_data', 'metadata', 'git_metadata'}
+TIMING_FIELDS = {'schedule_state', 'timing_reason', 'location_state', 'created_at', 'due_at', 'remaining_minutes', 'inclusion_state'}
+
+
+def timing_receipt(facts, freshness='current'):
+    """Expected secondary-line meaning from the immutable observed projection.
+
+    Exact dates stay in memory for comparison only; emitted diagnostics use
+    fixed codes and bounded relative minutes, never dates or arbitrary prose.
+    """
+    schedule = facts.get('schedule_evidence') or {}
+    location = facts.get('backup_location') or {}
+    result = {'schedule_state': schedule.get('state', 'unavailable'),
+              'timing_reason': schedule.get('reason', 'power_unknown'),
+              'location_state': location.get('state', 'unavailable'),
+              'created_at': location.get('created_at'), 'due_at': schedule.get('due_at'),
+              'remaining_minutes': None, 'inclusion_state': 'none'}
+    seconds = schedule.get('due_in_seconds')
+    if type(seconds) in (int, float) and math.isfinite(seconds) and 0 <= seconds <= 86400:
+        result['remaining_minutes'] = math.ceil(seconds / 60)
+    if facts['copying']:
+        result.update(schedule_state='creating', timing_reason='active_backup', due_at=None, remaining_minutes=None)
+    if not facts['fresh']:
+        result.update(schedule_state='unavailable', timing_reason='checks_unavailable', due_at=None, remaining_minutes=None)
+    if freshness != 'current':
+        result.update(schedule_state='unavailable', timing_reason='checks_unavailable', due_at=None,
+                      remaining_minutes=None, location_state='unavailable', created_at=None)
+    counts = facts['counts']
+    confirmed = (freshness == 'current' and facts['fresh'] and not facts['has_error'] and facts['needs_backup']
+                 and facts['has_backup'] and facts['archive_ref'] and facts['counts_complete']
+                 and facts['verification_state'] == 'different'
+                 and facts['verification_archive_ref'] == facts['archive_ref'])
+    if confirmed and not facts['copying']:
+        if counts['repo_files']:
+            result['inclusion_state'] = 'confirmed_changes'
+        elif counts['git_data']:
+            result['inclusion_state'] = 'git_metadata' if counts['finder_metadata'] else 'git_data'
+        elif counts['finder_metadata']:
+            result['inclusion_state'] = 'metadata'
+    return result
+
+
+def validate_timing(row):
+    if not isinstance(row, dict) or set(row) != TIMING_FIELDS:
+        raise ValueError('Invalid timing receipt fields')
+    for field, allowed in [('schedule_state', TIMING_STATES), ('timing_reason', TIMING_REASONS),
+                           ('location_state', LOCATION_STATES), ('inclusion_state', INCLUSION_STATES)]:
+        if not isinstance(row[field], str) or row[field] not in allowed:
+            raise ValueError('Invalid timing code')
+    minutes = row['remaining_minutes']
+    if minutes is not None and (type(minutes) is not int or not 0 <= minutes <= 1440):
+        raise ValueError('Invalid relative timing')
+    for field in ('created_at', 'due_at'):
+        value = row[field]
+        if value is not None:
+            if not isinstance(value, str) or len(value) > 64:
+                raise ValueError('Invalid timing date')
+            try:
+                if datetime.fromisoformat(value).tzinfo is None:
+                    raise ValueError('Missing timing timezone')
+            except ValueError:
+                raise ValueError('Invalid timing date') from None
 
 
 def repo_facts(row):
@@ -213,6 +282,12 @@ class ChangeEvidence:
             raw_counts = verification.get('changes', {}).get('counts', {})
             counts_complete = all(type(raw_counts.get(kind)) is int and raw_counts[kind] >= 0
                                   for kind in ('finder_metadata', 'git_data', 'repo_files'))
+            schedule_evidence = json.loads(json.dumps(row.get('schedule_evidence', {})))
+            schedule_evidence.pop('observed_at', None)
+            seconds = schedule_evidence.get('due_in_seconds')
+            if type(seconds) in (int, float) and math.isfinite(seconds) and 0 <= seconds <= 86400:
+                # Receipts display whole remaining minutes; sub-minute polling is not new evidence.
+                schedule_evidence['due_in_seconds'] = math.ceil(seconds / 60) * 60
             projection[row['id']] = {**repo_facts(row), 'counts_complete': counts_complete,
                 'change_reason': change_reason(row, repo_facts(row)),
                 'active_run_id': backup.get('run_id') if copying else None,
@@ -226,7 +301,9 @@ class ChangeEvidence:
                 'percent': cloud.get('percent'), 'has_error': bool(row.get('error') or verification.get('error') or any(
                     (error.get('repo_id') == row['id'] if 'repo_id' in error else error.get('repo') == row['name'])
                     and error.get('error') for error in backup.get('errors', []))),
-                'copying': copying}
+                'copying': copying,
+                'schedule_evidence': schedule_evidence,
+                'backup_location': json.loads(json.dumps(row.get('backup_location', {})))}
         identity = hashlib.sha256(json.dumps(projection, sort_keys=True, separators=(',', ':')).encode()).hexdigest()[:24]
         with self.lock:
             if identity not in self.snapshots:
@@ -250,13 +327,13 @@ class ChangeEvidence:
 
     def presentation(self, payload):
         import re
-        if not isinstance(payload, dict) or set(payload) not in ({'surface', 'native', 'client_id', 'observation_id', 'policy_version', 'rows'}, {'surface', 'native', 'client_id', 'observation_id', 'policy_version', 'rows', 'client_freshness'}):
+        if not isinstance(payload, dict) or set(payload) not in ({'surface', 'native', 'client_id', 'observation_id', 'policy_version', 'rows'}, {'surface', 'native', 'client_id', 'observation_id', 'policy_version', 'rows', 'client_freshness'}, {'surface', 'native', 'client_id', 'observation_id', 'policy_version', 'rows', 'client_freshness', 'selected_repo_id'}):
             raise ValueError('Invalid presentation diagnostic fields')
         if (not isinstance(payload['surface'], str) or payload['surface'] not in {'menu', 'app'} or type(payload['native']) is not bool
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
                 or not isinstance(payload['policy_version'], str)
-                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3'}
+                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4'}
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
         freshness = payload.get('client_freshness', 'current')
@@ -267,13 +344,21 @@ class ChangeEvidence:
             if snapshot is None:
                 raise FileExistsError('Observed status expired; request fresh status')
             rows = payload['rows']
-            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3'}
+            timing_frame = payload['policy_version'] == 'status-clarity-4' and payload['surface'] == 'menu'
+            selected = payload.get('selected_repo_id')
+            if timing_frame and (not isinstance(selected, str) or selected not in snapshot):
+                if snapshot or selected is not None:
+                    raise ValueError('Invalid selected timing repo')
+            if not timing_frame and 'selected_repo_id' in payload:
+                raise ValueError('Unexpected timing selection')
+            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4'}
             row_fields = {'repo_id', 'phase', 'display_label', 'ready'}
             if modern:
                 row_fields |= {'category', 'display_headline'}
             labels = LABELS | {value[1] for value in PRESENTATION_TEXT.values()}
             for row in rows:
-                if (not isinstance(row, dict) or set(row) != row_fields
+                expected_fields = row_fields | ({'timing'} if timing_frame and isinstance(row, dict) and row.get('repo_id') == selected else set())
+                if (not isinstance(row, dict) or set(row) != expected_fields
                         or not isinstance(row['repo_id'], str) or row['repo_id'] not in snapshot
                         or not isinstance(row['phase'], str) or row['phase'] not in PHASES
                         or not isinstance(row['display_label'], str) or row['display_label'] not in labels or type(row['ready']) is not bool):
@@ -283,6 +368,8 @@ class ChangeEvidence:
                                or not isinstance(row['display_headline'], str)
                                or row['display_headline'] not in {value[2] for value in PRESENTATION_TEXT.values()}):
                     raise ValueError('Invalid presentation text')
+                if 'timing' in row:
+                    validate_timing(row['timing'])
             if len(rows) != len(snapshot) or len({r['repo_id'] for r in rows}) != len(snapshot):
                 raise ValueError('Presentation must describe the observed repo list')
             client, observation = payload['client_id'], payload['observation_id']
@@ -293,7 +380,7 @@ class ChangeEvidence:
             displays = self.displays.setdefault(observation, {})
             for row in rows:
                 key = row['repo_id']
-                signature = (observation, freshness, payload['policy_version'], row['phase'], row['display_label'], row['ready'], row.get('category'), row.get('display_headline'))
+                signature = (observation, freshness, payload['policy_version'], row['phase'], row['display_label'], row['ready'], row.get('category'), row.get('display_headline'), json.dumps(row.get('timing'), sort_keys=True))
                 current[key] = signature
                 repo_ref = snapshot[key]['repo_ref']
                 if previous.get(key) != signature:
@@ -314,6 +401,18 @@ class ChangeEvidence:
                                   client_freshness=freshness, **text_fields, phase=row['phase'], display_label=row['display_label'], result='ready' if row['ready'] else 'not_ready',
                                   run_id=snapshot[key]['active_run_id'] or snapshot[key]['run_id'], archive_ref=snapshot[key]['archive_ref'],
                                   reason=reason)
+                if 'timing' in row and previous.get(key) != signature:
+                    expected_timing = timing_receipt(snapshot[key], freshness)
+                    timing_good = row['timing'] == expected_timing
+                    safe_fields = {field: row['timing'][field] for field in
+                                   ('schedule_state', 'timing_reason', 'location_state', 'remaining_minutes', 'inclusion_state')}
+                    self.log.emit('ui_timing', repo_ref=repo_ref, observation_id=observation,
+                                  client_id=client, surface=payload['surface'], native=payload['native'],
+                                  policy_version=payload['policy_version'], client_freshness=freshness,
+                                  result='complete' if timing_good else 'failed', **safe_fields)
+                    if not timing_good:
+                        self.log.emit('timing_disagreement', severity='warning', repo_ref=repo_ref,
+                                      observation_id=observation, result='failed', **safe_fields)
                 peers = displays.setdefault(key, {})
                 view = (payload['surface'], payload['native'], freshness, payload['policy_version'])
                 rendered = (row['phase'], row['display_label'], row['ready'], row.get('category'), row.get('display_headline'))
