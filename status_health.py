@@ -76,3 +76,17 @@ class ProblemTracker:
             if now - item["since"] >= delay:
                 issues.append({"id": item["id"], "name": name, "detail": detail})
         return issues
+
+
+def backup_location(row, now, cloud_limit):
+    """Describe the saved archive, independently of newer source changes."""
+    backup = row.get("last_backup") or {}
+    if not backup:
+        return {"state": "none", "created_at": None}
+    created = backup.get("completed_at")
+    if not backup.get("archive") or not backup.get("sha256") or age(created, now) == float("inf"):
+        return {"state": "unavailable", "created_at": None}
+    cloud = row.get("cloud") or {}
+    uploaded = (cloud.get("state") == "uploaded" and cloud.get("archive") == backup["archive"]
+                and age(cloud.get("checked_at"), now) <= cloud_limit)
+    return {"state": "cloud_confirmed" if uploaded else "local", "created_at": created}

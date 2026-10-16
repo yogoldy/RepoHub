@@ -189,3 +189,20 @@ Stage validation: original menu status/schedule/guide assertions, six clarity
 regressions (including unsupported-match prose) and scoped metadata backup
 safety tests. No installation. Leo’s event-state versus displayed-UI review
 remains a required follow-up after the combined implementation is validated.
+
+
+## Timing goal stage 2 — helper evidence
+
+public_status now supplies per-repo schedule_evidence and backup_location.
+The forecast copies scheduler state, restores the same saved wall-clock cadence
+used by automatic_tick, and queries the unchanged plan for current eligibility.
+Future due times use periodic anchors or quiet/retry eligibility; periodic
+precedence is preserved when both are already due. Busy is distinct from running.
+Location describes the saved archive, independently of newer source edits; cloud
+confirmation needs its exact archive and a valid fresh cloud observation. The
+displayed timestamp remains archive creation, never inferred upload completion.
+
+Four new timing tests (including a broad eligibility boundary matrix) and all
+33 existing policy/health tests passed. No schedule files are written by the
+projection; tests assert scheduler state remains unchanged. The interface does
+not consume these fields until the later UI commit. No deployment performed.

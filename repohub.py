@@ -20,8 +20,8 @@ import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
-from backup_policy import BackupScheduler, default_settings, validate_settings, power_source
-from status_health import annotate_health, ProblemTracker, age
+from backup_policy import BackupScheduler, default_settings, validate_settings, power_source, project_schedule
+from status_health import annotate_health, ProblemTracker, age, backup_location
 from diagnostics import DiagnosticLog, diagnostic_ref
 from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
@@ -616,9 +616,16 @@ class Hub:
             result["views"] = self.views
             result["notifications"] = load_json(self.state_dir / "notifications.json", {"permission": "unknown"})
             result["settings"] = self.settings
+            wall_now, monotonic_now = time.time(), time.monotonic()
             for row in result["repos"]:
                 row["schedule_override"] = row["id"] in self.repo_settings
                 row["backup_settings"] = self.repo_settings.get(row["id"], self.settings)
+                row["schedule_evidence"] = project_schedule(
+                    self.scheduler, self.settings, self.power, row, wall_now, monotonic_now,
+                    self.last_periodic_at, self.repo_periodic_at,
+                    busy=self.backup_lock.locked(), overrides=self.repo_settings)
+                row["backup_location"] = backup_location(
+                    row, wall_now, max(45, self.config.get("cloud_seconds", 5) * 6))
             result["power_source"] = self.power
             result["observed_at"] = utc_now()
             result["diagnostics"] = self.diagnostics.status()
