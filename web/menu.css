@@ -365,3 +365,17 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
+
+.backup-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 7px 0 12px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.backup-facts dt, .backup-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

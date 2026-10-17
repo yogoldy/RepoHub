@@ -101,7 +101,12 @@ function renderDetail() {
     <p class="status-explanation" data-category="${state.category}">${escape(state.detail)}</p>
     ${progress}${retry}
     <div id="backup-timing" class="backup-timing" data-receipt="${escape(JSON.stringify(timing.receipt))}">
-      <p class="last-backup">${escape(timing.lastLine)}</p>
+      <dl class="backup-facts" aria-label="Latest backup">
+        <dt>Where:</dt><dd>${escape(timing.locationLabel)}</dd>
+        <dt>When:</dt><dd>${timing.createdLabel !== 'Unavailable' && timing.createdLabel !== 'Not yet'
+          ? `<time datetime="${escape(timing.receipt.created_at)}" title="Backup creation time">${escape(timing.createdLabel)}</time>`
+          : escape(timing.createdLabel)}</dd>
+      </dl>
       <p class="next-backup">${escape(timing.nextLine)}</p>
       ${timing.inclusionLine ? `<p class="backup-inclusion">${escape(timing.inclusionLine)}</p>` : ''}
     </div>

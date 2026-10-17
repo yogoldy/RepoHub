@@ -189,6 +189,17 @@
         lastLine = 'Last backup created locally: ' + formatDate(receipt.created_at);
       }
     }
+    let locationLabel = receipt.location_state === 'none' ? 'No backup yet' : 'Unavailable';
+    let createdLabel = receipt.location_state === 'none' ? 'Not yet' : 'Unavailable';
+    if (['cloud_confirmed', 'local'].includes(receipt.location_state)
+        && receipt.created_at && Number.isFinite(Date.parse(receipt.created_at))) {
+      locationLabel = receipt.location_state === 'cloud_confirmed' ? 'iCloud' : 'This Mac';
+      createdLabel = new Intl.DateTimeFormat('en-US', {
+        month: 'numeric', day: 'numeric', year: '2-digit',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      }).format(new Date(receipt.created_at)).replace(/,\s*/g, ' ')
+        .replace(/\s+(AM|PM)$/, (_, period) => period.toLowerCase());
+    }
     const nextLabels = {
       due: 'Next scheduled check: due now.',
       busy: 'Check due · waiting for current backup.',
@@ -211,7 +222,7 @@
     };
     let inclusionLine = inclusionLabels[receipt.inclusion_state];
     if (freshness === 'current' && phase === 'background') inclusionLine = 'No new backup needed.';
-    return {receipt, lastLine, nextLine, inclusionLine};
+    return {receipt, lastLine, locationLabel, createdLabel, nextLine, inclusionLine};
   }
 
   function describeSchedule(repo, power) {
