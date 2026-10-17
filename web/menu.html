@@ -8,8 +8,15 @@
 <button id="settings" class="icon-button" aria-label="Settings" title="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.6 2.2-1.7 1L5 5.6 2.5 9.9l1.6 1.6v2L2.5 15 5 19.4l2.2-.6 1.7 1 .6 2.2h5l.6-2.2 1.7-1 2.2.6 2.5-4.4-1.6-1.5v-2l1.6-1.6L19 5.6l-2.2.6-1.7-1-.6-2.2Z"/><circle cx="12" cy="12.5" r="3"/></svg></button></div></header>
 <p id="notice" role="status"></p>
 <section aria-label="Repository cards">
-  <div class="rail-heading"><span id="position">Your repos</span><button id="all-repos" class="quiet-action" type="button" hidden>‹ All repos</button><span id="grid-hint">Select a repo for details</span></div>
-  <div id="cards" class="card-grid" role="group" aria-label="Repositories">
+  <div class="rail-heading">
+    <span id="position">Your repos</span>
+    <div>
+      <button id="all-repos" class="quiet-action" type="button" hidden>‹ All repos</button>
+      <button id="previous" class="arrow" aria-label="Previous repos">‹</button>
+      <button id="next" class="arrow" aria-label="Next repos">›</button>
+    </div>
+  </div>
+  <div id="cards" class="card-rail" role="group" aria-label="Scroll through repos">
     <p class="empty">Reading backup status…</p>
   </div>
 </section>

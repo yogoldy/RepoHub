@@ -1,7 +1,6 @@
 let observedMenuState=null,clientFreshness='current';
 let retryingRepo=null;
-let gridScrollTop = 0;
-let overviewScrollTop = 0;
+let detailsAnimation = null;
 const technicalOpen = new Set();
 const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
 let menuState=null,selectedId=null,sessionToken='',loading=false,lastResponseAt=0,settingsRevision='',settingsRepo=null,defaultsRevision='',settingsDefaults=null;
@@ -73,15 +72,12 @@ function render(){
   const grid = $('#cards');
   const existing = new Map([...grid.querySelectorAll('.repo-card')].map(
     button => [button.dataset.repoId, button]));
-  grid.dataset.focused = String(selectedId !== null);
-  $('#position').hidden = selectedId !== null;
   $('#all-repos').hidden = selectedId === null;
-  $('#grid-hint').textContent = selectedId ? 'Tap the card to return' : 'Select a repo for details';
   const slots = repos.map(repo => renderRepoCard(repo, presentations.get(repo.id), existing.get(repo.id)));
   renderDetail(presentations.get(selectedId));
-  arrangeRepoGrid(slots);
-  const displayedRows = [...grid.querySelectorAll('.repo-card')]
-    .filter(button => !button.parentElement.hidden).map(button => {
+  arrangeRepoCards(slots);
+  updatePosition();
+  const displayedRows = [...grid.querySelectorAll('.repo-card')].map(button => {
     const presentation = presentations.get(button.dataset.repoId);
     const row = {repo_id: button.dataset.repoId, phase: button.className.split(' ')[1],
       display_label: button.querySelector('.card-status').textContent.split(' · ')[0],
@@ -127,7 +123,6 @@ function renderRepoCard(repo, presentation, button) {
   }
   const {state, compact} = presentation;
   const expanded = repo.id === selectedId;
-  button.parentElement.hidden = selectedId !== null && !expanded;
   const label = state.label + (state.percent === null ? '' : ' · ' + percentLabel(state.percent));
   button.className = 'repo-card ' + state.phase;
   button.dataset.category = state.category;
@@ -153,11 +148,7 @@ function renderRepoCard(repo, presentation, button) {
   return button.parentElement;
 }
 
-function gridColumns() {
-  return Number(getComputedStyle($('#cards')).getPropertyValue('--repo-columns')) || 3;
-}
-
-function arrangeRepoGrid(slots) {
+function arrangeRepoCards(slots) {
   const grid = $('#cards');
   const desired = [...slots];
   if (!slots.length) {
@@ -173,24 +164,6 @@ function arrangeRepoGrid(slots) {
   desired.forEach((child, index) => {
     if (grid.children[index] !== child) grid.insertBefore(child, grid.children[index] || null);
   });
-  capOverviewRows(slots);
-  $('#position').textContent = `${slots.length} repo${slots.length === 1 ? '' : 's'}`;
-}
-
-function capOverviewRows(slots) {
-  if (selectedId) return;
-  const grid = $('#cards');
-  const visibleCount = gridColumns() * 3;
-  if (slots.length <= visibleCount) {
-    grid.style.removeProperty('--grid-visible-height');
-    return;
-  }
-  // Measure real wrapped rows so longer names/statuses cannot clip row three.
-  const bottom = Math.max(...slots.slice(0, visibleCount).map(
-    slot => slot.getBoundingClientRect().bottom));
-  const padding = parseFloat(getComputedStyle(grid).paddingBottom) || 0;
-  const height = Math.ceil(bottom - grid.getBoundingClientRect().top + grid.scrollTop + padding);
-  grid.style.setProperty('--grid-visible-height', height + 'px');
 }
 
 function renderDetail(presentation) {
@@ -292,14 +265,17 @@ function renderDetail(presentation) {
 }
 function selectRepo(id) {
   const closing = selectedId === id;
-  if (!selectedId) {
-    gridScrollTop = window.scrollY;
-    overviewScrollTop = $('#cards').scrollTop;
-  }
   selectedId = closing ? null : id;
   render();
-  if (closing) $('#cards').scrollTop = overviewScrollTop;
-  window.scrollTo({top: closing ? gridScrollTop : 0, behavior: 'auto'});
+  detailsAnimation?.cancel();
+  const panel = $('#repo-expansion');
+  if (!closing && typeof panel.animate === 'function'
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    detailsAnimation = panel.animate([
+      {opacity: 0, transform: 'translateY(-6px)'},
+      {opacity: 1, transform: 'translateY(0)'},
+    ], {duration: 160, easing: 'ease-out'});
+  }
 }
 $('#all-repos').onclick = () => {
   const selectedButton = [...$('#cards').querySelectorAll('.repo-card')].find(
@@ -309,9 +285,21 @@ $('#all-repos').onclick = () => {
 };
 function updatePosition() {
   if (!menuState) return;
-  arrangeRepoGrid([...$('#cards').querySelectorAll('.repo-card')].map(button => button.parentElement));
+  const rail = $('#cards');
+  const bounds = rail.getBoundingClientRect();
+  const buttons = [...rail.querySelectorAll('.repo-card')];
+  const visible = buttons.map((button, index) => ({box: button.getBoundingClientRect(), index}))
+    .filter(item => item.box.left >= bounds.left - 2 && item.box.right <= bounds.right + 2);
+  $('#position').textContent = visible.length
+    ? `${visible[0].index + 1}–${visible.at(-1).index + 1} of ${buttons.length} repos`
+    : `${buttons.length} repos`;
+  $('#previous').disabled = rail.scrollLeft <= 2;
+  $('#next').disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2;
 }
 const motion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+$('#previous').onclick = () => $('#cards').scrollBy({left: -($('#cards').clientWidth + 10), behavior: motion()});
+$('#next').onclick = () => $('#cards').scrollBy({left: $('#cards').clientWidth + 10, behavior: motion()});
+$('#cards').addEventListener('scroll', updatePosition, {passive: true});
 $('#cards').addEventListener('keydown', event => {
   const button = event.target.closest('.repo-card');
   if (event.key === 'Escape' && selectedId) {
@@ -322,10 +310,10 @@ $('#cards').addEventListener('keydown', event => {
     event.preventDefault();
     return;
   }
-  if (selectedId || !button || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+  if (!button || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
   const rows = menuState?.repos || [];
   const index = rows.findIndex(repo => repo.id === button.dataset.repoId);
-  const step = {ArrowLeft: -1, ArrowRight: 1, ArrowUp: -gridColumns(), ArrowDown: gridColumns()};
+  const step = {ArrowLeft: -1, ArrowRight: 1};
   const target = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1
     : Math.max(0, Math.min(rows.length - 1, index + step[event.key]));
   if (!rows[target]) return;

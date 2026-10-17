@@ -8,16 +8,16 @@ from change_evidence import ChangeEvidence
 from diagnostics import DiagnosticLog, read_events
 
 
-class MenuGridTests(unittest.TestCase):
-    def test_actual_grid_controller_and_timing_dom_faults(self):
+class MenuCardTests(unittest.TestCase):
+    def test_actual_card_controller_and_timing_dom_faults(self):
         root = Path(__file__).resolve().parents[1]
-        result = subprocess.run(['node', str(root/'tests/menu-grid.cjs')], cwd=root,
+        result = subprocess.run(['node', str(root/'tests/menu-cards.cjs')], cwd=root,
                                 capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_real_controller_observations_reach_independent_diagnostic_checks(self):
         root = Path(__file__).resolve().parents[1]
-        output = subprocess.check_output(['node', str(root/'tests/menu-grid.cjs'), '--proofs'],
+        output = subprocess.check_output(['node', str(root/'tests/menu-cards.cjs'), '--proofs'],
                                          cwd=root, text=True, timeout=15)
         proofs = json.loads(output.splitlines()[-1])
         with tempfile.TemporaryDirectory() as temp:

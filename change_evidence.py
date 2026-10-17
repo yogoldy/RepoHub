@@ -163,7 +163,7 @@ def compact_timing_receipt(timing):
     return {'kind': state if state in TIMING_STATES else 'unavailable', 'due_at': None}
 
 
-def validate_grid_timing(row, selected):
+def validate_card_timing(row, selected):
     card = row['card_timing']
     kinds = (TIMING_STATES - {'scheduled', 'due'}) | {'check', 'backup'}
     if (not isinstance(card, dict) or set(card) != {'kind', 'due_at', 'text_matches'}
@@ -377,10 +377,12 @@ class ChangeEvidence:
                 raise FileExistsError('Observed status expired; request fresh status')
             rows = payload['rows']
             timing_frame = payload['policy_version'] in {'status-clarity-4', 'status-clarity-5', 'status-clarity-6'} and payload['surface'] == 'menu'
-            grid_frame = payload['policy_version'] == 'status-clarity-6' and payload['surface'] == 'menu'
+            compact_frame = payload['policy_version'] == 'status-clarity-6' and payload['surface'] == 'menu'
             selected = payload.get('selected_repo_id')
+            if compact_frame and 'selected_repo_id' not in payload:
+                raise ValueError('Missing expansion selection')
             if timing_frame and (not isinstance(selected, str) or selected not in snapshot):
-                if selected is not None or (snapshot and not grid_frame):
+                if selected is not None or (snapshot and not compact_frame):
                     raise ValueError('Invalid selected timing repo')
             if not timing_frame and 'selected_repo_id' in payload:
                 raise ValueError('Unexpected timing selection')
@@ -391,7 +393,7 @@ class ChangeEvidence:
             labels = LABELS | {value[1] for value in PRESENTATION_TEXT.values()}
             for row in rows:
                 expected_fields = set(row_fields)
-                if grid_frame:
+                if compact_frame:
                     expected_fields |= {'timing', 'card_timing'}
                     if isinstance(row, dict) and row.get('repo_id') == selected:
                         expected_fields.add('detail_timing')
@@ -409,13 +411,13 @@ class ChangeEvidence:
                     raise ValueError('Invalid presentation text')
                 if 'timing' in row:
                     validate_timing(row['timing'])
-                if grid_frame:
-                    validate_grid_timing(row, selected)
-            expected_repos = {selected} if grid_frame and selected is not None else set(snapshot)
+                if compact_frame:
+                    validate_card_timing(row, selected)
+            expected_repos = set(snapshot)
             if len(rows) != len(expected_repos) or {row['repo_id'] for row in rows} != expected_repos:
                 raise ValueError('Presentation must describe the visible observed repo list')
             client, observation = payload['client_id'], payload['observation_id']
-            frame_fields = {'view_scope': 'focused' if selected else 'grid'} if grid_frame else {}
+            frame_fields = {'view_scope': 'expanded' if selected else 'overview'} if compact_frame else {}
             self.log.emit('ui_frame', **frame_fields, client_id=client, observation_id=observation,
                           surface=payload['surface'], native=payload['native'], policy_version=payload['policy_version'], client_freshness=freshness, repo_count=len(rows))
             previous = self.clients.pop(client, {})
@@ -446,16 +448,16 @@ class ChangeEvidence:
                                   reason=reason)
                 if 'timing' in row and previous.get(key) != signature:
                     expected_timing = timing_receipt(snapshot[key], freshness)
-                    receipts = {'card' if grid_frame else 'detail': row['timing']}
-                    if grid_frame and key == selected:
+                    receipts = {'card' if compact_frame else 'detail': row['timing']}
+                    if compact_frame and key == selected:
                         receipts['detail'] = row['detail_timing']['receipt']
                     for timing_surface, receipt in receipts.items():
                         timing_good = receipt == expected_timing
-                        if grid_frame and timing_surface == 'card':
+                        if compact_frame and timing_surface == 'card':
                             compact = compact_timing_receipt(expected_timing)
                             timing_good = timing_good and row['card_timing'] == {
                                 **compact, 'text_matches': True}
-                        elif grid_frame:
+                        elif compact_frame:
                             timing_good = timing_good and row['detail_timing']['text_matches']
                         safe_fields = {field: receipt[field] for field in
                                        ('schedule_state', 'timing_reason', 'location_state',

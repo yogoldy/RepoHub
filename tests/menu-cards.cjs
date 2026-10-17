@@ -11,6 +11,8 @@ const encode = value => String(value).replace(/[&<>"']/g,
   key => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[key]));
 let root;
 let activeElement = null;
+const animations = [];
+let reducedMotion = false;
 class Text {
   constructor(text) { this.textContent = decode(text); }
   get outerHTML() { return encode(this.textContent); }
@@ -21,9 +23,7 @@ class Element {
     this.attributes = {};
     this.childNodes = [];
     this.events = {};
-    this.scrollTop = 0;
-    this.style = {values: {}, setProperty(key, value) { this.values[key] = value; },
-      removeProperty(key) { delete this.values[key]; }};
+    this.scrollLeft = 0;
     this.dataset = new Proxy({}, {
       get: (_, key) => this.attributes['data-' + key.replace(/[A-Z]/g, c => '-' + c.toLowerCase())],
       set: (_, key, value) => { this.setAttribute('data-' + key.replace(/[A-Z]/g,
@@ -58,11 +58,14 @@ class Element {
     }
   }
   get isConnected() { return this === root || !!this.parentElement?.isConnected; }
+  get clientWidth() { return 530; }
+  get scrollWidth() { return Math.max(530, this.children.length * 180 - 10); }
   getBoundingClientRect() {
-    if (this.id === 'cards') return {top: 0};
-    const index = this.parentElement.children.indexOf(this);
-    const top = 3 + Math.floor(index / columns) * 180 - this.parentElement.scrollTop;
-    return {top, bottom: top + 168};
+    if (this.id === 'cards') return {left: 0, right: 530};
+    const slot = this.parentElement;
+    const rail = slot.parentElement;
+    const left = 1 + rail.children.indexOf(slot) * 180 - rail.scrollLeft;
+    return {left, right: left + 170};
   }
   getClientRects() { return !this.isConnected || this.closestHidden() ? [] : [1]; }
   closestHidden() { return this.hidden || this.parentElement?.closestHidden(); }
@@ -82,6 +85,16 @@ class Element {
   click() { (this.onclick || this.events.click)?.({target: this}); }
   focus() { activeElement = this; }
   scrollIntoView() { this.scrolled = true; }
+  scrollBy(options) {
+    this.scrollLeft = Math.max(0, Math.min(this.scrollWidth - this.clientWidth,
+      this.scrollLeft + options.left));
+    this.events.scroll?.();
+  }
+  animate(keyframes, options) {
+    const animation = {keyframes, options, cancelled: false, cancel() { this.cancelled = true; }};
+    animations.push(animation);
+    return animation;
+  }
   get textContent() { return this.childNodes.map(child => child.textContent).join(''); }
   set textContent(value) { this.childNodes = [new Text(encode(value))]; }
   get innerHTML() { return this.childNodes.map(child => child.outerHTML).join(''); }
@@ -130,73 +143,75 @@ function captureProof(label, failedSurface = null, changedRow = null) {
   proofs.push({label, failedSurface, status: structuredClone(state), rows,
     selected: frames.at(-1)[3]});
 }
-let columns = 3;
-let scrollY = 200;
 let timingCalls = 0;
 const context = vm.createContext({document, $: selector => document.querySelector(selector),
-  menuState: state, observedMenuState: state, selectedId: null, retryingRepo: null, gridScrollTop: 0, overviewScrollTop: 0,
+  menuState: state, observedMenuState: state, selectedId: null, retryingRepo: null, detailsAnimation: null,
   technicalOpen: new Set(), clientFreshness: 'current',
   RepoStatus: {...policy, timing(...args) { timingCalls++; return policy.timing(...args); }},
   RepoDiagnostics: diagnostics, diagnosticView: {observe(...args) { frames.push(args); }},
   view: row => policy.present(row, state.backup), percentLabel: value => value + '%',
   escape: encode, when: value => value || 'Not yet', bytes: () => '1 MB',
-  getComputedStyle: () => ({getPropertyValue: () => String(columns), paddingBottom: '8px'}),
-  window: {matchMedia: () => ({matches: true}), get scrollY() { return scrollY; },
-    scrollTo(options) { scrollY = options.top; }}, openSettings() {},
+  window: {matchMedia: () => ({matches: reducedMotion})}, openSettings() {},
 });
 const source = fs.readFileSync('web/menu.js', 'utf8');
 vm.runInContext(source.slice(source.indexOf('function percentLabel('), source.indexOf('function unreachable(')), context);
 const render = () => vm.runInContext('render()', context);
 const cards = () => get('cards').querySelectorAll('.repo-card');
 const last = () => frames.at(-1);
-const visibleCards = () => cards().filter(card => !card.parentElement.hidden);
 render();
 assert.equal(timingCalls, 13, 'One timing projection per repo per render');
 assert.equal(cards().length, 13);
 assert.equal(get('repo-expansion').hidden, true);
 assert.equal(last()[3], null);
 assert.ok(last()[1].every(row => row.card_timing.text_matches && !row.detail_timing));
+assert.equal(get('position').textContent, '1–3 of 13 repos');
+assert.equal(get('previous').disabled, true);
 captureProof('collapsed');
-assert.equal(get('cards').style.values['--grid-visible-height'], '539px');
-get('cards').scrollTop = 180;
-render();
-assert.equal(get('cards').style.values['--grid-visible-height'], '539px', 'Scroll cannot grow the cap');
+get('next').click();
+assert.equal(get('position').textContent, '4–6 of 13 repos');
+assert.equal(get('previous').disabled, false);
+get('previous').click();
+assert.equal(get('position').textContent, '1–3 of 13 repos');
 const beforeExpansion = timingCalls;
 cards()[0].click();
-assert.equal(timingCalls - beforeExpansion, state.repos.length, 'Expanding must reuse this frame projection');
-assert.equal(get('cards').children.length, 13);
-assert.ok(!get('cards').contains(get('repo-expansion')), 'All rows stay above the detail panel');
-const main = get('repo-expansion').parentElement;
-assert.ok(main.children.indexOf(get('cards').parentElement) < main.children.indexOf(get('repo-expansion')));
-assert.equal(root.querySelectorAll('#technical-details').length, 1);
-assert.equal(get('technical-details').dataset.repoId, 'id-0');
+assert.equal(timingCalls - beforeExpansion, state.repos.length, 'Expanding reuses the frame projection');
+assert.ok(!get('cards').contains(get('repo-expansion')));
 assert.equal(cards()[0].getAttribute('aria-expanded'), 'true');
+assert.equal(last()[1].length, 13, 'The horizontal row remains available while details are open');
 assert.equal(last()[1][0].detail_timing.text_matches, true);
-assert.equal(visibleCards().length, 1);
-assert.equal(last()[1].length, 1);
 assert.equal(last()[1][0].timing, last()[1][0].detail_timing.receipt);
+assert.equal(animations.length, 1);
+assert.equal(animations[0].options.duration, 160);
+assert.equal(animations[0].keyframes[0].transform, 'translateY(-6px)');
 captureProof('expanded');
+render();
+assert.equal(animations.length, 1, 'Polling cannot replay the selection cue');
 cards()[4].click();
 assert.equal(last()[3], 'id-4');
-assert.equal(get('cards').children.length, 13);
 assert.equal(get('technical-details').dataset.repoId, 'id-4');
-assert.equal(cards()[0].getAttribute('aria-expanded'), 'false');
-columns = 2;
-vm.runInContext('updatePosition()', context);
-assert.equal(get('cards').children.length, 13);
-assert.equal(get('technical-details').dataset.repoId, 'id-4');
-cards()[2].click();
-assert.equal(get('cards').children.length, 13);
-assert.equal(get('technical-details').dataset.repoId, 'id-2');
 assert.equal(root.querySelectorAll('#technical-details').length, 1);
-cards()[2].click();
+assert.equal(cards()[0].getAttribute('aria-expanded'), 'false');
+assert.equal(animations.length, 2);
+assert.equal(animations[0].cancelled, true, 'Switching cancels the old cue');
+cards()[4].click();
 render();
 assert.equal(last()[3], null, 'Polling must preserve collapsed selection');
 assert.equal(get('repo-expansion').hidden, true);
-assert.equal(visibleCards().length, 13);
-assert.equal(scrollY, 200, 'Returning restores overview scroll position');
-assert.equal(get('cards').scrollTop, 180, 'Returning restores internal grid scroll position');
-assert.equal(JSON.stringify(state), unchanged, 'Rendering must not mutate backup/scheduler input');
+assert.equal(animations[1].cancelled, true);
+assert.equal(JSON.stringify(state), unchanged, 'Rendering cannot mutate backup/scheduler input');
+reducedMotion = true;
+cards()[3].click();
+assert.equal(get('repo-expansion').hidden, false);
+assert.equal(animations.length, 2, 'Reduced motion skips the animation');
+get('all-repos').click();
+assert.equal(get('repo-expansion').hidden, true);
+reducedMotion = false;
+const originalAnimate = get('repo-expansion').animate;
+get('repo-expansion').animate = undefined;
+cards()[3].click();
+assert.equal(get('repo-expansion').hidden, false, 'Animation support cannot block details');
+get('all-repos').click();
+get('repo-expansion').animate = originalAnimate;
 state.repos[0].needs_backup = true;
 state.repos[0].verification = {state: 'different', archive: '/private/current', changes: {
   counts: {repo_files: 1, git_data: 0, finder_metadata: 0}}};
@@ -205,19 +220,16 @@ assert.equal(cards()[0].querySelector('.card-status').textContent, 'Edits confir
 assert.match(cards()[0].querySelector('.card-next').textContent, /^Next backup /);
 cards()[0].click();
 assert.equal(last()[1][0].detail_timing.text_matches, true);
-assert.equal(visibleCards().length, 1);
-assert.equal(last()[1].length, 1);
 state.repos[0].schedule_evidence = {state: 'manual', reason: 'manual'};
 render();
 assert.equal(cards()[0].querySelector('.card-next').textContent, 'Manual only');
 assert.equal(get('detail').querySelector('.next-backup').textContent, 'Next backup: manual only.');
-// Mutate nodes made by the real card renderer. Correct detail cannot mask them.
-cards()[1].click();
+// Mutate nodes made by the actual card renderer. Correct detail cannot mask them.
 const card = cards()[1];
 const compact = policy.compactTiming(policy.timing(state.repos[1], state.backup));
 card.querySelector('.card-next').textContent = 'Next check wrong time';
 assert.equal(diagnostics.readCardTiming(card, compact).text_matches, false);
-captureProof('bad-card-text-or-hidden-line', 'card', {repo_id: 'id-1',
+captureProof('wrong-card-text', 'card', {repo_id: 'id-1',
   card_timing: diagnostics.readCardTiming(card, compact)});
 render();
 card.querySelector('.card-next').querySelector('time').remove();
@@ -227,29 +239,28 @@ captureProof('missing-card-time', 'card', {repo_id: 'id-1',
 render();
 card.querySelector('.card-next').hidden = true;
 assert.equal(diagnostics.readCardTiming(card, compact).text_matches, false);
-captureProof('bad-card-text-or-hidden-line', 'card', {repo_id: 'id-1',
+captureProof('hidden-card-line', 'card', {repo_id: 'id-1',
   card_timing: diagnostics.readCardTiming(card, compact)});
 render();
 card.querySelector('.card-next').remove();
 assert.equal(diagnostics.readCardTiming(card, compact).text_matches, false);
-captureProof('bad-card-text-or-hidden-line', 'card', {repo_id: 'id-1',
+captureProof('missing-card-line', 'card', {repo_id: 'id-1',
   card_timing: diagnostics.readCardTiming(card, compact)});
 render();
 get('detail').querySelector('.next-backup').remove();
-assert.equal(diagnostics.readDetailTiming(get('detail'), policy.timing(state.repos[1], state.backup)).text_matches, false);
-captureProof('missing-expanded-line', 'detail', {repo_id: 'id-1',
-  detail_timing: diagnostics.readDetailTiming(get('detail'), policy.timing(state.repos[1], state.backup))});
+const currentTiming = policy.timing(state.repos[0], state.backup);
+assert.equal(diagnostics.readDetailTiming(get('detail'), currentTiming).text_matches, false);
+captureProof('missing-expanded-line', 'detail', {repo_id: 'id-0',
+  detail_timing: diagnostics.readDetailTiming(get('detail'), currentTiming)});
 render();
 const keyboard = get('cards').events.keydown;
-get('all-repos').click();
-assert.equal(visibleCards().length, 13);
+keyboard({key: 'Escape', target: cards()[0], preventDefault() {}});
 assert.equal(get('repo-expansion').hidden, true);
-cards()[1].click();
-keyboard({key: 'Escape', target: cards()[1], preventDefault() {}});
-assert.equal(get('repo-expansion').hidden, true);
-keyboard({key: 'ArrowDown', target: cards()[0], preventDefault() {}});
-assert.equal(activeElement, cards()[2]);
+keyboard({key: 'ArrowRight', target: cards()[0], preventDefault() {}});
+assert.equal(activeElement, cards()[1]);
 assert.equal(last()[3], null, 'Arrow navigation moves focus without opening a panel');
+keyboard({key: 'End', target: cards()[1], preventDefault() {}});
+assert.equal(activeElement, cards().at(-1));
 cards()[4].click();
 state.repos.reverse();
 render();
@@ -262,7 +273,5 @@ render();
 assert.equal(cards().length, 0);
 assert.equal(get('repo-expansion').hidden, true);
 assert.equal(get('position').textContent, '0 repos');
-assert.equal(get('cards').style.values['--grid-visible-height'], undefined);
-console.log('Actual grid controller: shared projections, collapsed defaults, three-row scrolling/focused layout, keyboard, refresh and DOM timing faults passed');
-
+console.log('Actual horizontal controller: shared projections, collapsed defaults, paging, animation/reduced-motion, refresh and DOM timing faults passed');
 if (process.argv.includes('--proofs')) console.log(JSON.stringify(proofs));

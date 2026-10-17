@@ -474,30 +474,15 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   color: var(--gold);
 }
 
-/* The menu starts with a compact grid; one selected detail region follows the entire grid. */
-.card-grid {
-  --repo-columns: 3;
-  display: grid;
-  grid-template-columns: repeat(var(--repo-columns), minmax(0, 1fr));
-  gap: 12px 10px;
-  padding: 3px 1px 8px;
-}
-.card-grid > .empty,
-.repo-expansion {
-  grid-column: 1 / -1;
-}
-.repo-expansion[hidden] {
-  display: none;
-}
-.card-grid .card-slot {
+/* A horizontal overview shares one selected detail region below the cards. */
+.card-rail .card-slot {
   display: flex;
-  min-width: 0;
 }
-.card-grid .repo-card {
+.card-rail .repo-card {
   height: 100%;
   min-height: 168px;
 }
-.card-grid .card-status {
+.card-rail .card-status {
   margin-top: auto;
   padding-top: 16px;
   font-size: 12px;
@@ -537,54 +522,20 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   transform: rotate(180deg);
   color: var(--gold);
 }
-.repo-expansion .detail {
-  margin-top: 0;
+.repo-expansion {
+  margin-top: 10px;
 }
+.repo-expansion[hidden],
 .repo-expansion .detail[hidden],
 .repo-expansion #technical-panel[hidden] {
   display: none;
 }
-@media (max-width: 400px) {
-  .card-grid {
-    --repo-columns: 2;
-  }
-}
-@media (max-width: 280px) {
-  .card-grid {
-    --repo-columns: 1;
-  }
-}
-
-.repo-expansion {
-  margin-top: 10px;
-}
-
-/* A selected repo is a focused view; the same card toggles back to the overview. */
-.card-grid .card-slot[hidden] {
-  display: none;
-}
-.card-grid[data-focused="true"] .card-slot:not([hidden]) {
-  grid-row: 1;
-  grid-column: 1;
+.repo-expansion .detail {
+  margin-top: 0;
 }
 #all-repos {
   padding: 4px 8px;
 }
 #all-repos[hidden] {
   display: none;
-}
-
-/* At most three real rows are visible; only the overview scrolls internally. */
-.card-grid {
-  max-height: var(--grid-visible-height, none);
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior-y: contain;
-  scrollbar-gutter: stable;
-  align-content: start;
-}
-.card-grid[data-focused="true"] {
-  max-height: none;
-  overflow: visible;
-  scrollbar-gutter: auto;
 }

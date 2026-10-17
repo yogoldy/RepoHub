@@ -13,7 +13,7 @@ from diagnostic_export import export_bundle
 from diagnostics import DiagnosticLog, read_events
 
 
-class GridTimingTests(unittest.TestCase):
+class CardTimingTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -36,8 +36,6 @@ class GridTimingTests(unittest.TestCase):
         observation = self.evidence.observe_status({'repos': repos, 'backup': {}})
         rows = []
         for repo in repos:
-            if selected is not None and repo['id'] != selected:
-                continue
             facts = self.evidence.snapshots[observation][repo['id']]
             timing = timing_receipt(facts, freshness)
             phase = 'ready' if freshness == 'current' else 'stale'
@@ -66,7 +64,7 @@ class GridTimingTests(unittest.TestCase):
         self.assertFalse(self.events('timing_disagreement'))
 
     def test_missing_wrong_or_hidden_card_time_is_detected_independently_of_detail(self):
-        for selected, targets in [(None, (0, 1)), ('private-id', (0,))]:
+        for selected, targets in [(None, (0, 1)), ('private-id', (0, 1))]:
             payload = self.payload(selected=selected)
             self.evidence.presentation(payload)
             for target in targets:
@@ -76,7 +74,7 @@ class GridTimingTests(unittest.TestCase):
                     bad['rows'][target]['card_timing'].update(change)
                     self.evidence.presentation(bad)
                     self.assertEqual(self.events('timing_disagreement')[-1]['timing_surface'], 'card')
-                    if selected:
+                    if selected and target == 0:
                         self.assertEqual(self.events('ui_timing')[-1]['result'], 'complete')
                         self.assertEqual(self.events('ui_timing')[-1]['timing_surface'], 'detail')
                     self.evidence.presentation(payload)
@@ -93,6 +91,10 @@ class GridTimingTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.evidence.presentation(payload)
         payload = self.payload()
+        del payload['selected_repo_id']
+        with self.assertRaises(ValueError):
+            self.evidence.presentation(payload)
+        payload = self.payload()
         payload['selected_repo_id'] = 'removed-id'
         with self.assertRaises(ValueError):
             self.evidence.presentation(payload)
@@ -101,20 +103,22 @@ class GridTimingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.evidence.presentation(payload)
 
-    def test_focus_checks_only_selected_repo_and_rejects_extra_or_missing_cards(self):
+    def test_expanded_checks_all_cards_and_only_selected_detail(self):
         payload = self.payload('private-id')
         self.evidence.presentation(payload)
         frames = self.events('ui_frame')
-        self.assertEqual(frames[-1]['view_scope'], 'focused')
-        self.assertEqual(frames[-1]['repo_count'], 1)
-        overview = self.payload()
-        for rows in [[], overview['rows']]:
-            bad = copy.deepcopy(payload)
-            bad['rows'] = rows
-            with self.assertRaises(ValueError):
-                self.evidence.presentation(bad)
-        self.evidence.presentation(overview)
-        self.assertEqual(self.events('ui_frame')[-1]['view_scope'], 'grid')
+        self.assertEqual(frames[-1]['view_scope'], 'expanded')
+        self.assertEqual(frames[-1]['repo_count'], 2)
+        bad = copy.deepcopy(payload)
+        bad['rows'].pop()
+        with self.assertRaises(ValueError):
+            self.evidence.presentation(bad)
+        bad = copy.deepcopy(payload)
+        bad['rows'][1]['detail_timing'] = copy.deepcopy(bad['rows'][0]['detail_timing'])
+        with self.assertRaises(ValueError):
+            self.evidence.presentation(bad)
+        self.evidence.presentation(self.payload())
+        self.assertEqual(self.events('ui_frame')[-1]['view_scope'], 'overview')
 
     def test_actual_compact_javascript_uses_same_timing_contract_for_every_state(self):
         root = Path(__file__).resolve().parents[1]
@@ -151,10 +155,10 @@ console.log(JSON.stringify(cases.map(i => {
                               else 'Next check', rendered['compact']['text'])
             self.assertNotIn('Next upload', rendered['compact']['text'])
 
-    def test_grid_exports_identify_surfaces_without_calendar_or_private_text(self):
+    def test_card_exports_identify_surfaces_without_calendar_or_private_text(self):
         self.evidence.presentation(self.payload('private-id'))
         payload = self.payload('private-id')
-        payload['rows'][0]['card_timing']['text_matches'] = False
+        payload['rows'][1]['card_timing']['text_matches'] = False
         self.evidence.presentation(payload)
         bundle = export_bundle(self.root/'logs', self.root/'export')
         text = (bundle/'share/events.jsonl').read_text()
