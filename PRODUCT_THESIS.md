@@ -331,3 +331,11 @@ Report this status, with Technical details below it and above the global backup
 controls. Where, When and the next-check line use consistent vertical spacing.
 Controller regressions cover navigation, demonstration reset and repo-scoped
 technical disclosures. No publication or installed-app update is included.
+
+The local Backed up display now treats the existing ordinary .DS_Store-only
+exception as success when project files and Git match a verified, uploaded backup.
+The card and headline use the normal Backed up presentation; Technical details
+retain the difference. The summary counts repos backed up to iCloud. Raw backup
+evidence, eligibility and retention remain unchanged. Diagnostic display policy 5
+records the exception explicitly and continues interpreting older policy versions.
+This stage does not yet revise the guide copy or authorize a push/install.

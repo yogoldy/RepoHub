@@ -122,7 +122,7 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 **Cause / solution:** Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts.
 
-**Required behavior:** Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement.
+**Required behavior:** Green requires fresh content verification plus exact-archive upload acknowledgement. Display policy 5 also permits the ordinary .DS_Store-only exception when project files and Git match. Keep the raw different comparison and Finder-only reason; absent view receipts do not prove agreement.
 
 **Diagnostic trail:** `status_repo`, `ui_presented`, `presentation_input_disagreement`, `presentation_disagreement`, `upload_stale`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
 
@@ -667,3 +667,19 @@ reuse another repo's disclosure state. The isolated information-controller
 regression exercises switching, late toggles, refresh and an empty selection;
 GR06 registers it. Browser checks also cover the fixed About header, Back,
 Escape and the existing Show me action. Installed WebKit validation is pending.
+
+### Finder view settings may share the Backed up display — October 17, 2026
+
+Leo approved the normal Backed up card, green check and headline for the existing
+ordinary .DS_Store-only exception. This supersedes the earlier information-icon
+requirement for this presentation only. The raw comparison stays different, the
+legacy internal view stays background/not-ready, and backup eligibility, archive
+verification and retention remain unchanged. Policy status-clarity-5 describes the
+new display; versions 1–4 keep their original diagnostic interpretation.
+
+Diagnostics independently require fresh source verification, the same verified
+archive, no pending backup/failure/active creation, and upload acknowledgement for
+that archive. They retain finder_only_project_match instead of claiming exact
+current byte equality. Technical details disclose the .DS_Store difference. GR06
+registers positive, conservative, legacy-version and real temporary-backup/export
+regressions. Native pixels and installed-app acceptance remain pending.

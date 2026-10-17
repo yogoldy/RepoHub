@@ -33,7 +33,7 @@
     if(cloud.state==='pending')return {phase:'pending',label:'Waiting for iCloud',detail:'Hashes verified · upload not yet confirmed',ready:false,percent};
     return {phase:'unknown',label:'Awaiting confirmation',detail:'Hashes verified · iCloud status unknown',ready:false,percent:null};
   }
-  // Describe the existing policy result without changing its safety decisions.
+  // Keep backup decisions intact while mapping their evidence to the displayed status.
   function present(repo, backup = {}) {
     const original = view(repo, backup);
     const verification = repo.verification || {};
@@ -47,14 +47,10 @@
       ? 'unknown' : original.phase;
     switch (displayPhase) {
       case 'ready':
+      case 'background':
         category = 'backed_up'; label = 'Backed up';
         headline = 'Your files are backed up.';
-        detail = 'Your files match the verified archive, and macOS confirms that same archive uploaded.';
-        break;
-      case 'background':
-        category = 'backed_up'; label = 'Only Finder view settings changed';
-        headline = 'Only Finder view settings changed.';
-        detail = 'Your project files and Git match the uploaded backup. Only ordinary .DS_Store view-setting files differ; no new backup is needed.';
+        detail = 'Your project files and Git data match the verified backup, and macOS confirms it uploaded to iCloud.';
         break;
       case 'changed': {
         category = 'backup_pending';
@@ -136,7 +132,15 @@
         headline = 'RepoHub can’t read the upload status.';
         detail = 'RepoHub cannot confirm that the current archive uploaded. See technical details for the available verification evidence.';
     }
-    return {...original, category, label, headline, detail, technicalDetail: original.phase === 'changed' ? detail : original.detail};
+    // A Finder-only exception remains recorded as a different comparison. It can
+    // use the normal green display only after view() establishes fresh verification
+    // and upload confirmation for the same archive.
+    const finderBackedUp = original.phase === 'background';
+    const technicalDetail = finderBackedUp
+      ? 'Only Finder view settings (.DS_Store) differ from the saved backup.'
+      : original.phase === 'changed' ? detail : original.detail;
+    return {...original, phase: finderBackedUp ? 'ready' : original.phase,
+      ready: original.ready || finderBackedUp, category, label, headline, detail, technicalDetail};
   }
 
   function timing(repo, backup = {}, freshness = 'current') {
@@ -298,5 +302,5 @@
         <h4>${group.title}</h4></div><p class="guide-labels">${group.labels}</p>
       <p>${group.explanation}</p><p class="guide-note">${group.note}</p></section>`).join('');
   }
-  const policy={view,present,timing,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-4'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,timing,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-5'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

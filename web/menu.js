@@ -56,7 +56,7 @@ function render(){
   if(!repos.some(r=>r.id===selectedId))selectedId=repos[0]?.id||null;
   const ready=repos.filter(r=>view(r).ready).length;
   $('#summary').textContent = repos.length
-    ? `${ready} of ${repos.length} repos fully verified and uploaded` : 'No repos found';
+    ? `${ready} of ${repos.length} repos backed up to iCloud` : 'No repos found';
   $('#backup').disabled=!!menuState.backup?.running;
   $('#backup').lastElementChild.textContent=menuState.backup?.running?'Backing up…':'Back up now';
   const problems=menuState.problems||[];

@@ -117,7 +117,7 @@
         "upload_stale"
       ],
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
-      "required_behavior": "Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics.",
+      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics.",
       "test_ids": [
         "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
         "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
@@ -132,7 +132,11 @@
         "test_timing_diagnostics.TimingDiagnosticTests.test_secondary_receipts_detect_wrong_date_location_and_countdown",
         "test_timing_diagnostics.TimingDiagnosticTests.test_actual_javascript_timing_matches_original_receipts",
         "test_timing_diagnostics.TimingDiagnosticTests.test_compact_backup_facts_keep_location_and_creation_evidence",
-        "test_menu_information.MenuInformationTests.test_information_navigation_and_folder_demonstration"
+        "test_menu_information.MenuInformationTests.test_information_navigation_and_folder_demonstration",
+        "test_status_clarity.ClarityTests.test_finder_display_success_preserves_raw_difference_and_exact_upload_requirement",
+        "test_status_clarity.ClarityTests.test_finder_display_rejects_uncertain_stale_busy_and_meaningful_changes",
+        "test_status_clarity.ClarityTests.test_finder_diagnostics_keep_previous_display_versions_interpretable",
+        "test_change_evidence.EvidenceTests.test_finder_only_green_display_keeps_real_backup_and_diagnostic_evidence"
       ],
       "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },

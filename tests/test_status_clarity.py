@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from change_evidence import ChangeEvidence
+from change_evidence import ChangeEvidence, presentation_text, timing_receipt
 from diagnostics import DiagnosticLog, read_events
 from diagnostic_export import export_bundle
 
@@ -30,7 +30,9 @@ class ClarityTests(unittest.TestCase):
         script = """const p=require('./web/repo-status.js');
 const input=JSON.parse(require('fs').readFileSync(0,'utf8'));
 const before=JSON.stringify(input), old=p.view(input.repo,input.backup), next=p.present(input.repo,input.backup);
-if(before!==JSON.stringify(input)||old.phase!==next.phase||old.ready!==next.ready||old.percent!==next.percent)throw Error('Policy mutated');
+const expectedPhase=old.phase==='background'?'ready':old.phase;
+const expectedReady=old.ready||old.phase==='background';
+if(before!==JSON.stringify(input)||expectedPhase!==next.phase||expectedReady!==next.ready||old.percent!==next.percent)throw Error('Unexpected policy change');
 console.log(JSON.stringify(next));"""
         return json.loads(subprocess.check_output(['node', '-e', script], cwd=ROOT,
                           input=json.dumps({'repo': repo, 'backup': backup or {}}), text=True))
@@ -46,8 +48,9 @@ console.log(JSON.stringify(next));"""
                'category': rendered['category'], 'display_label': rendered['label'],
                'display_headline': rendered['headline']}
         payload = {'surface': 'menu', 'native': False, 'client_id': 'c' * 24,
-                   'observation_id': observation, 'policy_version': 'status-clarity-3',
-                   'client_freshness': freshness, 'rows': [row]}
+                   'observation_id': observation, 'policy_version': 'status-clarity-5',
+                   'client_freshness': freshness, 'selected_repo_id': repo['id'], 'rows': [row]}
+        row['timing'] = timing_receipt(self.evidence.snapshots[observation][repo['id']], freshness)
         self.evidence.presentation(payload)
         return payload
 
@@ -87,12 +90,104 @@ console.log(JSON.stringify(next));"""
             self.report(self.good, freshness=reason)
         self.assertFalse([e for e in read_events(self.root/'logs')
                           if e['event'] == 'presentation_input_disagreement'])
-        self.assertFalse(self.render(finder)['ready'], 'Finder exception cannot become strict green')
+        self.assertTrue(self.render(finder)['ready'], 'Fresh Finder-only evidence allows the approved green display')
         finder_pending = copy.deepcopy(finder)
         finder_pending['needs_backup'] = True
         finder_pending['verification']['changes'] = {'counts': {'finder_metadata': 1}}
         self.assertNotEqual(self.render(finder_pending)['label'], 'Edits confirmed')
 
+
+    def finder_only(self):
+        repo = copy.deepcopy(self.good)
+        repo['verification'].update(state='different', ignored_finder_only=True, backup_required=False)
+        return repo
+
+    def test_finder_display_success_preserves_raw_difference_and_exact_upload_requirement(self):
+        repo = self.finder_only()
+        original = copy.deepcopy(repo)
+        rendered = self.render(repo)
+        self.assertTrue(rendered['ready'])
+        self.assertEqual(rendered['phase'], 'ready')
+        self.assertEqual(rendered['label'], 'Backed up')
+        self.assertEqual(rendered['headline'], 'Your files are backed up.')
+        self.assertEqual(rendered['technicalDetail'],
+                         'Only Finder view settings (.DS_Store) differ from the saved backup.')
+        self.assertEqual(repo, original)
+        self.report(repo)
+        events = list(read_events(self.root/'logs'))
+        presented = [e for e in events if e['event'] == 'ui_presented'][-1]
+        self.assertEqual(presented['reason'], 'finder_only_project_match')
+        facts = [e for e in events if e['event'] == 'status_repo'][-1]
+        self.assertEqual(facts['verification_state'], 'different')
+        self.assertTrue(facts['ignored_finder_only'])
+        # The existing internal comparison remains a distinct background result.
+        script = "const p=require('./web/repo-status.js');console.log(JSON.stringify(p.view(JSON.parse(require('fs').readFileSync(0,'utf8')))));"
+        raw = json.loads(subprocess.check_output(['node', '-e', script], cwd=ROOT,
+                                                input=json.dumps(repo), text=True))
+        self.assertEqual(raw['phase'], 'background')
+        self.assertFalse(raw['ready'])
+
+    def test_finder_display_rejects_uncertain_stale_busy_and_meaningful_changes(self):
+        base = self.finder_only()
+        cases = []
+        for state in ['pending', 'uploading', 'unknown', 'error']:
+            row = copy.deepcopy(base)
+            row['cloud']['state'] = state
+            cases.append((row, {}))
+        for field in ['sha256', 'archive']:
+            row = copy.deepcopy(base)
+            del row['last_backup'][field]
+            cases.append((row, {}))
+        for group, changes in [
+            ('health', {'fresh': False}), ('cloud', {'archive': '/private/old'}),
+            ('verification', {'archive': '/private/old'}),
+            ('verification', {'backup_required': True}),
+            ('verification', {'ignored_finder_only': False}),
+            ('verification', {'state': 'checking'}),
+            ('verification', {'state': 'changing'}),
+        ]:
+            row = copy.deepcopy(base)
+            row[group].update(changes)
+            cases.append((row, {}))
+        row = copy.deepcopy(base)
+        row['needs_backup'] = True
+        row['verification'].update(ignored_finder_only=False, backup_required=True,
+                                  changes={'counts': {'repo_files': 1, 'git_data': 0, 'finder_metadata': 1}})
+        cases.append((row, {}))
+        cases.append((base, {'running': True, 'current_repo_id': base['id']}))
+        for row, backup in cases:
+            with self.subTest(row=row, backup=backup):
+                self.assertFalse(self.render(row, backup)['ready'])
+                start = len(list(read_events(self.root/'logs')))
+                payload = self.report(row, backup)
+                self.assertFalse(any(e['event'] == 'presentation_input_disagreement'
+                                     for e in list(read_events(self.root/'logs'))[start:]))
+                # Diagnostics must reject a forged success for these same facts.
+                payload['rows'][0].update(phase='ready', ready=True, category='backed_up',
+                    display_label='Backed up', display_headline='Your files are backed up.')
+                self.evidence.presentation(payload)
+                self.assertTrue(any(e['event'] == 'presentation_input_disagreement'
+                                    for e in list(read_events(self.root/'logs'))[start:]))
+
+    def test_finder_diagnostics_keep_previous_display_versions_interpretable(self):
+        repo = self.finder_only()
+        payload = self.report(repo)
+        facts = self.evidence.snapshots[payload['observation_id']][repo['id']]
+        for version in ['status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4']:
+            previous = copy.deepcopy(payload)
+            previous['policy_version'] = version
+            previous['rows'][0].update(phase='background', ready=False,
+                                      **presentation_text(facts, 'background', version))
+            if version != 'status-clarity-4':
+                previous.pop('selected_repo_id')
+                previous['rows'][0].pop('timing')
+            self.evidence.presentation(previous)
+        self.assertFalse(any(e['event'] == 'presentation_input_disagreement'
+                             for e in read_events(self.root/'logs')))
+        payload['policy_version'] = 'status-clarity-4'
+        self.evidence.presentation(payload)
+        self.assertTrue(any(e['event'] == 'presentation_input_disagreement'
+                            for e in read_events(self.root/'logs')))
 
     def test_only_labels_require_complete_current_comparison(self):
         for finder, git, expected in [
@@ -128,6 +223,8 @@ console.log(JSON.stringify(next));"""
             'repo_files': 0, 'git_data': 1, 'finder_metadata': 0}})
         payload = self.report(row)
         payload['policy_version'] = 'status-clarity-1'
+        payload.pop('selected_repo_id')
+        payload['rows'][0].pop('timing')
         payload['rows'][0].update(display_label='Edits confirmed',
                                   display_headline='RepoHub confirmed edits.')
         self.evidence.presentation(payload)
@@ -143,7 +240,8 @@ console.log(JSON.stringify(next));"""
             payload['rows'][0].update(changes)
             self.evidence.presentation(payload)
             events = list(read_events(self.root/'logs'))
-            self.assertEqual(events[-1]['reason'], 'presentation_inputs_disagree')
+            presented = [event for event in events if event['event'] == 'ui_presented'][-1]
+            self.assertEqual(presented['reason'], 'presentation_inputs_disagree')
 
     def test_untyped_version_category_and_headline_fail_closed(self):
         payload = self.report(self.good)
@@ -161,7 +259,7 @@ console.log(JSON.stringify(next));"""
         bundle = export_bundle(self.root/'logs', self.root/'exports')
         shared = (bundle/'share/events.jsonl').read_text()
         rows = [json.loads(line) for line in shared.splitlines()]
-        actual = next(e for e in rows if e.get('policy_version') == 'status-clarity-3' and e['event'] == 'ui_presented')
+        actual = next(e for e in rows if e.get('policy_version') == 'status-clarity-5' and e['event'] == 'ui_presented')
         self.assertEqual(actual['category'], 'backed_up')
         self.assertEqual(actual['display_headline'], 'Your files are backed up.')
         for text in ['private-name', '/Users/private', '/private/current', 'private-repo', 'private-sha']:

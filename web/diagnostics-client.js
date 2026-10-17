@@ -6,7 +6,9 @@
     async function observe(status,rows,clientFreshness="current",selectedRepoId=null){
       if(!status?.diagnostic_observation_id)return false;
       const body={surface,native,client_id:clientId,observation_id:status.diagnostic_observation_id,policy_version:root.RepoStatus?.version||'change-evidence-1',client_freshness:clientFreshness,rows};
-      if(surface==='menu'&&body.policy_version==='status-clarity-4')body.selected_repo_id=selectedRepoId;
+      if(surface==='menu'&&['status-clarity-4','status-clarity-5'].includes(body.policy_version)) {
+        body.selected_repo_id=selectedRepoId;
+      }
       const signature=JSON.stringify(body),now=clock();
       if(clientFreshness!=='current')deferred=signature;
       if(pending)return false;

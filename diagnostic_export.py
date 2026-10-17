@@ -26,7 +26,7 @@ ENUMS = {
     'client_freshness': {'current','request_failed','response_timeout','cache_expired'},
     'event': EVENTS,
     'app_version': {'0.1.0'},
-    'policy_version': {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4'},
+    'policy_version': {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5'},
     'severity': {'info','warning','error'},
     'phase': {'background','stale','error','copying','changed','verifying','ready','uploading','pending','unknown'},
     'surface': {'app','menu'},

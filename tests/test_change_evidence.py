@@ -117,6 +117,57 @@ class EvidenceTests(unittest.TestCase):
         self.hub.evidence.presentation(app)
         self.assertEqual(sum(e['event']=='ui_presented' for e in self.events()), before)
 
+    def test_finder_only_green_display_keeps_real_backup_and_diagnostic_evidence(self):
+        import subprocess
+        from diagnostic_export import export_bundle
+        archive = self.hub.index[self.key]['archive']
+        (self.repo/'.DS_Store').write_text('new Finder view settings')
+        self.hub.scan(force=True)
+        status = self.hub.public_status()
+        repo = status['repos'][0]
+        self.assertEqual(repo['verification']['state'], 'different')
+        self.assertTrue(repo['verification']['ignored_finder_only'])
+        self.assertFalse(repo['needs_backup'])
+        original = copy.deepcopy(repo)
+        script = """const p=require('./web/repo-status.js');
+const s=JSON.parse(require('fs').readFileSync(0,'utf8'));
+console.log(JSON.stringify({state:p.present(s.repos[0],s.backup),timing:p.timing(s.repos[0],s.backup).receipt}));"""
+        rendered = json.loads(subprocess.check_output(['node', '-e', script],
+            cwd=Path(__file__).resolve().parents[1], input=json.dumps(status), text=True))
+        self.assertEqual(rendered['state']['label'], 'Backed up')
+        self.assertTrue(rendered['state']['ready'])
+        self.assertEqual(repo, original)
+        self.assertEqual(self.hub.index[self.key]['archive'], archive)
+        for surface in ['menu', 'app']:
+            shown = rendered['state']
+            row = {'repo_id': self.key, 'phase': shown['phase'], 'ready': shown['ready'],
+                   'display_label': shown['label'], 'category': shown['category'],
+                   'display_headline': shown['headline']}
+            payload = {'surface': surface, 'native': surface == 'menu',
+                       'client_id': ('c' if surface == 'menu' else 'd')*24,
+                       'observation_id': status['diagnostic_observation_id'],
+                       'policy_version': 'status-clarity-5', 'client_freshness': 'current', 'rows': [row]}
+            if surface == 'menu':
+                payload['selected_repo_id'] = self.key
+                row['timing'] = rendered['timing']
+            self.hub.evidence.presentation(payload)
+        self.assertFalse(any(e['event'] in {'presentation_input_disagreement',
+            'presentation_disagreement', 'timing_disagreement'} for e in self.events()))
+        report = summarize(self.events())
+        self.assertEqual(report['matching_comparisons'], 1)
+        bundle = export_bundle(self.hub.state_dir/'diagnostics', self.root/'exports')
+        shared = (bundle/'share/events.jsonl').read_text()
+        rows = [json.loads(line) for line in shared.splitlines()]
+        shown = [e for e in rows if e['event'] == 'ui_presented'][-1]
+        self.assertEqual(shown['policy_version'], 'status-clarity-5')
+        self.assertEqual(shown['reason'], 'finder_only_project_match')
+        self.assertEqual(shown['result'], 'ready')
+        facts = [e for e in rows if e['event'] == 'status_repo'][-1]
+        self.assertEqual(facts['verification_state'], 'different')
+        self.assertTrue(facts['ignored_finder_only'])
+        self.assertNotIn(str(self.repo), shared)
+        self.assertNotIn('confidential-name.txt', shared)
+
     def test_no_record_of_second_view_is_not_claimed_as_agreement(self):
         self.hub.evidence.presentation(self.payload('menu','Backed up','ready'))
         report = summarize(self.events())
