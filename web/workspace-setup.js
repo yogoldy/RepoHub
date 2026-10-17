@@ -71,6 +71,7 @@
     }
   }
   async function open(){
+    if (busy) return;
     if (root.RepoHubSettings && !await root.RepoHubSettings.leaveSchedule()) return;
     if (state && !$('workspace-form').hidden && dirty(state)) {
       const accepted = root.RepoHubSettings
@@ -83,14 +84,15 @@
   }
   function reset(){if(state)state.pending=null;$('workspace-form').hidden=true;$('settings-form').hidden=false;dialog.setAttribute('aria-labelledby','settings-title');}
   async function close(closeDialog = !root.RepoHubSettings?.showHome){
-    if(busy)return;
+    if(busy)return false;
     const changed=!!state&&dirty(state);
     const accepted=root.RepoHubSettings
       ? await root.RepoHubSettings.confirmDiscard(changed)
       : !changed||root.confirm('Discard unsaved folder changes?');
-    if(!accepted)return;
+    if(!accepted)return false;
     reset();state=null;
     if(closeDialog)dialog.close();else root.RepoHubSettings.showHome();
+    return true;
   }
   $('workspace-open').onclick=open;$('workspace-reload').onclick=open;
   if($('workspace-close'))$('workspace-close').onclick=()=>close(true);

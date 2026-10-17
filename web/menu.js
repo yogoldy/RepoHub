@@ -319,6 +319,11 @@ $('#settings-dialog').addEventListener('cancel', event => {
 });
 
 async function openSettings(repoId = null, page = 'home') {
+  if ($('#settings-dialog').open) {
+    if ($('#settings-form').hidden) {
+      if (!await window.RepoHubWorkspaces?.close(false)) return false;
+    } else if (activeSettingsPage === 'schedule' && !await leaveSchedule()) return false;
+  }
   try {
     const result = await api(repoId ? '/api/repo-settings/' + encodeURIComponent(repoId) : '/api/settings');
     settingsRepo = repoId;
@@ -343,8 +348,10 @@ async function openSettings(repoId = null, page = 'home') {
     $('#workspace-form').hidden = true;
     if (!$('#settings-dialog').open) $('#settings-dialog').showModal();
     showSettingsPage(repoId ? 'schedule' : page);
+    return true;
   } catch (error) {
     $('#notice').textContent = error.message;
+    return false;
   }
 }
 $('#settings').onclick = () => openSettings();
@@ -386,7 +393,7 @@ $('#settings-form').onsubmit = async event => {
 window.RepoHubSettings = {
   confirmDiscard, leaveSchedule,
   showHome: () => showSettingsPage('home'),
-  openAccess: async () => { await openSettings(); showSettingsPage('access'); },
+  openAccess: async () => { if (await openSettings()) showSettingsPage('access'); },
   workspaceOpened: () => {
     $('#settings-title').textContent = 'Folders to back up';
     $('#settings-back').hidden = false;

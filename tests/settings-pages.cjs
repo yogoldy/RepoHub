@@ -124,6 +124,11 @@ function change(id, value) {
   assert(!get('settings-page-schedule').hidden);
   assert(!get('schedule-actions').hidden);
   change('adapter-frequency', '30');
+  const accessRequest = context.window.RepoHubSettings.openAccess(); await tick();
+  assert(get('settings-discard').open);
+  get('settings-keep').onclick(); await accessRequest;
+  assert(!get('settings-page-schedule').hidden, 'Native access entry cannot hide a declined dirty draft');
+  assert.equal(Number(get('adapter-frequency').value), 30);
   const back = get('settings-back').onclick(); await tick();
   get('settings-keep').onclick(); await back;
   assert(!get('settings-page-schedule').hidden);
