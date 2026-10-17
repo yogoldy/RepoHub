@@ -29,7 +29,7 @@ Branch: `codex/signed-updates`, created from checked status/timing commit
 
 - [x] Apple Developer Program membership purchased — Leo reported purchase on 2026-10-16. This records the purchase, not independently verified activation.
 - [ ] Confirm the membership is active and create or identify a usable Developer ID Application signing identity.
-- [x] Build the native app, pinned Python/helper and web interface as one verified test bundle; integrate Sparkle and validate real signed isolated upgrades and rollback on application source `ad29dc9`.
+- [x] Build the native app, pinned Python/helper and web interface as one verified test bundle; integrate Sparkle and validate real signed isolated upgrades and rollback on final application source `985814d`.
 - [ ] Establish Developer ID signing/notarization and verify permission continuity after activation.
 - [ ] Set production signing-key custody and an HTTPS feed, then validate the first coordinated migration from existing launchd registrations with rollback before any daily deployment.
 

@@ -450,7 +450,7 @@
         "test_update_feed.UpdateFeedTests.test_key_file_must_be_private_regular_and_owned",
         "test_update_shutdown.UpdateShutdownTests.test_loopback_startup_does_not_wait_for_hostname_resolution"
       ],
-      "remaining_gap": "Native isolated updater acceptance passed on ad29dc9, but CI exposed a helper startup stall in standard-library hostname resolution. The loopback server now binds without DNS and a resolver-failure regression protects it. This application change requires new native candidate acceptance; earlier receipts remain historical. Developer ID/notarization, permission continuity, production key/feed custody and first coordinated launchd migration remain open. Daily Macs remain unchanged."
+      "remaining_gap": "Final native isolated acceptance on application source 985814d passed cancellation, signed replacement, invalid signature, truncated archive, equal-version refusal, busy-backup refusal and automatic rollback after injected helper failure, with unchanged synthetic archive/configuration hashes. Clean local gate: 233 tests, 20 rules, 25 commands; GitHub automated-contract passed that exact source. Production Developer ID/notarization, permission continuity, key/feed custody, first coordinated launchd migration and persistent recovery explanation remain open. Daily Macs unchanged."
     }
   ]
 }
