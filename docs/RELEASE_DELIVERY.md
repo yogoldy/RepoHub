@@ -31,7 +31,7 @@ Configured with Leo's approval on October 17:
 - Repository secret `REPOHUB_SPARKLE_PRIVATE_KEY`: the Ed25519 private seed, never source-controlled or printed.
 - Repository variable `REPOHUB_UPDATE_PUBLIC_KEY`: matching public verification key.
 - `REPOHUB_RELEASE_ENABLED=false`: publishing stays disabled.
-- A local owner-only recovery file outside the repository is available for Leo to save into his password manager. Password-manager recovery custody is not yet confirmed. Do not reproduce the seed in issues, logs, docs or chat.
+- Leo confirmed on October 17 that he saved the recovery key in his password manager. This is user-confirmed custody; the password-manager contents were not inspected. The owner-only local recovery file remains outside Git. Do not reproduce the seed in issues, logs, docs or chat.
 
 After Apple membership activation, configure the following repository secrets without sharing credentials in chat:
 
@@ -46,7 +46,7 @@ After Apple membership activation, configure the following repository secrets wi
 
 Use a disposable runner keychain; restore its prior search list and remove the temporary keychain/secret files in cleanup. Never enable shell tracing or print subprocess signing arguments. An interrupted hosted runner is disposable; no signing material is uploaded as an artifact. Apple's response must explicitly be Accepted; stapler validation and Gatekeeper assessment still gate archive preparation. Developer ID signing includes hardened runtime and trusted timestamps.
 
-Before enabling publication, confirm recovery custody, configure Apple credentials, finish a first signed-package/notarization test and review the guarded first install from the old external-runtime/launchd layout. Then set `REPOHUB_RELEASE_ENABLED=true`. The workflow becomes automatic once present on main; it does not run directly from this feature branch. A failed release job can be rerun, retaining the exact main-source checks. New main changes naturally trigger a new Golden Gate and publication attempt.
+Recovery custody is confirmed. Before enabling publication, configure Apple credentials, finish a first signed-package/notarization test and review the guarded first install from the old external-runtime/launchd layout. Then set `REPOHUB_RELEASE_ENABLED=true`. The workflow becomes automatic once present on main; it does not run directly from this feature branch. A failed release job can be rerun, retaining the exact main-source checks. New main changes naturally trigger a new Golden Gate and publication attempt.
 
 ## Current verification limits
 
@@ -55,3 +55,5 @@ A real unpublished GitHub draft probe confirmed exact-source targeting, uploaded
 Policy, publication-order/failure and secret-cleanup regressions run in the Golden Gate, along with pinned actionlint workflow validation. Simulated GitHub/signing cases prove the control flow, not Apple service acceptance or a live public release. No production release exists yet; the feed URL becomes live on the first successful signed publication. No installed Pro/Air app has been replaced by this work. Native permission continuity and the outstanding reliability matrix remain recorded separately. Apple activation is still user-reported pending.
 
 Sources: [GitHub workflow-run security and semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run), [Sparkle update signing](https://sparkle-project.org/documentation/), [Apple notarization](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow).
+
+Signing checkpoint — October 17: local inspection found zero usable Developer ID Application identities. No notarization submission was made; production signing and Apple submission credentials remain required.
