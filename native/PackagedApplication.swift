@@ -39,7 +39,7 @@ final class PackagedApplication {
         testMode = bundle.object(forInfoDictionaryKey: "RepoHubTestMode") as? Bool == true
         let home = FileManager.default.homeDirectoryForCurrentUser
         stateDirectory = testMode
-            ? home.appendingPathComponent("Library/Application Support/RepoHub Tests/" + release.bundle_id)
+            ? home.appendingPathComponent("Library/Application Support/RepoHub Tests/" + release.bundle_id + "/state")
             : home.appendingPathComponent("Library/Application Support/RepoHub")
         configURL = stateDirectory.appendingPathComponent("config.json")
         let data = try Data(contentsOf: configURL)
@@ -57,7 +57,7 @@ final class PackagedApplication {
             for key in ["repos_root", "backup_root"] {
                 guard let path = config[key] as? String,
                       URL(fileURLWithPath: path).resolvingSymlinksInPath().path.hasPrefix(
-                        stateDirectory.resolvingSymlinksInPath().path + "/") else {
+                        stateDirectory.deletingLastPathComponent().resolvingSymlinksInPath().path + "/") else {
                     throw Failure.configurationInvalid
                 }
             }

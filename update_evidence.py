@@ -12,7 +12,9 @@ def update_evidence(value, release):
         return None
     if set(value) != {'update_phase', 'update_reason', 'source_revision', 'build'}:
         return None
-    if value.get('update_phase') not in PHASES or value.get('update_reason') not in REASONS:
+    if (not isinstance(value.get('update_phase'), str)
+            or not isinstance(value.get('update_reason'), str)
+            or value['update_phase'] not in PHASES or value['update_reason'] not in REASONS):
         return None
     if (value.get('source_revision') != release.get('source_revision')
             or value.get('build') != release.get('build')

@@ -15,7 +15,7 @@ class UpdateEvidenceTests(unittest.TestCase):
             'update_phase': 'failed', 'update_reason': 'sparkle_aborted'})
         for patch in ({'source_revision': 'b' * 40}, {'build': '11'},
                       {'update_phase': '/private/secret'}, {'update_reason': 'opaque exception'},
-                      {'path': '/private/secret'}):
+                      {'path': '/private/secret'}, {'update_phase': []}, {'update_reason': {}}):
             self.assertIsNone(update_evidence({**value, **patch}, release))
         self.assertIsNone(update_evidence(None, release))
 
