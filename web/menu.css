@@ -129,6 +129,7 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 #technical-details summary {
   cursor: pointer;
   width: fit-content;
+  padding-inline-start: 4px;
 }
 #technical-details summary:focus-visible {
   outline: 2px solid var(--gold);
