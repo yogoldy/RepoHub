@@ -87,7 +87,16 @@ function render(){
   $('#notifications').setAttribute('aria-pressed',String(enabled));
   $('#notification-caption').textContent=notifications.permission==='denied'?'macOS permission needed':enabled?'On':'Off';
   $('#checked').textContent='Live · Checked '+when(menuState.cloud_checked_at);
-  for(const id of ['open-backups','notifications','quit']){$('#'+id).disabled=!window.webkit?.messageHandlers?.repoHub;if($('#'+id).disabled)$('#'+id).title='Available in the Mac menu-bar panel';}
+  for(const id of ['open-backups','notifications','quit']){
+    const control=$('#'+id);
+    control.disabled=!window.webkit?.messageHandlers?.repoHub;
+    if(control.disabled){
+      const explanation='Available in the Mac menu-bar panel';
+      control.setAttribute('aria-description',explanation);
+      if(id==='quit')control.removeAttribute('title');
+      else control.title=explanation;
+    }
+  }
 }
 function renderDetail() {
   const repo = menuState.repos.find(row => row.id === selectedId);

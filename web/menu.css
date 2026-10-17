@@ -396,3 +396,10 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* The footer Quit control should not pick up the generic button fill on hover. */
+footer button:hover {
+  background: transparent;
+  color: var(--text);
+  transition: color 150ms ease;
+}
