@@ -13,9 +13,28 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var notificationsEnabled: Bool { UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true }
     var polling: Timer?
     var sourcePicker: NSOpenPanel?
-    let address = URL(string: "http://127.0.0.1:8767/")!
+    var packaged: PackagedApplication?
+    var updates: AppUpdates?
+    var hasLoadedMenu = false
+    var address = URL(string: "http://127.0.0.1:8767/")!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if PackagedApplication.enabled {
+            do {
+                let application = try PackagedApplication()
+                packaged = application
+                address = application.address
+                try application.startHelper()
+                updates = AppUpdates(application: application)
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "RepoHub could not start this app version."
+                alert.informativeText = "Its package or configuration could not be verified. Your backups have not been changed."
+                alert.runModal()
+                NSApp.terminate(nil)
+                return
+            }
+        }
         NSApp.setActivationPolicy(.accessory)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Repo Hub")
@@ -34,7 +53,22 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         popover.appearance = NSAppearance(named: .darkAqua)
         popover.behavior = .transient
         popoverWebView = view
-        view.load(URLRequest(url: address.appendingPathComponent("menu.html")))
+        if packaged == nil {
+            view.load(URLRequest(url: address.appendingPathComponent("menu.html")))
+            hasLoadedMenu = true
+        }
+        let menu = NSMenu()
+        let check = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        check.target = self
+        menu.addItem(check)
+        let quit = NSMenuItem(title: "Quit RepoHub", action: #selector(quit), keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem()
+        appItem.submenu = menu
+        mainMenu.addItem(appItem)
+        NSApp.mainMenu = mainMenu
         UNUserNotificationCenter.current().delegate = self
         updateNotificationStatus()
         pollStatus()
@@ -58,6 +92,19 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                         self.notifyProblems([["id":"helper:" + String(since.timeIntervalSince1970), "name":"Repo Hub", "detail":"The backup helper has been unavailable for two minutes."]])
                     }
                     return
+                }
+                if let packaged = self.packaged {
+                    guard packaged.matches(status) else {
+                        self.statusItem.button?.title = " !"
+                        self.statusItem.button?.toolTip = "RepoHub: application components do not match"
+                        self.updates?.record("failed", reason: "component_mismatch")
+                        return
+                    }
+                    if !self.hasLoadedMenu {
+                        self.popoverWebView.load(URLRequest(url: self.address.appendingPathComponent("menu.html")))
+                        self.hasLoadedMenu = true
+                        self.updates?.record("ready", reason: "matching_helper")
+                    }
                 }
                 self.unavailableSince = nil
                 let repos = status["repos"] as? [[String: Any]] ?? []
@@ -105,8 +152,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 let request = BackupReadiness.permissionRequest(saved: UserDefaults.standard.string(forKey: "notificationRequest"), inFlight: self.permissionRequestInFlight)
                 let status: [String: Any] = ["enabled": self.notificationsEnabled, "permission": permission,
                     "request": request]
-                let path = FileManager.default.homeDirectoryForCurrentUser
-                    .appendingPathComponent("Library/Application Support/RepoHub/notifications.json")
+                let state = self.packaged?.stateDirectory ?? FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Library/Application Support/RepoHub")
+                let path = state.appendingPathComponent("notifications.json")
                 if let data = try? JSONSerialization.data(withJSONObject: status, options: [.sortedKeys]), data != self.lastNotificationData {
                     do {
                         try data.write(to: path, options: .atomic)
@@ -207,7 +255,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.webView === popoverWebView,
               let action = MenuBridge.action(body: message.body, frameURL: message.frameInfo.request.url,
-                                             isMainFrame: message.frameInfo.isMainFrame) else { return }
+                                             isMainFrame: message.frameInfo.isMainFrame, expectedPort: address.port ?? 8767) else { return }
         switch action {
         case .openBackups: openBackups()
         case .openRepo:
@@ -219,7 +267,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         case .privacySettings: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_FilesAndFolders")!)
         case .loginSettings: NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!)
         case .toggleNotifications: toggleNotifications()
-        case .connectGitHub: GitHubConnection.configure()
+        case .connectGitHub:
+            if packaged?.testMode != true { GitHubConnection.configure() }
+        case .checkForUpdates: checkForUpdates()
         case .chooseRepoHome, .chooseRepoFolders:
             if let body = message.body as? [String: Any], let id = body["request_id"] as? String {
                 chooseSources(multiple: action == .chooseRepoFolders, requestID: id)
@@ -235,7 +285,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             decisionHandler(.cancel)
             return
         }
-        decisionHandler(url.scheme == "http" && url.host == "127.0.0.1" && url.port == 8767 && url.path == "/menu.html" ? .allow : .cancel)
+        decisionHandler(url.scheme == "http" && url.host == "127.0.0.1" && url.port == address.port && url.path == "/menu.html" ? .allow : .cancel)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -309,7 +359,11 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Repository Backups")
         NSWorkspace.shared.open(path)
     }
+    @objc func checkForUpdates() { updates?.checkForUpdates() }
     @objc func quit() { NSApp.terminate(nil) }
+    func applicationWillTerminate(_ notification: Notification) {
+        packaged?.stopHelper()
+    }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showPopover()
         return true
@@ -319,6 +373,10 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
 @main enum RepoHubMain {
     static func main() {
+        if CommandLine.arguments.dropFirst().first == "--bundled-helper" {
+            guard PackagedApplication.enabled else { exit(64) }
+            do { exit(try PackagedApplication().runHelper()) } catch { exit(78) }
+        }
         if let code = HelperLaunch.run(CommandLine.arguments) { exit(code) }
         let application = NSApplication.shared
         let delegate = HubDelegate()

@@ -170,3 +170,14 @@ window.addEventListener('resize',updatePosition);setInterval(()=>{if(lastRespons
 $('#connect-github').onclick=()=>nativeAction('connectGitHub');
 
 window.addEventListener('repoHubWorkspacesChanged',()=>void load());
+
+const updateButton = document.getElementById('check-updates');
+if (updateButton) {
+  updateButton.onclick = () => {
+    if (window.webkit?.messageHandlers?.repoHub) {
+      window.webkit.messageHandlers.repoHub.postMessage({action: 'checkForUpdates'});
+    } else {
+      $('#notice').textContent = 'Check for Updates is available in the installed app.';
+    }
+  };
+}
