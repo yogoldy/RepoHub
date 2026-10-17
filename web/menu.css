@@ -127,9 +127,27 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   overflow-wrap: anywhere;
 }
 #technical-details summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
   width: fit-content;
-  padding-inline-start: 8px;
+  list-style: none;
+}
+#technical-details summary::-webkit-details-marker {
+  display: none;
+}
+#technical-details summary::before {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid currentColor;
+  content: "";
+  transition: transform 120ms ease;
+}
+#technical-details[open] summary::before {
+  transform: rotate(90deg);
 }
 #technical-details summary:focus-visible {
   outline: 2px solid var(--gold);
