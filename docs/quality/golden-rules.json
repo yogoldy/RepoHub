@@ -492,8 +492,11 @@
       "id": "GR22",
       "title": "Settings persist only through explicit reviewed saves",
       "breakpoint": "Closing a dirty settings page can silently lose a draft; repeated submits or stale revisions can overwrite saved choices.",
-      "diagnostic_events": [],
-      "cause_and_solution": "Keep local drafts, guard Back/Close/Escape, serialize saves and preserve the existing session-token and revision-checked API boundary.",
+      "diagnostic_events": [
+        "workspace_configuration",
+        "schedule_decision"
+      ],
+      "cause_and_solution": "Keep local drafts, guard Back/Close/Escape, serialize saves and preserve the existing session-token and revision-checked API boundary. Folder persistence has workspace_configuration evidence; effective saved scheduling policy appears in schedule_decision. Discard-only UI paths are covered by controller regressions, not claimed as save events.",
       "required_behavior": "No persistence from editing or navigation. Failed saves keep the draft. Folder choices retain review and revision protections.",
       "test_ids": [
         "test_settings_pages.SettingsPagesTests.test_explicit_save_discard_busy_and_failure_preserve_drafts_and_revision_guards",
