@@ -269,3 +269,15 @@ The Test session was not the physical console, so local test-account unlock is
 the next controlled permission investigation. Both cleanup receipts preserved
 protected state and restored daily services. Full matrix/Pro repeat/release remain
 open; no broad permissions or daily deployment occurred.
+
+
+### Personal update delivery — October 17, 2026
+
+Leo clarified that real-Mac testing follows easy update delivery for this personal
+app. The signed-update branch now prepares GitHub release hosting and automatic
+exact-main publication after Golden Gate acceptance, with current plus three
+historical packages and retained Git source tags. Update-key custody is configured
+with a local recovery copy awaiting password-manager confirmation. Publication
+remains disabled until Apple credentials and initial signed distribution are ready;
+no daily Mac has been updated. See [release delivery](docs/RELEASE_DELIVERY.md) for
+implementation, native evidence limits and the first-install migration dependency.

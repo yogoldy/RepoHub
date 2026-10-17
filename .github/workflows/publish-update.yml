@@ -1,0 +1,46 @@
+name: Publish signed update
+on:
+  workflow_run:
+    workflows: [Golden rules]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: repohub-production-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'yogoldy/RepoHub' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success' &&
+      vars.REPOHUB_RELEASE_ENABLED == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Recheck the exact clean source on the release runner
+        run: python3 tools/release_gate.py --require-clean --output "$RUNNER_TEMP/release-gate.json"
+      - name: Package, notarize, verify and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOHUB_RELEASE_ENABLED: ${{ vars.REPOHUB_RELEASE_ENABLED }}
+          REPOHUB_UPDATE_PUBLIC_KEY: ${{ vars.REPOHUB_UPDATE_PUBLIC_KEY }}
+          REPOHUB_SPARKLE_PRIVATE_KEY: ${{ secrets.REPOHUB_SPARKLE_PRIVATE_KEY }}
+          REPOHUB_CERTIFICATE_P12: ${{ secrets.REPOHUB_CERTIFICATE_P12 }}
+          REPOHUB_CERTIFICATE_PASSWORD: ${{ secrets.REPOHUB_CERTIFICATE_PASSWORD }}
+          REPOHUB_SIGNING_IDENTITY: ${{ secrets.REPOHUB_SIGNING_IDENTITY }}
+          REPOHUB_NOTARY_KEY: ${{ secrets.REPOHUB_NOTARY_KEY }}
+          REPOHUB_NOTARY_KEY_ID: ${{ secrets.REPOHUB_NOTARY_KEY_ID }}
+          REPOHUB_NOTARY_ISSUER: ${{ secrets.REPOHUB_NOTARY_ISSUER }}
+          ACCEPTED_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: python3 tools/publish_release.py --run-id "$ACCEPTED_RUN_ID" --gate-receipt "$RUNNER_TEMP/release-gate.json"

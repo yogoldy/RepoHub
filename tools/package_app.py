@@ -174,7 +174,7 @@ def build(output, cache, version, build_number, identifier, feed, public_key,
                 'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True}}
         (contents / 'Info.plist').write_bytes(plistlib.dumps(info))
         identity = signing_identity or '-'
-        options = ['--options', 'runtime'] if not test else []
+        options = ['--options', 'runtime', '--timestamp'] if not test else []
         # Sign nested executable code before hashing resources. Never use --deep to sign.
         for path in sorted((resources / 'python').rglob('*')):
             if path.is_file() and not path.is_symlink():

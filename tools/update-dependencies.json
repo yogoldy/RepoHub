@@ -10,5 +10,9 @@
     "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.14.8%2B20261013-aarch64-apple-darwin-install_only.tar.gz",
     "sha256": "709f419d175eb015f810b68aa54bdae1d776c9824cb362aa701c93b0a9f2a9e7",
     "license": "PSF and bundled third-party licenses"
+  },
+  "actionlint-arm64": {
+    "url": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_darwin_arm64.tar.gz",
+    "sha256": "aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f"
   }
 }

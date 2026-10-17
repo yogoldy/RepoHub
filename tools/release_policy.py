@@ -34,10 +34,14 @@ def release_number(release):
 
 
 def release_plan(releases, revision):
-    if not SHA.fullmatch(revision):
-        raise ValueError('exact_source_required')
     # Failed drafts reserve their number, avoiding accidental overwrite on retry.
     build = max((release_number(item) or 0 for item in releases), default=0) + 1
+    return plan_for_build(build, revision)
+
+
+def plan_for_build(build, revision):
+    if type(build) is not int or build < 1 or not SHA.fullmatch(revision):
+        raise ValueError('exact_source_and_positive_build_required')
     version = f'0.{build // 10}.{build % 10}'
     tag = f'repohub-v{version}-b{build}'
     archive = f'RepoHub-{version}-arm64.zip'
@@ -53,8 +57,7 @@ def validate_receipt(release, receipt):
     build = release_number(release)
     if build is None:
         raise ValueError('managed_release_required')
-    expected = release_plan([{'tag_name': f'repohub-v0.0.0-b{build - 1}'}] if build > 1 else [],
-                            receipt.get('source_revision', ''))
+    expected = plan_for_build(build, receipt.get('source_revision', ''))
     for field in ('schema', 'publisher', 'version', 'build', 'tag', 'archive', 'archive_url', 'feed_url'):
         if receipt.get(field) != expected[field]:
             raise ValueError('release_receipt_mismatch')

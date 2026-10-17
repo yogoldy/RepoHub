@@ -586,3 +586,16 @@ no resolver is needed. A deterministic regression makes getfqdn raise, confirms
 the standard server counterexample, and requires the RepoHub server to bind.
 Wildcard binding is rejected. This is an application change, so prior native
 updater acceptance is historical until repeated for the new candidate.
+
+
+## GR21 — accepted source and atomic release availability
+
+A passing feature-branch or PR gate is not an accepted main release. Publication
+requires the successful main-push workflow and job for the checked-out exact SHA;
+a new main commit during upload prevents that draft from publishing. Tests inject
+upload failure, altered downloaded assets and superseding source, and require no
+publication or package deletion. Latest-release uncertainty or a bad historical
+receipt prevents all cleanup. Cleanup retains current plus three prior managed
+packages and preserves tags and unrelated releases. The workflow is syntax-checked
+by pinned actionlint inside the macOS Golden Gate. Real Apple service/GitHub
+publication remains open until credentials and the first production release.

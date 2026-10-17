@@ -1,5 +1,9 @@
 # Coordinated packaging and signed updates
 
+## Personal release delivery
+
+The [October 17 delivery policy](RELEASE_DELIVERY.md) adds GitHub-hosted automatic releases after accepted main checks, current-plus-three package retention and approved update-key custody. This supersedes earlier native-before-publication requirements for Leo’s personal channel; production signing is still pending Apple activation.
+
 ## Authorized goal
 
 Work on `codex/signed-updates`, in the existing checkout. Build one coordinated app version, add Sparkle's Check for Updates, and validate actual upgrades using disposable apps. Daily Pro and Air installations, launch registrations, permissions, settings and backups stay untouched. Developer ID signing and permission continuity remain pending membership activation and a usable certificate.

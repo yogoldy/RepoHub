@@ -174,6 +174,7 @@ def main():
         if args.profile=='macos':
             if platform.system()!='Darwin':
                 raise ValueError('macOS profile requires macOS; native checks may not be silently skipped')
+            command('github-workflow-syntax',[sys.executable,str(ROOT/'tools/check_workflows.py'),'--cache',str(evidence/'workflow-dependencies')])
             swift=['/usr/bin/xcrun','swiftc','-module-cache-path',str(evidence/'swift-cache'),'-target',platform.machine()+'-apple-macos13.0']
             command('native-app-build',swift+[str(ROOT/'native'/name) for name in ['RepoHub.swift','HelperLaunch.swift','BackupReadiness.swift','ProblemAlerts.swift','MenuBridge.swift','GitHubConnection.swift','PackagedApplication.swift','AppUpdates.swift']]+['-o',str(evidence/'RepoHub'),'-framework','AppKit','-framework','WebKit','-framework','UserNotifications'])
             command('cloud-helper-build',swift+[str(ROOT/'native/CloudStatus.swift'),'-o',str(evidence/'cloud-status')])
