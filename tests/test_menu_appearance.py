@@ -69,11 +69,13 @@ def fixtures():
 def render(cases):
     script = """const p=require('./web/repo-status.js');
 const input=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const original=JSON.stringify(input);
 console.log(JSON.stringify(input.map(({status,mode})=>{
 const states=(status.repos||[]).map(r=>p.present(r,status.backup));
 const a=p.menuBar(status,mode), b=p.summarizeMenuBar(states,mode,status.backup,status.data_cloud);
 if(JSON.stringify(a)!==JSON.stringify(b))throw Error('Native count drifted from card presentations');
-return a;})));"""
+return a;})));
+if(JSON.stringify(input)!==original)throw Error('Counting mutated the app status');"""
     return json.loads(subprocess.check_output(['node', '-e', script], cwd=ROOT,
                       input=json.dumps(cases), text=True, timeout=15))
 
@@ -120,11 +122,25 @@ class MenuAppearanceTests(unittest.TestCase):
             altered = dict(last, title='/private/secret')
             with self.assertRaises(ValueError):
                 evidence.menu_bar_presentation(altered)
+            # Local/legacy logs are not trusted to obey the HTTP receipt schema.
+            log.emit('menu_bar_presented', menu_count_mode='private-mode',
+                     menu_count='private-count', menu_symbol='private-symbol')
+            for invalid in (True, -1, 4097, 10**100):
+                log.emit('menu_bar_presented', menu_count=invalid)
+            log.emit('menu_bar_presented', menu_count_mode='pending',
+                     menu_symbol='count', menu_count=4096)
             exported = export_bundle(log.directory, Path(temp)/'exports')
             shared = (exported/'share/events.jsonl').read_text()
             self.assertIn('menu_count_mode', shared)
             self.assertNotIn('/private/', shared)
             self.assertNotIn('Private sample', shared)
+            for secret in ('private-mode', 'private-count', 'private-symbol'):
+                self.assertNotIn(secret, shared)
+            exported_rows = [json.loads(line) for line in shared.splitlines()]
+            self.assertEqual(exported_rows[-1]['menu_count'], 1000)
+            for row in exported_rows[-6:-1]:
+                for field in ('menu_count', 'menu_count_mode', 'menu_symbol'):
+                    self.assertNotIn(field, row)
             self.assertEqual(log.failed, 0)
 
     def test_native_readback_receipt_and_http_origin_token_guards(self):
