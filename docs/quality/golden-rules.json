@@ -117,7 +117,7 @@
         "upload_stale"
       ],
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
-      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics. Policy 6 checks timing on every grid card, including when all details are collapsed, and separately checks the one expanded timing line. Missing, hidden or incorrect compact text cannot be proven by an expanded-panel receipt.",
+      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics. Policy 6 checks every visible grid card while details are collapsed. In the focused view it requires only the selected card and its expanded timing line; hidden repos are not claimed as displayed. Missing, hidden or incorrect compact text cannot be proven by an expanded-panel receipt.",
       "test_ids": [
         "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
         "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
@@ -140,7 +140,11 @@
         "test_grid_timing.GridTimingTests.test_all_cards_are_checked_with_no_expanded_selection",
         "test_grid_timing.GridTimingTests.test_missing_wrong_or_hidden_card_time_is_detected_independently_of_detail",
         "test_grid_timing.GridTimingTests.test_missing_receipts_and_inconsistent_expansion_fail_closed",
-        "test_grid_timing.GridTimingTests.test_actual_compact_javascript_uses_same_timing_contract_for_every_state"
+        "test_grid_timing.GridTimingTests.test_actual_compact_javascript_uses_same_timing_contract_for_every_state",
+        "test_menu_grid.MenuGridTests.test_actual_grid_controller_and_timing_dom_faults",
+        "test_menu_grid.MenuGridTests.test_real_controller_observations_reach_independent_diagnostic_checks",
+        "test_grid_timing.GridTimingTests.test_rendered_clock_text_and_day_labels_match_known_utc_times",
+        "test_grid_timing.GridTimingTests.test_focus_checks_only_selected_repo_and_rejects_extra_or_missing_cards"
       ],
       "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },

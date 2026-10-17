@@ -229,7 +229,7 @@
     return {receipt, lastLine, locationLabel, createdLabel, nextLine, inclusionLine};
   }
 
-  function compactTiming(timing) {
+  function compactTiming(timing, now = new Date()) {
     const receipt = timing.receipt;
     const state = receipt.schedule_state;
     let kind = state;
@@ -242,10 +242,13 @@
           && Number.isFinite(Date.parse(receipt.due_at))) {
         dueAt = receipt.due_at;
         label = kind === 'backup' ? 'Next backup' : 'Next check';
-        // Include the date so a check tomorrow cannot look due earlier today.
+        const due = new Date(dueAt);
+        const sameDay = due.toDateString() === now.toDateString();
+        // A different day needs a date; today's card can stay short.
         timeLabel = new Intl.DateTimeFormat(undefined, {
-          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-        }).format(new Date(dueAt));
+          ...(sameDay ? {} : {month: 'short', day: 'numeric'}),
+          hour: 'numeric', minute: '2-digit', hour12: true,
+        }).format(due).replace(/\s*(AM|PM)$/, (_, period) => period.toLowerCase());
       } else if (state === 'due') {
         label = kind === 'backup' ? 'Backup due now' : 'Check due now';
       } else {
@@ -349,5 +352,5 @@
       ${group.explanation ? `<p>${group.explanation}</p>` : ''}
       ${group.note ? `<p class="guide-note">${group.note}</p>` : ''}</section>`).join('');
   }
-  const policy={view,present,timing,compactTiming,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-5'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,timing,compactTiming,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-6'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

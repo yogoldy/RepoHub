@@ -56,7 +56,7 @@ checkPage('home');
 nodes.get('info-close').onclick();
 assert.equal(dialog.open, false);
 // The technical region is outside the repo pane and before global backup controls.
-assert.match(html, /<section id="detail"[^>]*>[\s\S]*?<\/section>\s*<section id="technical-panel"[^>]*><\/section>\s*<div class="controls">/);
+assert.match(html, /<div id="repo-expansion"[^>]*hidden>[\s\S]*?<section id="detail"[^>]*hidden>[\s\S]*?<section id="technical-panel"[^>]*hidden>/);
 assert.ok(source.indexOf('const technicalMarkup') > source.indexOf('id="report-status"'));
 console.log('Information navigation, selected-folder demonstration and detail-region checks passed');
 
@@ -83,6 +83,7 @@ function region(id) {
   detailNodes.set(id, node);
   return node;
 }
+region('repo-expansion');
 const detailRegion = region('detail');
 const technicalRegion = region('technical-panel');
 const repo = {id: 'a', name: 'First repo', health: {fresh: true}, needs_backup: false,
@@ -97,7 +98,7 @@ const renderContext = vm.createContext({
   escape: value => String(value ?? ''), when: value => value || 'Not yet', bytes: () => '1 MB',
   openSettings() {}, window: {},
 });
-vm.runInContext(source.slice(source.indexOf('function renderDetail()'),
+vm.runInContext(source.slice(source.indexOf('function renderDetail('),
   source.indexOf('function selectRepo(')), renderContext);
 vm.runInContext('renderDetail()', renderContext);
 assert.match(detailRegion.innerHTML, /id="report-status"/);

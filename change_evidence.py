@@ -411,10 +411,12 @@ class ChangeEvidence:
                     validate_timing(row['timing'])
                 if grid_frame:
                     validate_grid_timing(row, selected)
-            if len(rows) != len(snapshot) or len({r['repo_id'] for r in rows}) != len(snapshot):
-                raise ValueError('Presentation must describe the observed repo list')
+            expected_repos = {selected} if grid_frame and selected is not None else set(snapshot)
+            if len(rows) != len(expected_repos) or {row['repo_id'] for row in rows} != expected_repos:
+                raise ValueError('Presentation must describe the visible observed repo list')
             client, observation = payload['client_id'], payload['observation_id']
-            self.log.emit('ui_frame', client_id=client, observation_id=observation,
+            frame_fields = {'view_scope': 'focused' if selected else 'grid'} if grid_frame else {}
+            self.log.emit('ui_frame', **frame_fields, client_id=client, observation_id=observation,
                           surface=payload['surface'], native=payload['native'], policy_version=payload['policy_version'], client_freshness=freshness, repo_count=len(rows))
             previous = self.clients.pop(client, {})
             current = {}

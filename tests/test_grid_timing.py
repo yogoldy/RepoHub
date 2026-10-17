@@ -1,6 +1,7 @@
 """Every compact card and the optional expanded panel have separate observations."""
 import copy
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -35,6 +36,8 @@ class GridTimingTests(unittest.TestCase):
         observation = self.evidence.observe_status({'repos': repos, 'backup': {}})
         rows = []
         for repo in repos:
+            if selected is not None and repo['id'] != selected:
+                continue
             facts = self.evidence.snapshots[observation][repo['id']]
             timing = timing_receipt(facts, freshness)
             phase = 'ready' if freshness == 'current' else 'stale'
@@ -63,19 +66,20 @@ class GridTimingTests(unittest.TestCase):
         self.assertFalse(self.events('timing_disagreement'))
 
     def test_missing_wrong_or_hidden_card_time_is_detected_independently_of_detail(self):
-        payload = self.payload(selected='private-id')
-        self.evidence.presentation(payload)
-        for target in (0, 1):
-            for change in ({'text_matches': False}, {'due_at': None}, {'kind': 'backup'},
-                           {'due_at': '2026-10-18T23:00:00+00:00'}):
-                bad = copy.deepcopy(payload)
-                bad['rows'][target]['card_timing'].update(change)
-                self.evidence.presentation(bad)
-                self.assertEqual(self.events('timing_disagreement')[-1]['timing_surface'], 'card')
-                if target == 0:
-                    self.assertEqual(self.events('ui_timing')[-1]['result'], 'complete')
-                    self.assertEqual(self.events('ui_timing')[-1]['timing_surface'], 'detail')
-                self.evidence.presentation(payload)
+        for selected, targets in [(None, (0, 1)), ('private-id', (0,))]:
+            payload = self.payload(selected=selected)
+            self.evidence.presentation(payload)
+            for target in targets:
+                for change in ({'text_matches': False}, {'due_at': None}, {'kind': 'backup'},
+                               {'due_at': '2026-10-18T23:00:00+00:00'}):
+                    bad = copy.deepcopy(payload)
+                    bad['rows'][target]['card_timing'].update(change)
+                    self.evidence.presentation(bad)
+                    self.assertEqual(self.events('timing_disagreement')[-1]['timing_surface'], 'card')
+                    if selected:
+                        self.assertEqual(self.events('ui_timing')[-1]['result'], 'complete')
+                        self.assertEqual(self.events('ui_timing')[-1]['timing_surface'], 'detail')
+                    self.evidence.presentation(payload)
         bad = copy.deepcopy(payload)
         bad['rows'][0]['detail_timing']['text_matches'] = False
         self.evidence.presentation(bad)
@@ -96,6 +100,21 @@ class GridTimingTests(unittest.TestCase):
         payload['selected_repo_id'] = None
         with self.assertRaises(ValueError):
             self.evidence.presentation(payload)
+
+    def test_focus_checks_only_selected_repo_and_rejects_extra_or_missing_cards(self):
+        payload = self.payload('private-id')
+        self.evidence.presentation(payload)
+        frames = self.events('ui_frame')
+        self.assertEqual(frames[-1]['view_scope'], 'focused')
+        self.assertEqual(frames[-1]['repo_count'], 1)
+        overview = self.payload()
+        for rows in [[], overview['rows']]:
+            bad = copy.deepcopy(payload)
+            bad['rows'] = rows
+            with self.assertRaises(ValueError):
+                self.evidence.presentation(bad)
+        self.evidence.presentation(overview)
+        self.assertEqual(self.events('ui_frame')[-1]['view_scope'], 'grid')
 
     def test_actual_compact_javascript_uses_same_timing_contract_for_every_state(self):
         root = Path(__file__).resolve().parents[1]
@@ -135,7 +154,7 @@ console.log(JSON.stringify(cases.map(i => {
     def test_grid_exports_identify_surfaces_without_calendar_or_private_text(self):
         self.evidence.presentation(self.payload('private-id'))
         payload = self.payload('private-id')
-        payload['rows'][1]['card_timing']['text_matches'] = False
+        payload['rows'][0]['card_timing']['text_matches'] = False
         self.evidence.presentation(payload)
         bundle = export_bundle(self.root/'logs', self.root/'export')
         text = (bundle/'share/events.jsonl').read_text()
@@ -146,3 +165,20 @@ console.log(JSON.stringify(cases.map(i => {
         self.assertTrue(any(row.get('policy_version') == 'status-clarity-6' for row in rows))
         self.assertEqual({row['timing_surface'] for row in rows if row['event'] == 'ui_timing'},
                          {'card', 'detail'})
+
+    def test_rendered_clock_text_and_day_labels_match_known_utc_times(self):
+        root = Path(__file__).resolve().parents[1]
+        script = """const p = require('./web/repo-status.js');
+const repo = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const timing = p.timing(repo);
+console.log(JSON.stringify({
+  full: timing.nextLine,
+  today: p.compactTiming(timing, new Date('2026-10-17T18:00:00Z')).text,
+  tomorrow: p.compactTiming(timing, new Date('2026-10-16T18:00:00Z')).text,
+}));"""
+        result = json.loads(subprocess.check_output(['node', '-e', script], cwd=root,
+            input=json.dumps(self.repo), text=True,
+            env={**os.environ, 'TZ': 'UTC', 'LC_ALL': 'en_US.UTF-8'}))
+        self.assertEqual(result['full'], 'Next scheduled check due: Oct 17, 11:00 PM · in 3 min')
+        self.assertEqual(result['today'], 'Next check 11:00pm')
+        self.assertEqual(result['tomorrow'], 'Next check Oct 17, 11:00pm')

@@ -1,5 +1,6 @@
 let observedMenuState=null,clientFreshness='current';
 let retryingRepo=null;
+let gridScrollTop = 0;
 const technicalOpen = new Set();
 const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
 let menuState=null,selectedId=null,sessionToken='',loading=false,lastResponseAt=0,settingsRevision='',settingsRepo=null,defaultsRevision='',settingsDefaults=null;
@@ -35,14 +36,15 @@ $('#info-back').onclick = () => showInfoPage('home');
 $('#info-close').onclick = () => infoDialog.close();
 let folderDemoTimer=null;
 $('#show-folder').onclick=()=>{
-  const card=[...$('#cards').querySelectorAll('.repo-card')].find(b=>b.dataset.repoId===selectedId);
+  const demoId = selectedId || menuState?.repos[0]?.id;
+  const card=[...$('#cards').querySelectorAll('.repo-card')].find(b=>b.dataset.repoId===demoId);
   const folder=card?.parentElement.querySelector('.open-repo');if(!folder)return;
   // Close the information view so the demonstrated folder button is visible.
   infoDialog.close();
   clearTimeout(folderDemoTimer);for(const node of document.querySelectorAll('.demonstrating'))node.classList.remove('demonstrating');
   folder.scrollIntoView({behavior:motion(),block:'nearest',inline:'nearest'});
   void folder.offsetWidth;folder.classList.add('demonstrating');
-  const name=menuState?.repos.find(r=>r.id===selectedId)?.name||'the selected repo';
+  const name=menuState?.repos.find(r=>r.id===demoId)?.name||'the selected repo';
   $('#folder-demo-status').textContent='Folder button highlighted for '+name+'. Click that button to open the repo in Finder.';
   folderDemoTimer=setTimeout(()=>folder.classList.remove('demonstrating'),1400);
 };
@@ -53,33 +55,41 @@ function render(){
     ? 'Quit RepoHub after any current backup finishes'
     : 'Quit menu-bar app; the backup helper keeps running';
   const repos=menuState.repos||[];
-  if(!repos.some(r=>r.id===selectedId))selectedId=repos[0]?.id||null;
-  const ready=repos.filter(r=>view(r).ready).length;
+  if (!repos.some(repo => repo.id === selectedId)) selectedId = null;
+  // Both render locations consume this one presentation for the current frame.
+  const presentations = new Map(repos.map(repo => {
+    const state = view(repo);
+    const timing = RepoStatus.timing(repo, menuState.backup, clientFreshness);
+    return [repo.id, {state, timing, compact: RepoStatus.compactTiming(timing)}];
+  }));
+  const ready = [...presentations.values()].filter(item => item.state.ready).length;
   $('#summary').textContent = repos.length
     ? `${ready} of ${repos.length} repos backed up to iCloud` : 'No repos found';
   $('#backup').disabled=!!menuState.backup?.running;
   $('#backup').lastElementChild.textContent=menuState.backup?.running?'Backing up…':'Back up now';
   const problems=menuState.problems||[];
   $('#notice').textContent=menuState.backup?.running?`Backing up ${menuState.backup.current_repo||'your repos'}…`:problems.length?`${problems.length} backup issue${problems.length===1?'':'s'} need attention.`:repos.some(r=>r.health?.fresh!==true)?'Waiting for fresh status checks.':'';
-  const rail=$('#cards'),existing=new Map([...rail.querySelectorAll('.repo-card')].map(b=>[b.dataset.repoId,b]));
-  const buttons=repos.map(repo=>{
-    let button=existing.get(repo.id);
-    if(!button){const slot=document.createElement('div');slot.className='card-slot';button=document.createElement('button');button.type='button';button.dataset.repoId=repo.id;button.addEventListener('click',()=>selectRepo(repo.id));slot.append(button);const folder=document.createElement('button');folder.type='button';folder.className='open-repo';folder.setAttribute('aria-label','Open '+repo.name+' in Finder');folder.title='Open '+repo.name+' on this Mac in Finder';folder.innerHTML='<span class="folder-shape" aria-hidden="true"></span>';folder.onclick=()=>nativeAction('openRepo',repo.id);folder.disabled=!window.webkit?.messageHandlers?.repoHub;if(folder.disabled)folder.title+=' · Available from the Mac menu bar';slot.append(folder);}
-    const state=view(repo),label=state.label+(state.percent===null?'':' · '+percentLabel(state.percent));
-    button.className='repo-card '+state.phase;button.dataset.category=state.category;button.dataset.headline=state.headline;button.setAttribute('aria-description',state.headline);button.setAttribute('aria-pressed',String(repo.id===selectedId));button.setAttribute('aria-label',repo.name+' · '+label);button.setAttribute('aria-controls','detail');
-    const markup=`<span class="card-top"><span class="folder-placeholder" aria-hidden="true"></span><span class="status-mark" aria-hidden="true">${RepoStatus.categoryIcon(state)}</span></span><span class="card-name">${escape(repo.name)}</span><span class="card-status">${escape(label)}</span>`;
-    if(button.innerHTML!==markup)button.innerHTML=markup;
-    return button.parentElement;
-  });
-  const oldIds=[...existing.keys()].join('|'),newIds=repos.map(r=>r.id).join('|');
-  if(oldIds!==newIds||!repos.length){const offset=rail.scrollLeft;rail.replaceChildren(...buttons);rail.scrollLeft=offset;if(!repos.length)rail.innerHTML='<p class="empty">Repos will appear here when added to your repos folder.</p>';}
-  renderDetail();updatePosition();
-  const displayedRows = [...rail.querySelectorAll('.repo-card')].map(button => {
+  const grid = $('#cards');
+  const existing = new Map([...grid.querySelectorAll('.repo-card')].map(
+    button => [button.dataset.repoId, button]));
+  grid.dataset.focused = String(selectedId !== null);
+  $('#position').hidden = selectedId !== null;
+  $('#all-repos').hidden = selectedId === null;
+  $('#grid-hint').textContent = selectedId ? 'Tap the card to return' : 'Select a repo for details';
+  const slots = repos.map(repo => renderRepoCard(repo, presentations.get(repo.id), existing.get(repo.id)));
+  renderDetail(presentations.get(selectedId));
+  arrangeRepoGrid(slots);
+  const displayedRows = [...grid.querySelectorAll('.repo-card')]
+    .filter(button => !button.parentElement.hidden).map(button => {
+    const presentation = presentations.get(button.dataset.repoId);
     const row = {repo_id: button.dataset.repoId, phase: button.className.split(' ')[1],
       display_label: button.querySelector('.card-status').textContent.split(' · ')[0],
       ready: button.classList.contains('ready'), category: button.dataset.category,
-      display_headline: button.dataset.headline};
-    if (row.repo_id === selectedId) row.timing = JSON.parse($('#backup-timing').dataset.receipt);
+      display_headline: button.dataset.headline, timing: presentation.timing.receipt,
+      card_timing: RepoDiagnostics.readCardTiming(button, presentation.compact)};
+    if (row.repo_id === selectedId) {
+      row.detail_timing = RepoDiagnostics.readDetailTiming($('#detail'), presentation.timing);
+    }
     return row;
   });
   void diagnosticView.observe(observedMenuState, displayedRows, clientFreshness, selectedId);
@@ -98,14 +108,88 @@ function render(){
     }
   }
 }
-function renderDetail() {
+function renderRepoCard(repo, presentation, button) {
+  if (!button) {
+    const slot = document.createElement('div');
+    slot.className = 'card-slot';
+    button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.repoId = repo.id;
+    button.addEventListener('click', () => selectRepo(repo.id));
+    slot.append(button);
+    const folder = document.createElement('button');
+    folder.type = 'button';
+    folder.className = 'open-repo';
+    folder.innerHTML = '<span class="folder-shape" aria-hidden="true"></span>';
+    folder.onclick = () => nativeAction('openRepo', repo.id);
+    slot.append(folder);
+  }
+  const {state, compact} = presentation;
+  const expanded = repo.id === selectedId;
+  button.parentElement.hidden = selectedId !== null && !expanded;
+  const label = state.label + (state.percent === null ? '' : ' · ' + percentLabel(state.percent));
+  button.className = 'repo-card ' + state.phase;
+  button.dataset.category = state.category;
+  button.dataset.headline = state.headline;
+  button.setAttribute('aria-description', state.headline);
+  button.setAttribute('aria-pressed', String(expanded));
+  button.setAttribute('aria-expanded', String(expanded));
+  button.setAttribute('aria-controls', 'repo-expansion');
+  button.setAttribute('aria-label', repo.name + ' · ' + label + ' · ' + compact.text);
+  const markup = `<span class="card-top"><span class="folder-placeholder" aria-hidden="true"></span>
+      <span class="status-mark" aria-hidden="true">${RepoStatus.categoryIcon(state)}</span></span>
+    <span class="card-name">${escape(repo.name)}</span>
+    <span class="card-status">${escape(label)}</span>
+    <span class="card-next" data-kind="${compact.kind}">${escape(compact.label)}${compact.dueAt
+      ? ` <time datetime="${escape(compact.dueAt)}">${escape(compact.timeLabel)}</time>` : ''}</span>
+    <span class="card-disclosure" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg></span>`;
+  if (button.innerHTML !== markup) button.innerHTML = markup;
+  const folder = button.parentElement.querySelector('.open-repo');
+  folder.setAttribute('aria-label', 'Open ' + repo.name + ' in Finder');
+  folder.title = 'Open ' + repo.name + ' on this Mac in Finder';
+  folder.disabled = !window.webkit?.messageHandlers?.repoHub;
+  if (folder.disabled) folder.title += ' · Available from the Mac menu bar';
+  return button.parentElement;
+}
+
+function gridColumns() {
+  return Number(getComputedStyle($('#cards')).getPropertyValue('--repo-columns')) || 3;
+}
+
+function arrangeRepoGrid(slots) {
+  const grid = $('#cards');
+  const desired = [...slots];
+  const selectedIndex = menuState.repos.findIndex(repo => repo.id === selectedId);
+  if (selectedIndex >= 0) {
+    grid.style.setProperty('--selected-column', String(selectedIndex % gridColumns() + 1));
+  }
+  if (!slots.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent = 'Repos will appear here when added to your repos folder.';
+    desired.unshift(empty);
+  }
+  // Move only nodes whose position changed, preserving focus on unchanged cards.
+  for (const child of [...grid.children]) {
+    if (!desired.includes(child)) child.remove();
+  }
+  desired.forEach((child, index) => {
+    if (grid.children[index] !== child) grid.insertBefore(child, grid.children[index] || null);
+  });
+  $('#position').textContent = `${slots.length} repo${slots.length === 1 ? '' : 's'}`;
+}
+
+function renderDetail(presentation) {
   const repo = menuState.repos.find(row => row.id === selectedId);
+  $('#repo-expansion').hidden = !repo;
+  $('#detail').hidden = !repo;
+  $('#technical-panel').hidden = !repo;
   if (!repo) {
-    $('#detail').innerHTML = '<p class="empty">Select a repo to see its backup.</p>';
+    $('#detail').innerHTML = '';
     $('#technical-panel').innerHTML = '';
     return;
   }
-  const state = view(repo);
+  const state = presentation?.state || view(repo);
   const cloud = repo.cloud || {};
   const copying = state.phase === 'copying';
   const uploading = state.phase === 'uploading'
@@ -122,7 +206,7 @@ function renderDetail() {
     ? `<button id="retry-check" class="repo-schedule" ${retryingRepo === repo.id ? 'disabled' : ''}>
       ${retryingRepo === repo.id ? 'Check requested…' : 'Retry check now'}</button>` : '';
   const schedule = RepoStatus.describeSchedule(repo, menuState.power_source);
-  const timing = RepoStatus.timing(repo, menuState.backup, clientFreshness);
+  const timing = presentation?.timing || RepoStatus.timing(repo, menuState.backup, clientFreshness);
   const markup = `
     <p class="detail-context">${escape(repo.name)}</p>
     <h2 class="status-headline" data-category="${state.category}">${escape(state.headline)}</h2>
@@ -192,11 +276,55 @@ function renderDetail() {
     }
   };
 }
-function selectRepo(id){selectedId=id;render();}
-function updatePosition(){const rail=$('#cards'),buttons=[...rail.querySelectorAll('.repo-card')],rect=rail.getBoundingClientRect();const visible=buttons.map((button,i)=>({rect:button.getBoundingClientRect(),index:i})).filter(b=>b.rect.left>=rect.left-2&&b.rect.right<=rect.right+2);$('#position').textContent=visible.length?`${visible[0].index+1}–${visible[visible.length-1].index+1} of ${buttons.length} repos`:`${buttons.length} repos`;$('#previous').disabled=rail.scrollLeft<=2;$('#next').disabled=rail.scrollLeft+rail.clientWidth>=rail.scrollWidth-2;}
-const motion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
-$('#previous').onclick=()=>$('#cards').scrollBy({left:-($('#cards').clientWidth+10),behavior:motion()});$('#next').onclick=()=>$('#cards').scrollBy({left:$('#cards').clientWidth+10,behavior:motion()});$('#cards').addEventListener('scroll',updatePosition,{passive:true});
-$('#cards').addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const rows=menuState?.repos||[],index=rows.findIndex(r=>r.id===selectedId);const target=e.key==='Home'?0:e.key==='End'?rows.length-1:Math.max(0,Math.min(rows.length-1,index+(e.key==='ArrowRight'?1:-1)));if(!rows[target])return;e.preventDefault();selectRepo(rows[target].id);const button=[...$('#cards').querySelectorAll('.repo-card')].find(b=>b.dataset.repoId===selectedId);button?.focus({preventScroll:true});button?.scrollIntoView({behavior:motion(),block:'nearest',inline:'nearest'});});
+function selectRepo(id) {
+  const closing = selectedId === id;
+  if (!selectedId) gridScrollTop = window.scrollY;
+  selectedId = closing ? null : id;
+  render();
+  window.scrollTo({top: closing ? gridScrollTop : 0, behavior: 'auto'});
+}
+$('#all-repos').onclick = () => {
+  const selectedButton = [...$('#cards').querySelectorAll('.repo-card')].find(
+    card => card.dataset.repoId === selectedId);
+  selectRepo(selectedId);
+  selectedButton?.focus({preventScroll: true});
+};
+function updatePosition() {
+  if (!menuState) return;
+  arrangeRepoGrid([...$('#cards').querySelectorAll('.repo-card')].map(button => button.parentElement));
+}
+const motion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+$('#cards').addEventListener('keydown', event => {
+  const button = event.target.closest('.repo-card');
+  if (event.key === 'Escape' && selectedId) {
+    const selectedButton = [...$('#cards').querySelectorAll('.repo-card')].find(
+      card => card.dataset.repoId === selectedId);
+    selectRepo(selectedId);
+    selectedButton?.focus({preventScroll: true});
+    event.preventDefault();
+    return;
+  }
+  if (selectedId || !button || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+  const rows = menuState?.repos || [];
+  const index = rows.findIndex(repo => repo.id === button.dataset.repoId);
+  const step = {ArrowLeft: -1, ArrowRight: 1, ArrowUp: -gridColumns(), ArrowDown: gridColumns()};
+  const target = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1
+    : Math.max(0, Math.min(rows.length - 1, index + step[event.key]));
+  if (!rows[target]) return;
+  event.preventDefault();
+  const next = [...$('#cards').querySelectorAll('.repo-card')].find(
+    card => card.dataset.repoId === rows[target].id);
+  next?.focus({preventScroll: true});
+  next?.scrollIntoView({behavior: motion(), block: 'nearest'});
+});
+$('#repo-expansion').addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !selectedId) return;
+  const selectedButton = [...$('#cards').querySelectorAll('.repo-card')].find(
+    card => card.dataset.repoId === selectedId);
+  selectRepo(selectedId);
+  selectedButton?.focus({preventScroll: true});
+  event.preventDefault();
+});
 function unreachable(message,reason='request_failed'){clientFreshness=reason;if(observedMenuState){menuState=RepoDiagnostics.displayState(observedMenuState,reason);render();}$('#backup').disabled=true;$('#notice').textContent=message;$('#checked').textContent='Status outdated · reconnecting';}
 async function load(){if(loading)return;loading=true;try{observedMenuState=await api('/api/status');clientFreshness='current';menuState=observedMenuState;lastResponseAt=Date.now();render();}catch(e){unreachable('Could not reach the local backup helper.',e.name==='AbortError'?'response_timeout':'request_failed');}finally{loading=false;}}
 $('#backup').onclick=async()=>{try{sessionToken=(await api('/api/session')).token;$('#backup').disabled=true;await api('/api/backup',{});$('#notice').textContent='Backup requested.';setTimeout(load,700);}catch(e){$('#notice').textContent=e.message;$('#backup').disabled=false;}};

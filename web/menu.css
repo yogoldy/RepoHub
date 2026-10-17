@@ -468,3 +468,105 @@ footer button:hover {
 .things-key #things-panel .show-me {
   color: var(--gold);
 }
+
+/* The menu starts with a compact grid; one selected detail region follows the entire grid. */
+.card-grid {
+  --repo-columns: 3;
+  display: grid;
+  grid-template-columns: repeat(var(--repo-columns), minmax(0, 1fr));
+  gap: 12px 10px;
+  padding: 3px 1px 8px;
+}
+.card-grid > .empty,
+.repo-expansion {
+  grid-column: 1 / -1;
+}
+.repo-expansion[hidden] {
+  display: none;
+}
+.card-grid .card-slot {
+  display: flex;
+  min-width: 0;
+}
+.card-grid .repo-card {
+  height: 100%;
+  min-height: 168px;
+}
+.card-grid .card-status {
+  margin-top: auto;
+  padding-top: 16px;
+  font-size: 12px;
+}
+.card-next {
+  display: block;
+  width: 100%;
+  padding-right: 12px;
+  margin-top: 6px;
+  color: var(--green);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.card-next[data-kind="unavailable"],
+.card-next[data-kind="blocked"] {
+  color: var(--muted);
+}
+.card-disclosure {
+  position: absolute;
+  right: 9px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.card-disclosure svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.repo-card[aria-expanded="true"] .card-disclosure {
+  transform: rotate(180deg);
+  color: var(--gold);
+}
+.repo-expansion .detail {
+  margin-top: 0;
+}
+.repo-expansion .detail[hidden],
+.repo-expansion #technical-panel[hidden] {
+  display: none;
+}
+@media (max-width: 400px) {
+  .card-grid {
+    --repo-columns: 2;
+  }
+}
+@media (max-width: 280px) {
+  .card-grid {
+    --repo-columns: 1;
+  }
+}
+
+.repo-expansion {
+  margin-top: 10px;
+}
+
+/* A selected repo is a focused view; the same card toggles back to the overview. */
+.card-grid .card-slot[hidden] {
+  display: none;
+}
+.card-grid[data-focused="true"] .card-slot:not([hidden]) {
+  grid-row: 1;
+  grid-column: var(--selected-column);
+}
+#all-repos {
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--text);
+}
+#all-repos[hidden] {
+  display: none;
+}

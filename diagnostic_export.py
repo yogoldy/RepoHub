@@ -21,6 +21,7 @@ ENUMS = {
     'schedule_state': TIMING_STATES,
     'timing_reason': TIMING_REASONS,
     'timing_surface': {'card', 'detail'},
+    'view_scope': {'grid', 'focused'},
     'location_state': LOCATION_STATES,
     'inclusion_state': INCLUSION_STATES,
     'operation': {'source_read','destination_write','verification_read'},

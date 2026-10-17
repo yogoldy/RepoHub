@@ -690,8 +690,10 @@ The proposed collapsed grid adds a second timing location. Policies 4 and 5
 check only the selected expanded receipt, so they cannot establish that every
 card showed its time. Policy 6 requires each card's scheduler receipt and a
 small DOM observation of its compact meaning, date attribute and actual text.
-The selected repo, when expanded, supplies a separate expanded-line observation;
-a fully collapsed grid uses a null selection. The presentation is computed once
+The focused view supplies only the selected card and a separate expanded-line
+observation; a fully collapsed grid supplies all cards with a null selection.
+Other repo cards are deliberately hidden in the focused view, and overview
+scroll position is restored on return. The presentation is computed once
 per repo per render and shared by both locations. Diagnostic expectations remain
 independent of the renderer. Missing, hidden or incorrect card lines are tested
 without using the expanded line as their evidence. Earlier policies retain their
