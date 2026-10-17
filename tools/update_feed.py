@@ -46,6 +46,19 @@ def appcast(info, archive_url, signature, length):
     return ET.tostring(rss, encoding='utf-8', xml_declaration=True)
 
 
+def archive_distribution(info, manifest):
+    test = info.get('RepoHubTestMode') is True
+    personal = info.get('RepoHubPersonalUpdates') is True
+    if personal:
+        if (test or info.get('CFBundleIdentifier') != 'com.leogoldberg.repohub'
+                or manifest.get('distribution') != 'personal_adhoc'):
+            raise ValueError('personal_distribution_mismatch')
+        return 'personal_adhoc'
+    if manifest.get('distribution') == 'personal_adhoc':
+        raise ValueError('personal_distribution_mismatch')
+    return 'test' if test else 'developer_id'
+
+
 def prepare(app, output, archive_url, key_file, cache):
     validate_key_file(key_file)
     if output.exists() or output.is_symlink():
@@ -55,7 +68,8 @@ def prepare(app, output, archive_url, key_file, cache):
     if manifest['bundle_id'] != info['CFBundleIdentifier'] or manifest['build'] != info['CFBundleVersion']:
         raise ValueError('release_identity_mismatch')
     subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(app)], check=True)
-    if info.get('RepoHubTestMode') is not True:
+    mode = archive_distribution(info, manifest)
+    if mode == 'developer_id':
         # A locally signed build alone does not establish distribution readiness.
         subprocess.run(['/usr/bin/xcrun', 'stapler', 'validate', str(app)], check=True)
         subprocess.run(['/usr/sbin/spctl', '--assess', '--type', 'execute', str(app)], check=True)
@@ -82,7 +96,8 @@ def prepare(app, output, archive_url, key_file, cache):
         (artifacts / 'appcast.xml').write_bytes(appcast(info, archive_url, signature, archive.stat().st_size))
         receipt = {'source_revision': manifest['source_revision'], 'build': manifest['build'],
                    'archive_sha256': sha256(archive), 'archive_bytes': archive.stat().st_size,
-                   'test_only': info.get('RepoHubTestMode') is True, 'published': False}
+                   'test_only': info.get('RepoHubTestMode') is True, 'distribution': mode,
+                   'notarized': mode == 'developer_id', 'published': False}
         (artifacts / 'release-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
         artifacts.rename(output)
     return receipt

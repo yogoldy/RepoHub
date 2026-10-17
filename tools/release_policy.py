@@ -61,7 +61,8 @@ def validate_receipt(release, receipt):
     for field in ('schema', 'publisher', 'version', 'build', 'tag', 'archive', 'archive_url', 'feed_url'):
         if receipt.get(field) != expected[field]:
             raise ValueError('release_receipt_mismatch')
-    if (receipt.get('test_only') is not False
+    if (receipt.get('distribution', 'developer_id') not in ('developer_id', 'personal_adhoc')
+            or receipt.get('test_only') is not False
             or not re.fullmatch(r'[0-9a-f]{64}', receipt.get('archive_sha256', ''))
             or type(receipt.get('archive_bytes')) is not int or receipt['archive_bytes'] <= 0):
         raise ValueError('production_archive_evidence_required')

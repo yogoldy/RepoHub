@@ -610,3 +610,14 @@ exact target SHA, and resolve the tag after publication. The regression includes
 a missing-tag normal case, foreign tag collision and moving-branch draft target.
 The actual text-fixture upload/download matched and its draft/assets were removed.
 No production update was published.
+
+### Explicit personal delivery before Apple signing
+
+Apple distribution readiness was incorrectly made a dependency of personal
+Sparkle delivery. An explicit personal_adhoc mode preserves HTTPS, bundle identity,
+archive authentication, exact-main acceptance and retention guards while omitting
+Apple submission. Conflicting app/manifest distribution flags are rejected.
+Background discovery uses Sparkle's actual SUScheduledCheckInterval key and
+one-hour minimum; the native settings check reads the built bundle through
+SPUUpdaterSettings. Silent installation remains disabled. Developer ID mode keeps
+its original certificate/notary requirements.

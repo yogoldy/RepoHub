@@ -30,9 +30,10 @@ jobs:
           fetch-depth: 0
       - name: Recheck the exact clean source on the release runner
         run: python3 tools/release_gate.py --require-clean --output "$RUNNER_TEMP/release-gate.json"
-      - name: Package, notarize, verify and publish
+      - name: Package, authenticate and publish
         env:
           GH_TOKEN: ${{ github.token }}
+          REPOHUB_RELEASE_MODE: ${{ vars.REPOHUB_RELEASE_MODE }}
           REPOHUB_RELEASE_ENABLED: ${{ vars.REPOHUB_RELEASE_ENABLED }}
           REPOHUB_UPDATE_PUBLIC_KEY: ${{ vars.REPOHUB_UPDATE_PUBLIC_KEY }}
           REPOHUB_SPARKLE_PRIVATE_KEY: ${{ secrets.REPOHUB_SPARKLE_PRIVATE_KEY }}

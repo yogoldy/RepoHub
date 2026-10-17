@@ -2,7 +2,7 @@
 import re
 
 PHASES = frozenset({'checking', 'waiting', 'downloading', 'installing', 'relaunching', 'ready', 'failed'})
-REASONS = frozenset({'user_requested', 'backup_busy', 'helper_shutdown', 'helper_stopped',
+REASONS = frozenset({'user_requested', 'scheduled_check', 'backup_busy', 'helper_shutdown', 'helper_stopped',
                      'verified_update', 'update_available', 'sparkle_aborted',
                      'component_mismatch', 'matching_helper', 'recovery_unavailable',
                      'no_update', 'user_cancelled', 'check_finished'})

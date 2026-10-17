@@ -194,6 +194,11 @@ def main():
                 '--bundle-id','com.leogoldberg.repohub.test.gate',
                 '--feed','http://127.0.0.1:8781/appcast.xml',
                 '--public-key','eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=','--test'])
+            framework=evidence/'RepoHub Gate.app/Contents/Frameworks'
+            command('updater-settings-build',swift+['-parse-as-library',str(ROOT/'tests/updater_settings.swift'),
+                    '-F',str(framework),'-framework','Sparkle','-Xlinker','-rpath','-Xlinker',str(framework),
+                    '-o',str(evidence/'updater-settings')])
+            command('updater-settings-checks',[str(evidence/'updater-settings'),str(evidence/'RepoHub Gate.app'),'off'])
         report['source_unchanged'] = source_fingerprint(ROOT)==source
         good = good and report['source_unchanged']
         report['result'] = ('passed' if args.profile=='macos' else 'partial') if good else 'failed'

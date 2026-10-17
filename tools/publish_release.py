@@ -79,7 +79,9 @@ class GitHub:
                 raise ValueError('release_tag_source_mismatch')
         command(['gh', 'release', 'create', plan['tag'], '--repo', REPOSITORY,
                  '--target', plan['source_revision'], '--draft', '--title', 'RepoHub ' + plan['version'],
-                 '--notes', 'Automated Golden Gate passed. Native Mac testing follows delivery.\nSource: '
+                 '--notes', 'Automated Golden Gate passed. Native Mac testing follows delivery. '
+                 + ('Personal Sparkle-signed release; not Apple-notarized. ' if selected_mode() == 'personal_adhoc' else '')
+                 + '\nSource: '
                  + plan['source_revision'] + '\nBuild: ' + plan['build']])
         draft = json.loads(command(['gh', 'release', 'view', plan['tag'], '--repo', REPOSITORY,
                                     '--json', 'isDraft,targetCommitish,tagName']))
@@ -207,6 +209,56 @@ def signing_material(work):
             path.unlink(missing_ok=True)
 
 
+@contextmanager
+def personal_signing_material(work):
+    value = os.environ.get('REPOHUB_SPARKLE_PRIVATE_KEY')
+    if not value:
+        raise ValueError('sparkle_private_key_required')
+    path = work / 'sparkle.key'
+    path.write_text(value)
+    path.chmod(0o600)
+    try:
+        yield None, path
+    finally:
+        path.unlink(missing_ok=True)
+
+
+def selected_mode():
+    mode = os.environ.get('REPOHUB_RELEASE_MODE', 'developer_id')
+    if mode not in ('developer_id', 'personal_adhoc'):
+        raise ValueError('invalid_release_mode')
+    return mode
+
+
+def build_artifacts(work, plan, mode, notary_key, update_key):
+    app = work / 'Repo Hub.app'
+    cache = work / 'dependencies'
+    personal = mode == 'personal_adhoc'
+    build(app, cache, plan['version'], plan['build'], 'com.leogoldberg.repohub',
+          plan['feed_url'], os.environ['REPOHUB_UPDATE_PUBLIC_KEY'], personal=personal,
+          signing_identity=None if personal else os.environ['REPOHUB_SIGNING_IDENTITY'])
+    if not personal:
+        submission = work / 'notarization.zip'
+        command(['/usr/bin/ditto', '-c', '-k', '--keepParent', str(app), str(submission)])
+        print('Submitting the signed package for Apple notarization.', flush=True)
+        result = json.loads(command(['xcrun', 'notarytool', 'submit', str(submission),
+            '--key', str(notary_key), '--key-id', os.environ['REPOHUB_NOTARY_KEY_ID'],
+            '--issuer', os.environ['REPOHUB_NOTARY_ISSUER'], '--wait', '--timeout', '20m',
+            '--output-format', 'json']))
+        if result.get('status') != 'Accepted':
+            raise ValueError('apple_notarization_not_accepted')
+        command(['xcrun', 'stapler', 'staple', str(app)])
+    artifacts = work / 'artifacts'
+    receipt = prepare(app, artifacts, plan['archive_url'], update_key, cache)
+    if (receipt['source_revision'] != plan['source_revision'] or receipt['build'] != plan['build']
+            or receipt['test_only'] is not False or receipt['distribution'] != mode):
+        raise ValueError('prepared_source_mismatch')
+    receipt.pop('published', None)
+    receipt.update(plan)
+    (artifacts / 'release-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    return artifacts
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id', required=True, type=int)
@@ -232,30 +284,10 @@ def main():
     plan = release_plan(history, revision)
     with tempfile.TemporaryDirectory(prefix='repohub-release-') as folder:
         work = Path(folder)
-        with signing_material(work) as (notary_key, update_key):
-            app = work / 'Repo Hub.app'
-            cache = work / 'dependencies'
-            build(app, cache, plan['version'], plan['build'], 'com.leogoldberg.repohub',
-                  plan['feed_url'], os.environ['REPOHUB_UPDATE_PUBLIC_KEY'],
-                  signing_identity=os.environ['REPOHUB_SIGNING_IDENTITY'])
-            submission = work / 'notarization.zip'
-            command(['/usr/bin/ditto', '-c', '-k', '--keepParent', str(app), str(submission)])
-            print('Submitting the signed package for Apple notarization.', flush=True)
-            result = json.loads(command(['xcrun', 'notarytool', 'submit', str(submission),
-                '--key', str(notary_key), '--key-id', os.environ['REPOHUB_NOTARY_KEY_ID'],
-                '--issuer', os.environ['REPOHUB_NOTARY_ISSUER'], '--wait', '--timeout', '20m',
-                '--output-format', 'json']))
-            if result.get('status') != 'Accepted':
-                raise ValueError('apple_notarization_not_accepted')
-            command(['xcrun', 'stapler', 'staple', str(app)])
-            artifacts = work / 'artifacts'
-            receipt = prepare(app, artifacts, plan['archive_url'], update_key, cache)
-            if (receipt['source_revision'] != revision or receipt['build'] != plan['build']
-                    or receipt['test_only'] is not False):
-                raise ValueError('prepared_source_mismatch')
-            receipt.pop('published', None)  # This receipt describes verified bytes, not publication status.
-            receipt.update(plan)
-            (artifacts / 'release-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+        mode = selected_mode()
+        material = personal_signing_material if mode == 'personal_adhoc' else signing_material
+        with material(work) as (notary_key, update_key):
+            artifacts = build_artifacts(work, plan, mode, notary_key, update_key)
             print(json.dumps(publish_verified(github, plan, artifacts, args.run_id)))
 
 

@@ -117,17 +117,41 @@ def run(*arguments):
     subprocess.run([str(argument) for argument in arguments], check=True)
 
 
+
+def distribution_mode(test, personal, signing_identity):
+    if test and personal:
+        raise ValueError('conflicting_distribution_modes')
+    if personal:
+        if signing_identity not in (None, '-'):
+            raise ValueError('personal_mode_requires_adhoc')
+        return 'personal_adhoc'
+    if test:
+        return 'test'
+    if not (signing_identity or '').startswith('Developer ID Application:'):
+        raise ValueError('developer_id_required')
+    return 'developer_id'
+
+
+def update_defaults(test):
+    return {
+        'SUEnableAutomaticChecks': not test,
+        'SUScheduledCheckInterval': 3600,
+        'SUAutomaticallyUpdate': False,
+        'SUAllowsAutomaticUpdates': False,
+        'SUEnableSystemProfiling': False,
+    }
+
+
 def build(output, cache, version, build_number, identifier, feed, public_key,
-          test=False, signing_identity=None):
+          test=False, signing_identity=None, personal=False):
     validate_options(identifier, feed, public_key, test)
+    mode = distribution_mode(test, personal, signing_identity)
     if not re.fullmatch(r'[0-9]+(?:\.[0-9]+){0,2}', version):
         raise ValueError('invalid_version')
     if not re.fullmatch(r'[1-9][0-9]*', build_number):
         raise ValueError('invalid_build_number')
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         raise ValueError('arm64_macos_required')
-    if not test and not (signing_identity or '').startswith('Developer ID Application:'):
-        raise ValueError('developer_id_required')
     if output.exists() or output.is_symlink() or output.suffix != '.app':
         raise ValueError('new_app_path_required')
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
@@ -168,13 +192,13 @@ def build(output, cache, version, build_number, identifier, feed, public_key,
                 'CFBundleVersion': build_number, 'CFBundleShortVersionString': version,
                 'LSUIElement': True, 'LSMinimumSystemVersion': '13.0',
                 'NSHighResolutionCapable': True, 'RepoHubPackaged': True,
-                'RepoHubTestMode': test, 'SUFeedURL': feed, 'SUPublicEDKey': public_key,
-                'SUEnableAutomaticChecks': False, 'SUAutomaticallyUpdate': False,
+                'RepoHubTestMode': test, 'RepoHubPersonalUpdates': personal,
+                'SUFeedURL': feed, 'SUPublicEDKey': public_key, **update_defaults(test),
                 'SUVerifyUpdateBeforeExtraction': True,
                 'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True}}
         (contents / 'Info.plist').write_bytes(plistlib.dumps(info))
         identity = signing_identity or '-'
-        options = ['--options', 'runtime', '--timestamp'] if not test else []
+        options = ['--options', 'runtime', '--timestamp'] if mode == 'developer_id' else []
         # Sign nested executable code before hashing resources. Never use --deep to sign.
         for path in sorted((resources / 'python').rglob('*')):
             if path.is_file() and not path.is_symlink():
@@ -183,7 +207,7 @@ def build(output, cache, version, build_number, identifier, feed, public_key,
                 if magic in (b'\xcf\xfa\xed\xfe', b'\xfe\xed\xfa\xcf', b'\xca\xfe\xba\xbe'):
                     run('/usr/bin/codesign', '--force', '--sign', identity, *options, path)
         run('/usr/bin/codesign', '--force', '--sign', identity, *options, runtime / 'cloud-status')
-        if not test:
+        if mode == 'developer_id':
             # Sparkle's nested XPC services already have upstream signatures. Re-sign
             # from the inside out for this distribution identity.
             for suffix in ('Updater.app', 'Installer.xpc', 'Downloader.xpc'):
@@ -192,7 +216,7 @@ def build(output, cache, version, build_number, identifier, feed, public_key,
             run('/usr/bin/codesign', '--force', '--sign', identity, *options, framework / 'Versions/B/Autoupdate')
             run('/usr/bin/codesign', '--force', '--sign', identity, *options, framework)
         manifest = {'schema': 1, 'source_revision': revision, 'version': version,
-                    'build': build_number, 'bundle_id': identifier,
+                    'build': build_number, 'bundle_id': identifier, 'distribution': mode,
                     'dependencies': json.loads(LOCK.read_text()), 'files': inventory(resources)}
         (resources / 'release.json').write_text(json.dumps(manifest, sort_keys=True) + '\n')
         run('/usr/bin/codesign', '--force', '--sign', identity, *options, app)
@@ -201,7 +225,7 @@ def build(output, cache, version, build_number, identifier, feed, public_key,
         app.rename(output)
     return {'app': str(output), 'source_revision': revision, 'build': build_number,
             'manifest_sha256': sha256(output / 'Contents/Resources/release.json'),
-            'test_only': test, 'notarized': False}
+            'test_only': test, 'distribution': mode, 'notarized': False}
 
 
 def main():
@@ -213,11 +237,13 @@ def main():
     parser.add_argument('--bundle-id', required=True)
     parser.add_argument('--feed', required=True)
     parser.add_argument('--public-key', required=True)
-    parser.add_argument('--test', action='store_true')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--test', action='store_true')
+    modes.add_argument('--personal', action='store_true', help='Explicit personal ad-hoc app; Sparkle archive signing remains required')
     parser.add_argument('--signing-identity')
     args = parser.parse_args()
     receipt = build(args.output.absolute(), args.cache.absolute(), args.version, args.build,
-                    args.bundle_id, args.feed, args.public_key, args.test, args.signing_identity)
+                    args.bundle_id, args.feed, args.public_key, args.test, args.signing_identity, args.personal)
     print(json.dumps(receipt, indent=2))
 
 

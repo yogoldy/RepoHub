@@ -85,6 +85,7 @@ final class AppUpdates: NSObject {
 extension AppUpdates: SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
         try requireIdle()
+        record("checking", reason: updateCheck == .updatesInBackground ? "scheduled_check" : "user_requested")
     }
 
     func updater(_ updater: SPUUpdater, shouldProceedWithUpdate item: SUAppcastItem,
