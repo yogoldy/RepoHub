@@ -621,3 +621,13 @@ Background discovery uses Sparkle's actual SUScheduledCheckInterval key and
 one-hour minimum; the native settings check reads the built bundle through
 SPUUpdaterSettings. Silent installation remains disabled. Developer ID mode keeps
 its original certificate/notary requirements.
+
+### Legacy Homebrew interpreter responsibility identity
+
+The Pro’s read-only migration preflight found that the configured Homebrew bin
+interpreter executes the framework’s Python.app binary. Comparing only the bin
+symlink’s target falsely rejected the legitimate service before any stop. Resolve
+the real process path by probing exactly the configured interpreter in isolated
+mode, then retain the same strict libproc PID-path comparison. The regression
+requires the configured interpreter and rejects malformed probe paths; no name-only
+process matching or generic Python termination is introduced.

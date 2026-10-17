@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from tools.install_packaged import (
-    FRONTEND, SERVICE, freeze_idle_legacy, protected_hashes, require_legacy, restore,
+    FRONTEND, SERVICE, freeze_idle_legacy, interpreter_process_path, protected_hashes, require_legacy, restore,
 )
 
 
@@ -68,3 +68,16 @@ class PackagedInstallTests(unittest.TestCase):
                 command.assert_not_called()
             self.assertEqual(json.loads(record.read_text())['phase'], 'restored')
             self.assertTrue(app.exists())
+
+    def test_configured_interpreter_probe_resolves_framework_launcher_without_weakening_pid_check(self):
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'Python.app-executable'
+            actual.write_bytes(b'synthetic')
+            configured = Path('/synthetic/bin/python3')
+            from subprocess import CompletedProcess
+            with patch('tools.install_packaged.command', return_value=CompletedProcess([], 0, str(actual) + '\n', '')) as command:
+                self.assertEqual(interpreter_process_path(configured), actual.resolve())
+                self.assertEqual(command.call_args.args[0][:3], [str(configured), '-I', '-c'])
+            with patch('tools.install_packaged.command', return_value=CompletedProcess([], 0, 'relative-path', '')):
+                with self.assertRaises(ValueError):
+                    interpreter_process_path(configured)

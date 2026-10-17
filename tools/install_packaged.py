@@ -72,6 +72,19 @@ def pid_path(pid):
     return Path(os.fsdecode(buffer.value)).resolve() if size > 0 else None
 
 
+def interpreter_process_path(interpreter):
+    probe = (
+        "import ctypes,os; b=ctypes.create_string_buffer(4096); "
+        "n=ctypes.CDLL('/usr/lib/libproc.dylib').proc_pidpath(os.getpid(),b,len(b)); "
+        "assert n>0; print(os.fsdecode(b.value))"
+    )
+    result = command([str(interpreter), '-I', '-c', probe])
+    path = Path(result.stdout.strip())
+    if not path.is_absolute() or not path.is_file():
+        raise ValueError('configured_interpreter_identity_unavailable')
+    return path.resolve()
+
+
 def service_pid():
     result = command(['launchctl', 'list'])
     for line in result.stdout.splitlines():
@@ -178,7 +191,8 @@ def install(candidate, revision):
     except ModuleNotFoundError:
         from package_app import verify
     home = Path.home()
-    state, app, agents, python = require_legacy(home)
+    state, app, agents, interpreter = require_legacy(home)
+    python = interpreter_process_path(interpreter)
     manifest = verify(candidate / 'Contents/Resources')
     info = plistlib.loads((candidate / 'Contents/Info.plist').read_bytes())
     if (manifest['source_revision'] != revision or manifest['bundle_id'] != 'com.leogoldberg.repohub'
