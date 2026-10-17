@@ -16,7 +16,7 @@
 - Use `docs/quality/FAILURE_MODES.md` and `docs/quality/golden-rules.json` when diagnosing regressions. A new failure needs a small controlled counterexample, appropriate diagnostic assertions, a narrow fix and an updated rule/gap. Keep private case data outside Git.
 - For Leo’s personal Sparkle channel, follow [the approved delivery policy](docs/RELEASE_DELIVERY.md): an accepted protected main commit can publish after the automated gate; native testing follows delivery. Keep untested hardware/provider/UI conditions explicit. Publishing an update does not silently install it. Other deployments retain the changed-boundary checks in `docs/quality/RELEASE_GATE.md`; never substitute an older release’s receipt.
 
-- GitHub `main` promotion must use a pull request with the required up-to-date `automated-contract` check from GitHub Actions. Do not bypass or disable protection to merge a failing version; no additional approving review is required.
+- GitHub `main` promotion must use a pull request with the required up-to-date `automated-contract` check from GitHub Actions. Do not bypass or disable protection to merge a failing version; no additional approving review is required. When Leo says “push to Git,” carry the complete agreed feature through this protected main flow as defined in [working-copy guidance](docs/WORKING_COPY.md); explicit local-only instructions override it.
 
 ## Readability for new and deliberately changed code
 
