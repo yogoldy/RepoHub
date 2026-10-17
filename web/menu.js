@@ -75,6 +75,7 @@ function renderDetail() {
   const repo = menuState.repos.find(row => row.id === selectedId);
   if (!repo) {
     $('#detail').innerHTML = '<p class="empty">Select a repo to see its backup.</p>';
+    $('#technical-panel').innerHTML = '';
     return;
   }
   const state = view(repo);
@@ -114,6 +115,13 @@ function renderDetail() {
       <span class="schedule-copy"><strong>${escape(schedule.label)}</strong>
         <small>${escape(schedule.detail)}</small></span><span aria-hidden="true">›</span>
     </button>
+    <button id="report-status" type="button" class="report-status">Report this status</button>`;
+  if ($('#detail').innerHTML !== markup) {
+    const focused = $('#detail').contains(document.activeElement) ? document.activeElement.id : null;
+    $('#detail').innerHTML = markup;
+    if (focused) document.getElementById(focused)?.focus({preventScroll: true});
+  }
+  const technicalMarkup = `
     <details id="technical-details" ${technicalOpen.has(repo.id) ? 'open' : ''}>
       <summary id="technical-toggle">Technical details</summary>
       <p class="technical-explanation" data-category="${state.category}">${escape(state.technicalDetail)}</p>
@@ -124,14 +132,18 @@ function renderDetail() {
       </div>
       ${repo.health?.fresh !== true ? `<p>${escape((repo.health?.reasons || ['Fresh evidence unavailable']).join(' · '))}</p>` : ''}
     </details>
-    <button id="report-status" type="button" class="report-status">Report this status</button>`;
-  if ($('#detail').innerHTML !== markup) {
-    const focused = $('#detail').contains(document.activeElement) ? document.activeElement.id : null;
-    $('#detail').innerHTML = markup;
+`;
+  const technicalPanel = $('#technical-panel');
+  if (technicalPanel.innerHTML !== technicalMarkup) {
+    const focused = technicalPanel.contains(document.activeElement) ? document.activeElement.id : null;
+    technicalPanel.innerHTML = technicalMarkup;
     if (focused) document.getElementById(focused)?.focus({preventScroll: true});
   }
-  $('#technical-details').ontoggle = () => {
-    if ($('#technical-details').open) technicalOpen.add(repo.id);
+  const technicalDetails = $('#technical-details');
+  technicalDetails.ontoggle = () => {
+    // Ignore a queued toggle from a panel replaced after selecting another repo.
+    if (!technicalDetails.isConnected) return;
+    if (technicalDetails.open) technicalOpen.add(repo.id);
     else technicalOpen.delete(repo.id);
   };
   $('#repo-schedule').onclick = () => openSettings(repo.id);
