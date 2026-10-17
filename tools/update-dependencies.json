@@ -1,0 +1,14 @@
+{
+  "sparkle": {
+    "version": "2.10.0",
+    "url": "https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz",
+    "sha256": "c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c",
+    "license": "MIT"
+  },
+  "python-arm64": {
+    "version": "3.14.8+20261013",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.14.8%2B20261013-aarch64-apple-darwin-install_only.tar.gz",
+    "sha256": "709f419d175eb015f810b68aa54bdae1d776c9824cb362aa701c93b0a9f2a9e7",
+    "license": "PSF and bundled third-party licenses"
+  }
+}
