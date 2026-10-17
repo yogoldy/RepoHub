@@ -478,7 +478,10 @@
         "test_personal_updates.PersonalUpdateTests.test_automatic_discovery_does_not_enable_silent_install_or_test_network_requests",
         "test_personal_updates.PersonalUpdateTests.test_personal_release_uses_sparkle_key_without_apple_credentials_and_cleans_it",
         "test_personal_updates.PersonalUpdateTests.test_personal_path_keeps_archive_signing_but_never_calls_notarytool",
-        "test_personal_updates.PersonalUpdateTests.test_scheduled_checks_have_typed_private_diagnostic_evidence"
+        "test_personal_updates.PersonalUpdateTests.test_scheduled_checks_have_typed_private_diagnostic_evidence",
+        "test_packaged_install.PackagedInstallTests.test_only_known_legacy_layout_is_accepted_and_protected_files_are_read_only",
+        "test_packaged_install.PackagedInstallTests.test_backup_race_resumes_frozen_process_without_terminating_archive_write",
+        "test_packaged_install.PackagedInstallTests.test_watchdog_before_service_handoff_never_restarts_or_replaces_daily_services"
       ],
       "remaining_gap": "Personal ad-hoc distribution is explicitly authorized and remains Sparkle-authenticated over HTTPS. Developer ID/notarization and permission continuity await Apple credentials. Actual main publication and the first Pro migration require live receipts; synthetic tests alone do not establish those results."
     }
