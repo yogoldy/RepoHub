@@ -117,7 +117,7 @@
         "upload_stale"
       ],
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
-      "required_behavior": "Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics.",
+      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics.",
       "test_ids": [
         "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
         "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
@@ -130,7 +130,13 @@
         "test_status_clarity.ClarityTests.test_only_labels_require_complete_current_comparison",
         "test_backup_timing.TimingTests.test_cloud_location_requires_same_archive_fresh_observation_and_valid_creation",
         "test_timing_diagnostics.TimingDiagnosticTests.test_secondary_receipts_detect_wrong_date_location_and_countdown",
-        "test_timing_diagnostics.TimingDiagnosticTests.test_actual_javascript_timing_matches_original_receipts"
+        "test_timing_diagnostics.TimingDiagnosticTests.test_actual_javascript_timing_matches_original_receipts",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_compact_backup_facts_keep_location_and_creation_evidence",
+        "test_menu_information.MenuInformationTests.test_information_navigation_and_folder_demonstration",
+        "test_status_clarity.ClarityTests.test_finder_display_success_preserves_raw_difference_and_exact_upload_requirement",
+        "test_status_clarity.ClarityTests.test_finder_display_rejects_uncertain_stale_busy_and_meaningful_changes",
+        "test_status_clarity.ClarityTests.test_finder_diagnostics_keep_previous_display_versions_interpretable",
+        "test_change_evidence.EvidenceTests.test_finder_only_green_display_keeps_real_backup_and_diagnostic_evidence"
       ],
       "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },
@@ -486,6 +492,22 @@
         "test_packaged_install.PackagedInstallTests.test_replacement_registration_precedes_bootstrap_and_private_errors_are_retained"
       ],
       "remaining_gap": "Personal release 0.0.1 was automatically published and bootstrapped on the Pro with unchanged protected hashes and 13 repos. Launch Services registration before login-agent bootstrap resolved observed EIO after two restored attempts. Complete the follow-up real Sparkle upgrade; Apple signing/permission continuity and the Air matrix remain deferred."
+    },
+    {
+      "id": "GR22",
+      "title": "Settings persist only through explicit reviewed saves",
+      "breakpoint": "Closing a dirty settings page can silently lose a draft; repeated submits or stale revisions can overwrite saved choices.",
+      "diagnostic_events": [
+        "workspace_configuration",
+        "schedule_decision"
+      ],
+      "cause_and_solution": "Keep local drafts, guard Back/Close/Escape, serialize saves and preserve the existing session-token and revision-checked API boundary. Folder persistence has workspace_configuration evidence; effective saved scheduling policy appears in schedule_decision. Discard-only UI paths are covered by controller regressions, not claimed as save events.",
+      "required_behavior": "No persistence from editing or navigation. Failed saves keep the draft. Folder choices retain review and revision protections.",
+      "test_ids": [
+        "test_settings_pages.SettingsPagesTests.test_explicit_save_discard_busy_and_failure_preserve_drafts_and_revision_guards",
+        "test_settings_pages.SettingsPagesTests.test_folder_review_cancel_conflict_and_navigation_keep_saved_sources_intact"
+      ],
+      "remaining_gap": "Actual isolated browser checks cover schedule edits/save/discard/reload, folder-mode discard and a long access list with a fixed toolbar. Shared-controller regressions cover both menu and full-page folder hosts. Native Settings layout, permission actions and folder picking are not validated by these browser cases; no installed app or daily configuration changed."
     }
   ]
 }

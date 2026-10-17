@@ -105,6 +105,38 @@ class TimingDiagnosticTests(unittest.TestCase):
                     self.assertIn('Created', actual['lastLine'])
                     self.assertNotIn('uploaded at', actual['lastLine'])
 
+    def test_compact_backup_facts_keep_location_and_creation_evidence(self):
+        root = Path(__file__).resolve().parents[1]
+        for state, freshness, expected in [
+            ('cloud_confirmed', 'current', 'iCloud'),
+            ('local', 'current', 'This Mac'),
+            ('none', 'current', 'No backup yet'),
+            ('unavailable', 'current', 'Unavailable'),
+            ('cloud_confirmed', 'cache_expired', 'Unavailable'),
+        ]:
+            with self.subTest(state=state, freshness=freshness):
+                repo = copy.deepcopy(self.repo)
+                repo['backup_location']['state'] = state
+                script = "const p=require('./web/repo-status.js');const r=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(JSON.stringify(p.timing(r.repo,{},r.freshness)));"
+                actual = json.loads(subprocess.check_output(
+                    ['node', '-e', script], cwd=root, text=True,
+                    input=json.dumps({'repo': repo, 'freshness': freshness}),
+                ))
+                self.assertEqual(actual['locationLabel'], expected)
+                if expected in ('iCloud', 'This Mac'):
+                    self.assertRegex(actual['createdLabel'], r'^\d{1,2}/\d{1,2}/\d{2} \d{1,2}:\d{2}[ap]m$')
+                    self.assertEqual(actual['receipt']['created_at'], repo['backup_location']['created_at'])
+                elif expected == 'Unavailable':
+                    self.assertEqual(actual['createdLabel'], 'Unavailable')
+        # A claimed location without a usable creation observation stays unknown.
+        repo['backup_location'] = {'state': 'cloud_confirmed', 'created_at': 'invalid'}
+        actual = json.loads(subprocess.check_output(
+            ['node', '-e', script], cwd=root, text=True,
+            input=json.dumps({'repo': repo, 'freshness': 'current'}),
+        ))
+        self.assertEqual(actual['locationLabel'], 'Unavailable')
+        self.assertEqual(actual['createdLabel'], 'Unavailable')
+
     def test_new_exports_are_bounded_and_exclude_private_calendar_evidence(self):
         self.evidence.presentation(self.payload())
         self.log.emit('ui_timing', schedule_state='/Users/private', remaining_minutes=10**50,

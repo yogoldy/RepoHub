@@ -127,8 +127,27 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   overflow-wrap: anywhere;
 }
 #technical-details summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
   width: fit-content;
+  list-style: none;
+}
+#technical-details summary::-webkit-details-marker {
+  display: none;
+}
+#technical-details summary::before {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid currentColor;
+  content: "";
+  transition: transform 120ms ease;
+}
+#technical-details[open] summary::before {
+  transform: rotate(90deg);
 }
 #technical-details summary:focus-visible {
   outline: 2px solid var(--gold);
@@ -167,12 +186,6 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   grid-template-columns: 1fr;
   gap: 16px;
 }
-#info-dialog > .settings-heading {
-  flex: none;
-  background: var(--bg);
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--line);
-}
 .status-guide-item {
   border-bottom: 1px solid var(--line);
   padding-bottom: 15px;
@@ -193,10 +206,6 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   line-height: 1.65;
   margin: 8px 0 0;
   overflow-wrap: anywhere;
-}
-.status-guide-item .guide-labels {
-  color: var(--gold);
-  font-size: 10px;
 }
 .status-guide-item .guide-note {
   color: var(--muted);
@@ -225,7 +234,8 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   min-height: 0;
   contain: layout paint;
   overflow-y: auto;
-  padding: 0 20px 20px;
+  padding: 18px;
+  overscroll-behavior: contain;
 }
 
 /* Larger reading text without changing status evidence or success icons. */
@@ -236,10 +246,9 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 #technical-details, #technical-details .facts { font-size: 12px; }
 #technical-details .fact small, .schedule-copy small { font-size: 11px; }
 #repo-schedule { font-size: 12px; }
-#info-dialog .settings-heading h2 { font-size: 20px; }
+
 #info-dialog h3, .guide-heading h4 { font-size: 14px; }
 .status-guide-item p, #info-dialog .things-key p { font-size: 13px; }
-.status-guide-item .guide-labels { font-size: 12px; }
 
 /* Green is a prose treatment here; pending work keeps its existing icon. */
 .status-explanation[data-category="backup_pending"],
@@ -255,6 +264,8 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 
 /* Dates describe a saved archive; the next line describes scheduler eligibility. */
 .backup-timing {
+  display: grid;
+  gap: 8px;
   margin: 14px 0;
 }
 .backup-timing p {
@@ -262,7 +273,7 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   font-size: 14px;
   line-height: 1.55;
   overflow-wrap: anywhere;
-  margin: 7px 0;
+  margin: 0;
 }
 .backup-timing .backup-inclusion {
   font-size: 13px;
@@ -272,4 +283,134 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 .status-explanation,
 .technical-explanation {
   color: var(--green);
+}
+
+/* The toolbar stays outside the scrolling page content. */
+#settings-dialog {
+  padding: 0;
+  overflow: hidden;
+}
+#settings-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.settings-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.settings-toolbar h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+#settings-back, #info-back {
+  padding: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+#settings-back[hidden], #info-back[hidden], [data-info-page][hidden],
+[data-settings-page][hidden], #schedule-actions[hidden] {
+  display: none !important;
+}
+.settings-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px;
+  overscroll-behavior: contain;
+}
+#settings-home, #info-home {
+  display: grid;
+  gap: 9px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px;
+  text-align: left;
+  background: var(--panel);
+}
+.settings-row strong {
+  display: block;
+  font-size: 14px;
+}
+.settings-row small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.settings-row > span:last-child {
+  color: var(--gold);
+}
+.settings-content p, .settings-content .settings-note {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.settings-content .power-settings label, .settings-content select {
+  font-size: 13px;
+}
+.settings-content .power-settings h3 {
+  font-size: 15px;
+}
+.settings-content .readiness-panel {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.settings-content form > .settings-actions {
+  position: sticky;
+  bottom: -18px;
+  margin-bottom: -18px;
+  padding: 14px 0 18px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.backup-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.backup-facts dt, .backup-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The footer Quit control should not pick up the generic button fill on hover. */
+footer button:hover {
+  background: transparent;
+  color: var(--text);
+  transition: color 150ms ease;
+}
+
+/* Put each status label beside its own short explanation. */
+.guide-definitions {
+  margin: 12px 0 0;
+}
+.guide-definitions dt {
+  color: var(--gold);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.guide-definitions dd {
+  margin: 3px 0 12px;
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
 }

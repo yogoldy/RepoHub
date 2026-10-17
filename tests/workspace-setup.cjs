@@ -10,3 +10,10 @@ state.pending='multi';assert.equal(picked(state,{request_id:'multi',paths:['/one
 state.pending='bad';const before=source(state);assert.equal(picked(state,{request_id:'bad',paths:['relative']}),false);assert.deepEqual(source(state),before);
 const copy=source(state);copy.paths.push('/outside');assert.deepEqual(source(state),before);
 console.log('Workspace draft: stale/cancelled picker, duplicate paths, same-name paths, review invalidation and source isolation passed');
+
+const {dirty}=require('../web/workspace-setup.js');
+const original=draft({revision:'r',configuration:{source:{mode:'manual'},workspaces:[{path:'/one',active:true}]}});
+assert.equal(dirty(original),false);
+original.paths.push('/two'); assert.equal(dirty(original),true);
+original.paths.pop(); assert.equal(dirty(original),false);
+console.log('Folder dirty state follows the actual selected source, including reverting changes');

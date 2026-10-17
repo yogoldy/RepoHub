@@ -36,6 +36,10 @@
   $('readiness-check').onclick=async()=>{try{$('readiness-error').textContent='';$('readiness-check').disabled=true;await request('/api/readiness/check',{});await refresh();}catch(error){$('readiness-error').textContent=error.message;$('readiness-check').disabled=false;}};
   $('readiness-enable').onclick=()=>native('requestNotifications');$('readiness-notification-settings').onclick=()=>native('notificationSettings');$('readiness-privacy').onclick=()=>native('privacySettings');$('readiness-login').onclick=()=>native('loginSettings');
   new MutationObserver(()=>void refresh()).observe(dialog,{attributes:true,attributeFilter:['open']});
-  root.addEventListener('repoHubReadinessRequested',()=>{$('settings').click();setTimeout(()=>void refresh(),300);});
+  root.addEventListener('repoHubReadinessRequested',async()=>{
+    if(root.RepoHubSettings?.openAccess)await root.RepoHubSettings.openAccess();
+    else $('settings').click();
+    void refresh();
+  });
   root.addEventListener('repoHubNotificationsChanged',()=>void refresh());setInterval(()=>void refresh(),1500);
 })(globalThis);

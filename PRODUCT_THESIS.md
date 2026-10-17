@@ -293,3 +293,56 @@ before loading the login agent resolved the observed handoff. Background discove
 is enabled with user-controlled installation. Air and Apple permission-continuity
 validation remain outside this completed bootstrap. See the release-delivery record
 for exact evidence and the subsequent real-upgrade acceptance boundary.
+
+### Local Settings pages candidate — October 17, 2026
+
+Leo approved staged local commits for explicit saving and a less crowded Settings
+interface, with no push, main merge or installed-app update in this batch.
+`codex/settings-pages` adds a Settings home with separate schedule, folders,
+notifications, updates, help and access pages. Access is last. A shared header keeps
+the page title, Back and Close outside the scrolling content.
+
+Schedule edits stay in a draft until Save changes succeeds. Back, Close and Escape
+ask before discarding edits; failed saves retain the draft. Native access-readiness
+entry respects the same guard. Folder setup keeps review, exact source identities,
+revision checks and existing backups; its shared controller also preserves the full
+status page's existing behavior. Access checks, notification permission requests,
+updates and report previews remain explicit actions rather than schedule saves.
+
+The repo detail now presents Where and When separately. iCloud still requires the
+existing upload-confirmation evidence; When is the archive's creation time in
+month/day/two-digit-year and local 12-hour time. Unknown evidence remains unknown.
+Backup selection, scheduling decisions, verification and typed timing receipts are
+unchanged.
+
+Focused controller regressions and isolated browser checks exercised edit-versus-save,
+discard, failed/conflicting and duplicate saves, folder navigation, reload persistence,
+and an overflowing list of 61 disposable access results. The fixed header remained
+visible while the list scrolled. Full local acceptance is recorded in the clean
+Golden Gate receipt outside Git. Installed WebKit/native folder picking and real
+permission actions remain future checks; this candidate does not change the running
+0.0.2 app or authorize publication.
+
+The same local candidate now gives About your backups a home page and separate
+status-guide and Things to know pages. Back, title and Close remain outside the
+scrolling content. Existing guide wording and the selected-folder demonstration
+are preserved; this is not the later tutorial expansion. The repo summary retains
+Report this status, with Technical details below it and above the global backup
+controls. Where, When and the next-check line use consistent vertical spacing.
+Controller regressions cover navigation, demonstration reset and repo-scoped
+technical disclosures. No publication or installed-app update is included.
+
+The local Backed up display now treats the existing ordinary .DS_Store-only
+exception as success when project files and Git match a verified, uploaded backup.
+The card and headline use the normal Backed up presentation; Technical details
+retain the difference. The summary counts repos backed up to iCloud. Raw backup
+evidence, eligibility and retention remain unchanged. Diagnostic display policy 5
+records the exception explicitly and continues interpreting older policy versions.
+After the rule passed its clean Golden Gate, the six guide sections were revised
+in separate local commits: Backed up, waiting to run, work in progress, upload
+confirmation, unavailable status and failure. Short definitions explain each
+remaining card label; repeated label lines and long combined paragraphs are removed.
+The guide still distinguishes scanning, creating and uploading; unknown upload
+evidence does not prove success or failure; scheduled waiting does not cause stale
+status; reports are reviewed before Send. This batch does not authorize a push or
+installed-app update.

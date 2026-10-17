@@ -33,7 +33,7 @@
     if(cloud.state==='pending')return {phase:'pending',label:'Waiting for iCloud',detail:'Hashes verified · upload not yet confirmed',ready:false,percent};
     return {phase:'unknown',label:'Awaiting confirmation',detail:'Hashes verified · iCloud status unknown',ready:false,percent:null};
   }
-  // Describe the existing policy result without changing its safety decisions.
+  // Keep backup decisions intact while mapping their evidence to the displayed status.
   function present(repo, backup = {}) {
     const original = view(repo, backup);
     const verification = repo.verification || {};
@@ -47,14 +47,10 @@
       ? 'unknown' : original.phase;
     switch (displayPhase) {
       case 'ready':
+      case 'background':
         category = 'backed_up'; label = 'Backed up';
         headline = 'Your files are backed up.';
-        detail = 'Your files match the verified archive, and macOS confirms that same archive uploaded.';
-        break;
-      case 'background':
-        category = 'backed_up'; label = 'Only Finder view settings changed';
-        headline = 'Only Finder view settings changed.';
-        detail = 'Your project files and Git match the uploaded backup. Only ordinary .DS_Store view-setting files differ; no new backup is needed.';
+        detail = 'Your project files and Git data match the verified backup, and macOS confirms it uploaded to iCloud.';
         break;
       case 'changed': {
         category = 'backup_pending';
@@ -136,7 +132,15 @@
         headline = 'RepoHub can’t read the upload status.';
         detail = 'RepoHub cannot confirm that the current archive uploaded. See technical details for the available verification evidence.';
     }
-    return {...original, category, label, headline, detail, technicalDetail: original.phase === 'changed' ? detail : original.detail};
+    // A Finder-only exception remains recorded as a different comparison. It can
+    // use the normal green display only after view() establishes fresh verification
+    // and upload confirmation for the same archive.
+    const finderBackedUp = original.phase === 'background';
+    const technicalDetail = finderBackedUp
+      ? 'Only Finder view settings (.DS_Store) differ from the saved backup.'
+      : original.phase === 'changed' ? detail : original.detail;
+    return {...original, phase: finderBackedUp ? 'ready' : original.phase,
+      ready: original.ready || finderBackedUp, category, label, headline, detail, technicalDetail};
   }
 
   function timing(repo, backup = {}, freshness = 'current') {
@@ -189,6 +193,17 @@
         lastLine = 'Last backup created locally: ' + formatDate(receipt.created_at);
       }
     }
+    let locationLabel = receipt.location_state === 'none' ? 'No backup yet' : 'Unavailable';
+    let createdLabel = receipt.location_state === 'none' ? 'Not yet' : 'Unavailable';
+    if (['cloud_confirmed', 'local'].includes(receipt.location_state)
+        && receipt.created_at && Number.isFinite(Date.parse(receipt.created_at))) {
+      locationLabel = receipt.location_state === 'cloud_confirmed' ? 'iCloud' : 'This Mac';
+      createdLabel = new Intl.DateTimeFormat('en-US', {
+        month: 'numeric', day: 'numeric', year: '2-digit',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      }).format(new Date(receipt.created_at)).replace(/,\s*/g, ' ')
+        .replace(/\s+(AM|PM)$/, (_, period) => period.toLowerCase());
+    }
     const nextLabels = {
       due: 'Next scheduled check: due now.',
       busy: 'Check due · waiting for current backup.',
@@ -211,7 +226,7 @@
     };
     let inclusionLine = inclusionLabels[receipt.inclusion_state];
     if (freshness === 'current' && phase === 'background') inclusionLine = 'No new backup needed.';
-    return {receipt, lastLine, nextLine, inclusionLine};
+    return {receipt, lastLine, locationLabel, createdLabel, nextLine, inclusionLine};
   }
 
   function describeSchedule(repo, power) {
@@ -258,34 +273,49 @@
   function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
   function legend() {
     const groups = [
-      {category: 'backed_up', icon: 'ready', title: 'Backed up', labels: 'Backed up · Only Finder view settings changed',
-        explanation: 'Backed up means fresh checks match your files to the verified archive, and macOS confirms that exact archive uploaded.',
-        note: 'Only Finder view settings changed uses the information icon instead of a green check when the uploaded archive matches project files and Git. Only ordinary .DS_Store view settings differ; no new backup is needed in this exception. It is not full byte-for-byte equality.'},
+      {category: 'backed_up', icon: 'ready', title: 'Backed up',
+        explanation: 'RepoHub checked your project files and Git data against the saved backup. macOS confirmed that backup uploaded to iCloud.',
+        note: 'Changes to Finder’s folder view settings don’t require a new backup.'},
       {category: 'backup_pending', icon: 'changed', title: 'A backup is waiting to run',
-        labels: 'First backup pending · Edits confirmed · Backup pending · Changes need verification · Only Git data changed · Only Git and file metadata changed · Only file metadata changed',
-        explanation: 'First backup pending means no archive exists yet. Edits confirmed means a hash comparison found project or Git changes against the saved archive. Backup pending means a backup is needed without that confirmed-edit evidence.',
-        note: 'The Only labels require a complete comparison showing no project-file changes. Git data includes version-control history and still needs a backup. Other file metadata remains eligible for backup; the expanded explanation distinguishes it from the ignored Finder exception. Review the separate Schedule row or use Back up now. Waiting for a scheduled attempt is normal and does not mean status checks failed.'},
+        definitions: [
+          ['First backup pending', 'RepoHub hasn’t created a backup for this repo yet.'],
+          ['Edits confirmed', 'RepoHub found project-file or Git changes since the saved backup.'],
+          ['Backup pending', 'RepoHub needs to create or update this repo’s backup.'],
+          ['Changes need verification', 'RepoHub needs a complete comparison before it can identify the changes.'],
+          ['Only Git data changed', 'Git history or other Git data changed; your project files match.'],
+          ['Only file metadata changed', 'File information changed; your project files and Git match.'],
+          ['Only Git and file metadata changed', 'Git data and file information changed; your project files match.'],
+        ],
+        note: 'Check the schedule or choose Back up now. Waiting for a scheduled backup is normal.'},
       {category: 'working', icon: 'copying', title: 'RepoHub or macOS is working',
-        labels: 'Scanning · Checking again · Creating backup · Uploading',
-        explanation: 'Scanning compares files with the archive. Checking again means files changed during that scan; RepoHub retries on the next scan. Creating backup packages and verifies the archive. Uploading means macOS reports transfer activity for that archive.',
-        note: 'The expanded sentence names the current step. A progress bar, even at 100%, does not establish upload completion.'},
-      {category: 'upload_unconfirmed', icon: 'unknown', title: 'Cloud upload completion is not confirmed',
-        labels: 'Awaiting upload confirmation · Upload status unavailable',
-        explanation: 'Awaiting upload confirmation means macOS has not acknowledged completion. Upload status unavailable means RepoHub cannot establish upload status for the current archive.',
-        note: 'RepoHub creates the archive on this Mac; macOS uploads the iCloud Drive file separately. Neither state proves that uploading failed, and a local file alone is not cloud confirmation.'},
-      {category: 'status_unavailable', icon: 'stale', title: 'RepoHub cannot get current information',
-        labels: 'Current status unavailable',
-        explanation: 'Expected checks are not supplying fresh evidence, or the interface cannot reach the helper. Technical details show available timestamps and reasons.',
-        note: 'This is separate from backup frequency. An hourly backup schedule does not make status outdated between backups.'},
-      {category: 'failure', icon: 'error', title: 'An operation failed',
-        labels: 'Needs attention — failure',
-        explanation: 'RepoHub or macOS reported a failure. The expanded view shows the available error; Technical details retain supporting evidence.',
-        note: 'Use Retry check now when offered, or Report this status to describe the issue and optionally attach sanitized diagnostics. Review the preview and explicitly Send; opening a report sends nothing.'}
+        definitions: [
+          ['Scanning', 'RepoHub is comparing your files with the saved backup.'],
+          ['Checking again', 'Files changed during the scan. RepoHub will try again.'],
+          ['Creating backup', 'RepoHub is packaging your files and checking the backup.'],
+          ['Uploading', 'macOS is transferring the backup to iCloud.'],
+        ],
+        note: 'A progress bar reaching 100% does not confirm that the upload finished.'},
+      {category: 'upload_unconfirmed', icon: 'unknown', title: 'Upload not yet confirmed',
+        explanation: 'RepoHub creates the backup on this Mac. macOS uploads it separately.',
+        definitions: [
+          ['Awaiting upload confirmation', 'macOS hasn’t confirmed that the upload finished.'],
+          ['Upload status unavailable', 'RepoHub can’t determine whether the upload finished.'],
+        ],
+        note: 'A local backup file does not prove upload completion. These statuses do not prove that the upload failed.'},
+      {category: 'status_unavailable', icon: 'stale', title: 'Current status unavailable',
+        explanation: 'RepoHub doesn’t have a recent, reliable check of your backup status.',
+        note: 'See Technical details or choose Report this status. Waiting between scheduled backups is normal and does not cause this status.'},
+      {category: 'failure', icon: 'error', title: 'Needs attention — failure',
+        explanation: 'A backup or related operation failed. The repo’s expanded view shows the available error.',
+        note: 'Open Technical details or use Retry check now when offered. Report this status lets you review a report; nothing is sent until you choose Send.'}
     ];
     return groups.map(group => `<section class="status-guide-item" data-category="${group.category}">
       <div class="guide-heading"><span class="guide-symbol" aria-hidden="true">${icon(group.icon)}</span>
-        <h4>${group.title}</h4></div><p class="guide-labels">${group.labels}</p>
-      <p>${group.explanation}</p><p class="guide-note">${group.note}</p></section>`).join('');
+        <h4>${group.title}</h4></div>
+      ${group.definitions ? `<dl class="guide-definitions">${group.definitions.map(
+        ([label, meaning]) => `<dt>${label}</dt><dd>${meaning}</dd>`).join('')}</dl>` : ''}
+      ${group.explanation ? `<p>${group.explanation}</p>` : ''}
+      ${group.note ? `<p class="guide-note">${group.note}</p>` : ''}</section>`).join('');
   }
-  const policy={view,present,timing,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-4'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,timing,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-5'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

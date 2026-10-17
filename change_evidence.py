@@ -66,7 +66,7 @@ def presentation_text(facts, phase, version='status-clarity-1'):
                 code = 'git_finder' if counts['finder_metadata'] > 0 else 'git'
             elif counts['finder_metadata'] > 0:
                 code = 'finder_pending'
-    if version in {'status-clarity-3', 'status-clarity-4'}:
+    if version in {'status-clarity-3', 'status-clarity-4', 'status-clarity-5'}:
         if phase == 'background':
             code = 'view_settings'
         elif phase == 'changed' and facts['has_backup']:
@@ -194,7 +194,7 @@ def change_reason(row, facts):
     return 'backup_pending_unclassified'
 
 
-def icon_reason(rendered, facts):
+def icon_reason(rendered, facts, version=None):
     """Explain the reported presentation; inputs remain recorded independently."""
     # This checks the logged inputs independently of the submitted icon. A claimed
     # green icon never becomes proof of a verified/uploaded archive.
@@ -217,6 +217,8 @@ def icon_reason(rendered, facts):
           and facts['has_backup'] and facts['backup_hash_ref'] and same_verification
           and facts['verification_state'] == 'different'):
         expected, reason = cloud_icon(facts, same_cloud, finder=True)
+        if version == 'status-clarity-5' and expected == 'background':
+            expected = 'ready'
     elif facts['verification_state'] != 'matched' or not same_verification:
         expected, reason = 'verifying', 'awaiting_hash_verification'
     else:
@@ -334,7 +336,7 @@ class ChangeEvidence:
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
                 or not isinstance(payload['policy_version'], str)
-                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4'}
+                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5'}
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
         freshness = payload.get('client_freshness', 'current')
@@ -345,14 +347,14 @@ class ChangeEvidence:
             if snapshot is None:
                 raise FileExistsError('Observed status expired; request fresh status')
             rows = payload['rows']
-            timing_frame = payload['policy_version'] == 'status-clarity-4' and payload['surface'] == 'menu'
+            timing_frame = payload['policy_version'] in {'status-clarity-4', 'status-clarity-5'} and payload['surface'] == 'menu'
             selected = payload.get('selected_repo_id')
             if timing_frame and (not isinstance(selected, str) or selected not in snapshot):
                 if snapshot or selected is not None:
                     raise ValueError('Invalid selected timing repo')
             if not timing_frame and 'selected_repo_id' in payload:
                 raise ValueError('Unexpected timing selection')
-            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4'}
+            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5'}
             row_fields = {'repo_id', 'phase', 'display_label', 'ready'}
             if modern:
                 row_fields |= {'category', 'display_headline'}
@@ -385,7 +387,7 @@ class ChangeEvidence:
                 current[key] = signature
                 repo_ref = snapshot[key]['repo_ref']
                 if previous.get(key) != signature:
-                    reason = (icon_reason(row, snapshot[key]) if freshness == 'current' else
+                    reason = (icon_reason(row, snapshot[key], payload['policy_version']) if freshness == 'current' else
                               ('client_' + freshness if row['phase'] == 'stale' and row['ready'] is False and row['display_label'] == ('Current status unavailable' if modern else 'Status outdated') else 'presentation_inputs_disagree'))
                     if modern:
                         expected = presentation_text(snapshot[key], row['phase'], payload['policy_version'])

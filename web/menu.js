@@ -13,7 +13,25 @@ function view(repo){return RepoStatus.present(repo,menuState?.backup);}
 $('#status-legend').innerHTML=RepoStatus.legend();
 
 const infoDialog = $('#info-dialog');
-$('#info').onclick = () => infoDialog.showModal();
+function showInfoPage(page) {
+  const titles = {home: 'About your backups', status: 'What your backup status means',
+    things: 'Things to know'};
+  if (!Object.hasOwn(titles, page)) return;
+  for (const section of document.querySelectorAll('[data-info-page]')) {
+    section.hidden = section.dataset.infoPage !== page;
+  }
+  $('#info-title').textContent = titles[page];
+  $('#info-back').hidden = page === 'home';
+  $('#info-content').scrollTop = 0;
+  $('#info-title').focus({preventScroll: true});
+}
+$('#info').onclick = () => {
+  infoDialog.showModal();
+  showInfoPage('home');
+};
+$('#info-nav-status').onclick = () => showInfoPage('status');
+$('#info-nav-things').onclick = () => showInfoPage('things');
+$('#info-back').onclick = () => showInfoPage('home');
 $('#info-close').onclick = () => infoDialog.close();
 let folderDemoTimer=null;
 $('#show-folder').onclick=()=>{
@@ -38,7 +56,7 @@ function render(){
   if(!repos.some(r=>r.id===selectedId))selectedId=repos[0]?.id||null;
   const ready=repos.filter(r=>view(r).ready).length;
   $('#summary').textContent = repos.length
-    ? `${ready} of ${repos.length} repos fully verified and uploaded` : 'No repos found';
+    ? `${ready} of ${repos.length} repos backed up to iCloud` : 'No repos found';
   $('#backup').disabled=!!menuState.backup?.running;
   $('#backup').lastElementChild.textContent=menuState.backup?.running?'Backing up…':'Back up now';
   const problems=menuState.problems||[];
@@ -69,12 +87,22 @@ function render(){
   $('#notifications').setAttribute('aria-pressed',String(enabled));
   $('#notification-caption').textContent=notifications.permission==='denied'?'macOS permission needed':enabled?'On':'Off';
   $('#checked').textContent='Live · Checked '+when(menuState.cloud_checked_at);
-  for(const id of ['open-backups','notifications','quit']){$('#'+id).disabled=!window.webkit?.messageHandlers?.repoHub;if($('#'+id).disabled)$('#'+id).title='Available in the Mac menu-bar panel';}
+  for(const id of ['open-backups','notifications','quit']){
+    const control=$('#'+id);
+    control.disabled=!window.webkit?.messageHandlers?.repoHub;
+    if(control.disabled){
+      const explanation='Available in the Mac menu-bar panel';
+      control.setAttribute('aria-description',explanation);
+      if(id==='quit')control.removeAttribute('title');
+      else control.title=explanation;
+    }
+  }
 }
 function renderDetail() {
   const repo = menuState.repos.find(row => row.id === selectedId);
   if (!repo) {
     $('#detail').innerHTML = '<p class="empty">Select a repo to see its backup.</p>';
+    $('#technical-panel').innerHTML = '';
     return;
   }
   const state = view(repo);
@@ -101,7 +129,12 @@ function renderDetail() {
     <p class="status-explanation" data-category="${state.category}">${escape(state.detail)}</p>
     ${progress}${retry}
     <div id="backup-timing" class="backup-timing" data-receipt="${escape(JSON.stringify(timing.receipt))}">
-      <p class="last-backup">${escape(timing.lastLine)}</p>
+      <dl class="backup-facts" aria-label="Latest backup">
+        <dt>Where:</dt><dd>${escape(timing.locationLabel)}</dd>
+        <dt>When:</dt><dd>${timing.createdLabel !== 'Unavailable' && timing.createdLabel !== 'Not yet'
+          ? `<time datetime="${escape(timing.receipt.created_at)}" title="Backup creation time">${escape(timing.createdLabel)}</time>`
+          : escape(timing.createdLabel)}</dd>
+      </dl>
       <p class="next-backup">${escape(timing.nextLine)}</p>
       ${timing.inclusionLine ? `<p class="backup-inclusion">${escape(timing.inclusionLine)}</p>` : ''}
     </div>
@@ -109,7 +142,14 @@ function renderDetail() {
       <span class="schedule-copy"><strong>${escape(schedule.label)}</strong>
         <small>${escape(schedule.detail)}</small></span><span aria-hidden="true">›</span>
     </button>
-    <details id="technical-details" ${technicalOpen.has(repo.id) ? 'open' : ''}>
+    <button id="report-status" type="button" class="report-status">Report this status</button>`;
+  if ($('#detail').innerHTML !== markup) {
+    const focused = $('#detail').contains(document.activeElement) ? document.activeElement.id : null;
+    $('#detail').innerHTML = markup;
+    if (focused) document.getElementById(focused)?.focus({preventScroll: true});
+  }
+  const technicalMarkup = `
+    <details id="technical-details" data-repo-id="${escape(repo.id)}" ${technicalOpen.has(repo.id) ? 'open' : ''}>
       <summary id="technical-toggle">Technical details</summary>
       <p class="technical-explanation" data-category="${state.category}">${escape(state.technicalDetail)}</p>
       <div class="facts">
@@ -119,14 +159,18 @@ function renderDetail() {
       </div>
       ${repo.health?.fresh !== true ? `<p>${escape((repo.health?.reasons || ['Fresh evidence unavailable']).join(' · '))}</p>` : ''}
     </details>
-    <button id="report-status" type="button" class="report-status">Report this status</button>`;
-  if ($('#detail').innerHTML !== markup) {
-    const focused = $('#detail').contains(document.activeElement) ? document.activeElement.id : null;
-    $('#detail').innerHTML = markup;
+`;
+  const technicalPanel = $('#technical-panel');
+  if (technicalPanel.innerHTML !== technicalMarkup) {
+    const focused = technicalPanel.contains(document.activeElement) ? document.activeElement.id : null;
+    technicalPanel.innerHTML = technicalMarkup;
     if (focused) document.getElementById(focused)?.focus({preventScroll: true});
   }
-  $('#technical-details').ontoggle = () => {
-    if ($('#technical-details').open) technicalOpen.add(repo.id);
+  const technicalDetails = $('#technical-details');
+  technicalDetails.ontoggle = () => {
+    // Ignore a queued toggle from a panel replaced after selecting another repo.
+    if (!technicalDetails.isConnected) return;
+    if (technicalDetails.open) technicalOpen.add(repo.id);
     else technicalOpen.delete(repo.id);
   };
   $('#repo-schedule').onclick = () => openSettings(repo.id);
@@ -157,16 +201,245 @@ function unreachable(message,reason='request_failed'){clientFreshness=reason;if(
 async function load(){if(loading)return;loading=true;try{observedMenuState=await api('/api/status');clientFreshness='current';menuState=observedMenuState;lastResponseAt=Date.now();render();}catch(e){unreachable('Could not reach the local backup helper.',e.name==='AbortError'?'response_timeout':'request_failed');}finally{loading=false;}}
 $('#backup').onclick=async()=>{try{sessionToken=(await api('/api/session')).token;$('#backup').disabled=true;await api('/api/backup',{});$('#notice').textContent='Backup requested.';setTimeout(load,700);}catch(e){$('#notice').textContent=e.message;$('#backup').disabled=false;}};
 $('#open-backups').onclick=()=>nativeAction('openBackups');$('#notifications').onclick=()=>{if(nativeAction('toggleNotifications'))setTimeout(load,500);};$('#quit').onclick=()=>nativeAction('quit');window.addEventListener('repoHubNotificationsChanged',load);
-const powerName=source=>source==='battery'?'On battery':source==='adapter'?'On power adapter':'Power source unavailable';
-for(const source of ['battery','adapter']){$('#'+source+'-frequency').innerHTML=[[0,'Off'],[15,'15 minutes'],[30,'30 minutes'],[60,'1 hour'],[120,'2 hours'],[240,'4 hours']].map(([value,label])=>`<option value="${value}">${label}</option>`).join('');$('#'+source+'-delay').innerHTML=[2,5,10,15,30].map(value=>`<option value="${value}">${value} minutes</option>`).join('');$('#'+source+'-edits').onchange=()=>{settingsDisabled();};}
-function settingsDisabled(){const inherited=settingsRepo!==null&&$('#repo-defaults').checked;$('#battery-automatic').disabled=inherited;for(const source of ['battery','adapter']){const disabled=inherited||(source==='battery'&&!$('#battery-automatic').checked);for(const field of ['frequency','edits'])$('#'+source+'-'+field).disabled=disabled;$('#'+source+'-delay').disabled=disabled||!$('#'+source+'-edits').checked;}}
-$('#repo-defaults').onchange=()=>{if($('#repo-defaults').checked&&settingsDefaults)fillSettings(settingsDefaults);settingsDisabled();};
-$('#battery-automatic').onchange=()=>{if($('#battery-automatic').checked&&Number($('#battery-frequency').value)===0)$('#battery-frequency').value=60;settingsDisabled();};
-function fillSettings(settings){$('#battery-automatic').checked=!!(settings.battery.frequency_minutes||settings.battery.after_edits);for(const source of ['battery','adapter']){const policy=settings[source];$('#'+source+'-frequency').value=policy.frequency_minutes;$('#'+source+'-edits').checked=policy.after_edits;$('#'+source+'-delay').value=policy.edit_delay_minutes;}}
-async function openSettings(repoId=null){try{const result=await api(repoId?'/api/repo-settings/'+encodeURIComponent(repoId):'/api/settings');settingsRepo=repoId;settingsRevision=result.revision;defaultsRevision=result.defaults_revision||'';settingsDefaults=result.defaults||result.settings;fillSettings(result.settings);$('#repo-defaults-label').hidden=!repoId;$('#repo-defaults').checked=!result.override;const repo=menuState?.repos?.find(r=>r.id===repoId);$('#settings-title').textContent=repo?'Schedule · '+repo.name:'Default backup settings';$('#settings-scope').textContent=repo?'Only this repo. Use defaults to follow the main settings automatically.':'Default behavior for every repo without a custom schedule. Individual schedules are adjusted from each menu-bar card.';settingsDisabled();$('#readiness-panel').hidden=!!repoId;$('#settings-power').textContent='Currently: '+powerName(result.power_source);$('#settings-error').textContent='';$('#settings-dialog').showModal();}catch(e){$('#notice').textContent=e.message;}}
-$('#settings').onclick=()=>openSettings();
-for(const id of ['settings-close','settings-cancel'])$('#'+id).onclick=()=>$('#settings-dialog').close();
-$('#settings-form').onsubmit=async e=>{e.preventDefault();$('#settings-save').disabled=true;try{sessionToken=(await api('/api/session')).token;const settings={};for(const source of ['battery','adapter'])settings[source]={frequency_minutes:Number($('#'+source+'-frequency').value),after_edits:$('#'+source+'-edits').checked,edit_delay_minutes:Number($('#'+source+'-delay').value)};if(!$('#battery-automatic').checked){settings.battery.frequency_minutes=0;settings.battery.after_edits=false;}await api(settingsRepo?'/api/repo-settings/'+encodeURIComponent(settingsRepo):'/api/settings',settingsRepo?{settings:$('#repo-defaults').checked?null:settings,revision:settingsRevision,defaults_revision:defaultsRevision}:{settings,revision:settingsRevision});$('#settings-dialog').close();await load();}catch(e){$('#settings-error').textContent=e.message;}finally{$('#settings-save').disabled=false;}};
+const powerName = source => source === 'battery' ? 'On battery'
+  : source === 'adapter' ? 'On power adapter' : 'Power source unavailable';
+let savedSchedule = null;
+let savedScheduleKey = '';
+let savingSchedule = false;
+let discardDecision = null;
+let activeSettingsPage = 'home';
+
+function showSettingsPage(page) {
+  const titles = {home: 'Settings', schedule: 'Backup schedule', notifications: 'Notifications',
+    updates: 'App updates', help: 'Help & diagnostics', access: 'Access & permissions'};
+  if (!(page in titles)) return;
+  activeSettingsPage = page;
+  for (const name of Object.keys(titles)) {
+    const selector = name === 'home' ? '#settings-home' : '#settings-page-' + name;
+    $(selector).hidden = name !== page;
+  }
+  $('#settings-title').textContent = settingsRepo && page === 'schedule'
+    ? 'Schedule · ' + (menuState?.repos?.find(row => row.id === settingsRepo)?.name || 'Repository')
+    : titles[page];
+  $('#settings-back').hidden = page === 'home';
+  $('#settings-back').textContent = settingsRepo ? '‹ Backups' : '‹ Settings';
+  $('#schedule-actions').hidden = page !== 'schedule';
+  $('#settings-content').scrollTop = 0;
+  $('#settings-title').focus();
+  if (page === 'updates') {
+    const native = !!window.webkit?.messageHandlers?.repoHub;
+    $('#check-updates').disabled = !native;
+    $('#updates-note').textContent = native
+      ? 'Your backup folders and settings stay separate.'
+      : 'Check for Updates is available in the installed Mac app.';
+  }
+}
+
+async function settingsBack() {
+  if ($('#settings-form').hidden) return window.RepoHubWorkspaces?.close(false);
+  if (activeSettingsPage === 'schedule' && !await leaveSchedule()) return;
+  if (settingsRepo) $('#settings-dialog').close();
+  else showSettingsPage('home');
+}
+
+
+function scheduleDraft() {
+  if (settingsRepo !== null && $('#repo-defaults').checked) return null;
+  const settings = {};
+  for (const source of ['battery', 'adapter']) {
+    settings[source] = {
+      frequency_minutes: Number($('#' + source + '-frequency').value),
+      after_edits: $('#' + source + '-edits').checked,
+      edit_delay_minutes: Number($('#' + source + '-delay').value),
+    };
+  }
+  if (!$('#battery-automatic').checked) {
+    settings.battery.frequency_minutes = 0;
+    settings.battery.after_edits = false;
+  }
+  return settings;
+}
+
+function scheduleDirty() {
+  return JSON.stringify(scheduleDraft()) !== savedScheduleKey;
+}
+
+function settingsDisabled() {
+  const inherited = settingsRepo !== null && $('#repo-defaults').checked;
+  $('#settings-close').disabled = savingSchedule;
+  $('#settings-back').disabled = savingSchedule;
+  $('#repo-defaults').disabled = savingSchedule;
+  $('#battery-automatic').disabled = savingSchedule || inherited;
+  for (const source of ['battery', 'adapter']) {
+    const disabled = savingSchedule || inherited
+      || (source === 'battery' && !$('#battery-automatic').checked);
+    for (const field of ['frequency', 'edits']) {
+      $('#' + source + '-' + field).disabled = disabled;
+    }
+    $('#' + source + '-delay').disabled = disabled || !$('#' + source + '-edits').checked;
+  }
+  $('#settings-save').disabled = savingSchedule || !scheduleDirty();
+  $('#settings-save').textContent = savingSchedule ? 'Saving…' : 'Save changes';
+}
+
+function fillSettings(settings) {
+  $('#battery-automatic').checked = !!(settings.battery.frequency_minutes || settings.battery.after_edits);
+  for (const source of ['battery', 'adapter']) {
+    const policy = settings[source];
+    $('#' + source + '-frequency').value = policy.frequency_minutes;
+    $('#' + source + '-edits').checked = policy.after_edits;
+    $('#' + source + '-delay').value = policy.edit_delay_minutes;
+  }
+}
+
+function confirmDiscard(dirty) {
+  if (!dirty) return Promise.resolve(true);
+  if (discardDecision) return Promise.resolve(false);
+  $('#settings-discard').showModal();
+  $('#settings-keep').focus();
+  return new Promise(resolve => { discardDecision = resolve; });
+}
+
+function finishDiscard(discard) {
+  $('#settings-discard').close();
+  const resolve = discardDecision;
+  discardDecision = null;
+  if (resolve) resolve(discard);
+}
+
+async function leaveSchedule() {
+  if (savingSchedule) return false;
+  if (!await confirmDiscard(scheduleDirty())) return false;
+  // Discard restores the saved draft, including its inheritance choice.
+  fillSettings(savedSchedule);
+  $('#settings-error').textContent = '';
+  $('#repo-defaults').checked = settingsRepo !== null && savedScheduleKey === 'null';
+  settingsDisabled();
+  return true;
+}
+
+async function closeSettings() {
+  if ($('#settings-form').hidden) return window.RepoHubWorkspaces?.close(true);
+  if (await leaveSchedule()) $('#settings-dialog').close();
+}
+
+for (const source of ['battery', 'adapter']) {
+  $('#' + source + '-frequency').innerHTML = [
+    [0, 'Off'], [15, '15 minutes'], [30, '30 minutes'],
+    [60, '1 hour'], [120, '2 hours'], [240, '4 hours'],
+  ].map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+  $('#' + source + '-delay').innerHTML = [2, 5, 10, 15, 30]
+    .map(value => `<option value="${value}">${value} minutes</option>`).join('');
+  $('#' + source + '-edits').onchange = settingsDisabled;
+}
+$('#repo-defaults').onchange = () => {
+  if ($('#repo-defaults').checked && settingsDefaults) fillSettings(settingsDefaults);
+  settingsDisabled();
+};
+$('#battery-automatic').onchange = () => {
+  if ($('#battery-automatic').checked && Number($('#battery-frequency').value) === 0) {
+    $('#battery-frequency').value = 60;
+  }
+  settingsDisabled();
+};
+for (const event of ['input', 'change']) {
+  $('#settings-form').addEventListener(event, settingsDisabled);
+}
+$('#settings-keep').onclick = () => finishDiscard(false);
+$('#settings-discard-confirm').onclick = () => finishDiscard(true);
+$('#settings-discard').addEventListener('cancel', event => {
+  event.preventDefault();
+  finishDiscard(false);
+});
+$('#settings-dialog').addEventListener('cancel', event => {
+  if ($('#settings-form').hidden) return;
+  event.preventDefault();
+  void closeSettings();
+});
+
+async function openSettings(repoId = null, page = 'home') {
+  if ($('#settings-dialog').open) {
+    if ($('#settings-form').hidden) {
+      if (!await window.RepoHubWorkspaces?.close(false)) return false;
+    } else if (activeSettingsPage === 'schedule' && !await leaveSchedule()) return false;
+  }
+  try {
+    const result = await api(repoId ? '/api/repo-settings/' + encodeURIComponent(repoId) : '/api/settings');
+    settingsRepo = repoId;
+    settingsRevision = result.revision;
+    defaultsRevision = result.defaults_revision || '';
+    settingsDefaults = result.defaults || result.settings;
+    savedSchedule = result.settings;
+    fillSettings(savedSchedule);
+    $('#repo-defaults-label').hidden = !repoId;
+    $('#repo-defaults').checked = !result.override;
+    savedScheduleKey = JSON.stringify(scheduleDraft());
+    const repo = menuState?.repos?.find(row => row.id === repoId);
+    $('#settings-title').textContent = repo ? 'Schedule · ' + repo.name : 'Default backup settings';
+    $('#settings-scope').textContent = repo
+      ? 'Only this repo. Use defaults to follow the main settings automatically.'
+      : 'Default behavior for every repo without a custom schedule. Individual schedules are adjusted from each menu-bar card.';
+    settingsDisabled();
+    $('#readiness-panel').hidden = !!repoId;
+    $('#settings-power').textContent = 'Currently: ' + powerName(result.power_source);
+    $('#settings-error').textContent = '';
+    $('#settings-form').hidden = false;
+    $('#workspace-form').hidden = true;
+    if (!$('#settings-dialog').open) $('#settings-dialog').showModal();
+    showSettingsPage(repoId ? 'schedule' : page);
+    return true;
+  } catch (error) {
+    $('#notice').textContent = error.message;
+    return false;
+  }
+}
+$('#settings').onclick = () => openSettings();
+$('#settings-close').onclick = closeSettings;
+$('#settings-cancel').onclick = settingsBack;
+$('#settings-back').onclick = settingsBack;
+for (const page of ['schedule', 'notifications', 'updates', 'help', 'access']) {
+  $('#settings-nav-' + page).onclick = () => page === 'schedule'
+    ? openSettings(null, 'schedule') : showSettingsPage(page);
+}
+$('#settings-form').onsubmit = async event => {
+  event.preventDefault();
+  if (savingSchedule || !scheduleDirty()) return;
+  const settings = scheduleDraft();
+  savingSchedule = true;
+  settingsDisabled();
+  $('#settings-error').textContent = '';
+  try {
+    sessionToken = (await api('/api/session')).token;
+    const path = settingsRepo ? '/api/repo-settings/' + encodeURIComponent(settingsRepo) : '/api/settings';
+    const payload = settingsRepo
+      ? {settings, revision: settingsRevision, defaults_revision: defaultsRevision}
+      : {settings, revision: settingsRevision};
+    const saved = await api(path, payload);
+    settingsRevision = saved.revision;
+    savedSchedule = saved.settings;
+    savedScheduleKey = JSON.stringify(settings);
+    if (settingsRepo) $('#settings-dialog').close();
+    else { settingsDefaults = saved.settings; showSettingsPage('home'); }
+    $('#notice').textContent = 'Backup schedule saved.';
+    await load();
+  } catch (error) {
+    $('#settings-error').textContent = error.message + ' Your changes are still here; nothing was confirmed saved.';
+  } finally {
+    savingSchedule = false;
+    settingsDisabled();
+  }
+};
+window.RepoHubSettings = {
+  confirmDiscard, leaveSchedule,
+  showHome: () => showSettingsPage('home'),
+  openAccess: async () => { if (await openSettings()) showSettingsPage('access'); },
+  workspaceOpened: () => {
+    $('#settings-title').textContent = 'Folders to back up';
+    $('#settings-back').hidden = false;
+    $('#settings-content').scrollTop = 0;
+    $('#settings-title').focus();
+  },
+};
 window.addEventListener('resize',updatePosition);setInterval(()=>{if(lastResponseAt&&Date.now()-lastResponseAt>20000)unreachable('Status outdated: waiting for the local helper.','cache_expired');},5000);
 (async()=>{try{sessionToken=(await api('/api/session')).token;}catch(e){/* Read status still works; writes acquire a fresh token when needed. */}await load();setInterval(load,5000);})();
 
