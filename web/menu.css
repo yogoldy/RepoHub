@@ -310,6 +310,33 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   font-size: 18px;
   overflow-wrap: anywhere;
 }
+.appearance-label {
+  display: block;
+  margin: 18px 0 8px;
+}
+.menu-appearance-preview {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 20px;
+  min-height: 32px;
+  font-size: 16px;
+}
+.menu-appearance-preview svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+#menu-appearance-error {
+  color: var(--red);
+}
+#menu-appearance-error:empty {
+  display: none;
+}
 .back-button {
   display: inline-flex;
   align-items: center;

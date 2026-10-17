@@ -176,11 +176,11 @@ def main():
                 raise ValueError('macOS profile requires macOS; native checks may not be silently skipped')
             command('github-workflow-syntax',[sys.executable,str(ROOT/'tools/check_workflows.py'),'--cache',str(evidence/'workflow-dependencies')])
             swift=['/usr/bin/xcrun','swiftc','-module-cache-path',str(evidence/'swift-cache'),'-target',platform.machine()+'-apple-macos13.0']
-            command('native-app-build',swift+[str(ROOT/'native'/name) for name in ['RepoHub.swift','HelperLaunch.swift','BackupReadiness.swift','ProblemAlerts.swift','MenuBridge.swift','GitHubConnection.swift','PackagedApplication.swift','AppUpdates.swift']]+['-o',str(evidence/'RepoHub'),'-framework','AppKit','-framework','WebKit','-framework','UserNotifications'])
+            command('native-app-build',swift+[str(ROOT/'native'/name) for name in ['RepoHub.swift','HelperLaunch.swift','BackupReadiness.swift','ProblemAlerts.swift','MenuBridge.swift','GitHubConnection.swift','PackagedApplication.swift','AppUpdates.swift','MenuAppearance.swift']]+['-o',str(evidence/'RepoHub'),'-framework','AppKit','-framework','WebKit','-framework','UserNotifications'])
             command('cloud-helper-build',swift+[str(ROOT/'native/CloudStatus.swift'),'-o',str(evidence/'cloud-status')])
             command('readiness-build',swift+[str(ROOT/'native/BackupReadiness.swift'),str(ROOT/'native/ProblemAlerts.swift'),str(ROOT/'tests/readiness.swift'),'-o',str(evidence/'readiness')])
             command('readiness-checks',[str(evidence/'readiness')])
-            command('bridge-build',swift+[str(ROOT/'native/MenuBridge.swift'),str(ROOT/'tests/menu_bridge_checks.swift'),'-o',str(evidence/'bridge')])
+            command('bridge-build',swift+[str(ROOT/'native/MenuBridge.swift'),str(ROOT/'native/MenuAppearance.swift'),str(ROOT/'tests/menu_bridge_checks.swift'),'-o',str(evidence/'bridge')])
             command('bridge-checks',[str(evidence/'bridge')])
             command('helper-launch-build',swift+[str(ROOT/'native/HelperLaunch.swift'),str(ROOT/'tests/helper_launch_checks.swift'),'-o',str(evidence/'helper-launch')])
             command('helper-launch-checks',[str(evidence/'helper-launch')])

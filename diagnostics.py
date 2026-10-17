@@ -17,6 +17,7 @@ MAX_RECORD = 8192
 FIELDS = frozenset("update_phase update_reason schedule_state timing_reason timing_surface view_scope location_state remaining_minutes inclusion_state display_headline category operation client_freshness report_ref archive_dataless previous_run_id frequency_minutes after_edits edit_delay_minutes error_code previous_archive_ref copying verification_archive_ref cloud_archive_ref build_id run_id scan_id repo_ref archive_ref observation_id client_id surface native policy_version stage result reason mode state has_error has_backup backup_hash_ref ignored_finder_only backup_required edit_signature previous_signature source_signature backup_signature content_signature archive_content_signature verification_state verification_checked_at duration_ms files bytes counts samples cached needs_backup metadata_changed fresh scan_running backup_running repo_count uptime_seconds gap_seconds dropped_events error_type display_label phase percent previous_scan_id".split())
 SAMPLE_FIELDS = {"path_ref", "category", "change", "known_file"}
 COUNTS = {"finder_metadata", "git_data", "repo_files"}
+FIELDS = FIELDS | {'menu_count_mode', 'menu_count', 'menu_symbol'}
 
 
 def diagnostic_ref(value):

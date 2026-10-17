@@ -1059,6 +1059,7 @@ class Handler(BaseHTTPRequestHandler):
                       "/readiness.js": "readiness.js", "/readiness.css": "readiness.css",
                       "/workspace-setup.js": "workspace-setup.js", "/workspace-setup.css": "workspace-setup.css",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
+                      "/menu-appearance.js": "menu-appearance.js",
                       "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:
                 return self.send({"error": "Not found"}, 404)
@@ -1125,6 +1126,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/diagnostics/presentation":
                 try:
                     return self.send(self.hub.evidence.presentation(payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
+            if path == "/api/diagnostics/menu-bar":
+                try:
+                    return self.send(self.hub.evidence.menu_bar_presentation(payload))
                 except FileExistsError as e:
                     return self.send({"error": str(e)}, 409)
             if path == "/api/workspaces/preview":

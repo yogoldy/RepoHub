@@ -16,6 +16,8 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var packaged: PackagedApplication?
     var updates: AppUpdates?
     var hasLoadedMenu = false
+    var statusGeneration = 0
+    var lastAppliedStatusGeneration = 0
     var address = URL(string: "http://127.0.0.1:8767/")!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -77,6 +79,8 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func pollStatus() {
+        statusGeneration += 1
+        let generation = statusGeneration
         updateNotificationStatus()
         var statusRequest = URLRequest(url: address.appendingPathComponent("api/status"))
         statusRequest.timeoutInterval = 8
@@ -84,9 +88,12 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             guard let self = self else { return }
             let status = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             DispatchQueue.main.async {
+                guard generation > self.lastAppliedStatusGeneration else { return }
+                self.lastAppliedStatusGeneration = generation
                 guard error == nil, let status = status else {
                     self.statusItem.button?.title = " !"
                     self.statusItem.button?.toolTip = "Repo Hub: backup helper unavailable"
+                    self.statusItem.button?.setAccessibilityLabel("RepoHub: backup helper unavailable")
                     if self.unavailableSince == nil { self.unavailableSince = Date() }
                     if let since = self.unavailableSince, Date().timeIntervalSince(since) >= 120 {
                         self.notifyProblems([["id":"helper:" + String(since.timeIntervalSince1970), "name":"Repo Hub", "detail":"The backup helper has been unavailable for two minutes."]])
@@ -97,6 +104,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                     guard packaged.matches(status) else {
                         self.statusItem.button?.title = " !"
                         self.statusItem.button?.toolTip = "RepoHub: application components do not match"
+                        self.statusItem.button?.setAccessibilityLabel("RepoHub: application components do not match")
                         self.updates?.record("failed", reason: "component_mismatch")
                         return
                     }
@@ -108,21 +116,57 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 }
                 self.unavailableSince = nil
                 let repos = status["repos"] as? [[String: Any]] ?? []
-                let backup = status["backup"] as? [String: Any] ?? [:]
-                let running = backup["running"] as? Bool ?? false
-                let pending = repos.filter { $0["needs_backup"] as? Bool ?? true }.count
-                let errors = backup["errors"] as? [[String: Any]] ?? []
-                let stale = repos.contains { ($0["health"] as? [String: Any])?["fresh"] as? Bool != true }
-                let copyError = repos.contains { $0["error"] != nil || ($0["verification"] as? [String: Any])?["state"] as? String == "error" }
-                let cloudError = repos.contains { ($0["cloud"] as? [String: Any])?["state"] as? String == "error" }
-                let dataError = (status["data_cloud"] as? [String: Any])?["state"] as? String == "error"
-                let ready = BackupReadiness.pendingNotifications(repos, seen: []).count
-                self.statusItem.button?.title = running ? " ↻" : (stale || copyError || cloudError || dataError || !errors.isEmpty) ? " !" : pending > 0 ? " \(pending)" : ready < repos.count ? " ↑" : ""
-                self.statusItem.button?.toolTip = "Repo Hub: \(ready) of \(repos.count) repo backups verified and uploaded"
+                self.renderMenuBar(status: status, generation: generation)
                 self.notifyProblems(status["problems"] as? [[String: Any]] ?? [])
                 self.notifyReadyBackups(repos)
             }
         }.resume()
+    }
+
+    func renderMenuBar(status: [String: Any], generation: Int) {
+        let mode = MenuAppearance.saved()
+        guard let expression = MenuAppearance.expression(status: status, mode: mode) else { return }
+        popoverWebView.evaluateJavaScript(expression) { [weak self] value, error in
+            guard let self = self, generation == self.lastAppliedStatusGeneration,
+                  MenuAppearance.saved() == mode else { return }
+            guard error == nil, let display = MenuAppearance.rendered(value, mode: mode) else {
+                self.statusItem.button?.title = " !"
+                self.statusItem.button?.toolTip = "RepoHub: menu bar status unavailable"
+                self.statusItem.button?.setAccessibilityLabel("RepoHub: menu bar status unavailable")
+                return
+            }
+            self.statusItem.button?.title = display.title
+            self.statusItem.button?.toolTip = display.tooltip
+            self.statusItem.button?.setAccessibilityLabel(display.tooltip)
+            var observed = value as? [String: Any] ?? [:]
+            observed["title"] = self.statusItem.button?.title ?? ""
+            if let data = try? JSONSerialization.data(withJSONObject: [status, observed]),
+               let json = String(data: data, encoding: .utf8) {
+                self.popoverWebView.evaluateJavaScript(
+                    "window.RepoHubMenuAppearance?.recordNative(..." + json + ")"
+                )
+            }
+        }
+    }
+
+    func menuAppearance(action: MenuAction, body: [String: Any]) {
+        guard let requestID = body["request_id"] as? String else { return }
+        let result: String
+        if action == .saveMenuAppearance, let mode = body["mode"] as? String,
+           let revision = body["revision"] as? String {
+            result = MenuAppearance.save(mode: mode, revision: revision)
+        } else {
+            result = "loaded"
+        }
+        var detail = MenuAppearance.settings()
+        detail["request_id"] = requestID
+        detail["result"] = result
+        guard let data = try? JSONSerialization.data(withJSONObject: detail),
+              let json = String(data: data, encoding: .utf8) else { return }
+        popoverWebView.evaluateJavaScript(
+            "window.dispatchEvent(new CustomEvent('repoHubMenuAppearance',{detail:" + json + "}))"
+        )
+        if result == "saved" { pollStatus() }
     }
 
     func requestNotifications() {
@@ -270,6 +314,8 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         case .connectGitHub:
             if packaged?.testMode != true { GitHubConnection.configure() }
         case .checkForUpdates: checkForUpdates()
+        case .getMenuAppearance, .saveMenuAppearance:
+            if let body = message.body as? [String: Any] { menuAppearance(action: action, body: body) }
         case .chooseRepoHome, .chooseRepoFolders:
             if let body = message.body as? [String: Any], let id = body["request_id"] as? String {
                 chooseSources(multiple: action == .chooseRepoFolders, requestID: id)
@@ -296,6 +342,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        pollStatus()
         if !UserDefaults.standard.bool(forKey: "readinessShown") {
             webView.evaluateJavaScript("window.dispatchEvent(new Event('repoHubReadinessRequested'))") { _, error in
                 if error == nil { UserDefaults.standard.set(true, forKey: "readinessShown") }

@@ -63,6 +63,8 @@ function render(){
     return [repo.id, {state, timing, compact: RepoStatus.compactTiming(timing)}];
   }));
   const ready = [...presentations.values()].filter(item => item.state.ready).length;
+  window.RepoHubMenuAppearance?.update(menuState,
+    [...presentations.values()].map(item => item.state));
   $('#summary').textContent = repos.length
     ? `${ready} of ${repos.length} repos backed up to iCloud` : 'No repos found';
   $('#backup').disabled=!!menuState.backup?.running;
@@ -345,7 +347,8 @@ let activeSettingsPage = 'home';
 
 function showSettingsPage(page) {
   const titles = {home: 'Settings', schedule: 'Backup schedule', notifications: 'Notifications',
-    updates: 'App updates', help: 'Help & diagnostics', access: 'Access & permissions'};
+    appearance: 'Menu bar appearance', updates: 'App updates',
+    help: 'Help & diagnostics', access: 'Access & permissions'};
   if (!(page in titles)) return;
   activeSettingsPage = page;
   for (const name of Object.keys(titles)) {
@@ -362,6 +365,7 @@ function showSettingsPage(page) {
   $('#schedule-actions').hidden = page !== 'schedule';
   $('#settings-content').scrollTop = 0;
   $('#settings-title').focus();
+  if (page === 'appearance') void window.RepoHubMenuAppearance?.open();
   if (page === 'updates') {
     const native = !!window.webkit?.messageHandlers?.repoHub;
     $('#check-updates').disabled = !native;
@@ -373,7 +377,7 @@ function showSettingsPage(page) {
 
 async function settingsBack() {
   if ($('#settings-form').hidden) return window.RepoHubWorkspaces?.close(false);
-  if (activeSettingsPage === 'schedule' && !await leaveSchedule()) return;
+  if (!await leaveSettingsPage()) return;
   if (settingsRepo) $('#settings-dialog').close();
   else showSettingsPage('home');
 }
@@ -456,7 +460,14 @@ async function leaveSchedule() {
 
 async function closeSettings() {
   if ($('#settings-form').hidden) return window.RepoHubWorkspaces?.close(true);
-  if (await leaveSchedule()) $('#settings-dialog').close();
+  if (await leaveSettingsPage()) $('#settings-dialog').close();
+}
+
+async function leaveSettingsPage() {
+  if (activeSettingsPage === 'appearance') {
+    return await window.RepoHubMenuAppearance?.leave() ?? true;
+  }
+  return leaveSchedule();
 }
 
 for (const source of ['battery', 'adapter']) {
@@ -497,7 +508,7 @@ async function openSettings(repoId = null, page = 'home') {
   if ($('#settings-dialog').open) {
     if ($('#settings-form').hidden) {
       if (!await window.RepoHubWorkspaces?.close(false)) return false;
-    } else if (activeSettingsPage === 'schedule' && !await leaveSchedule()) return false;
+    } else if (!await leaveSettingsPage()) return false;
   }
   try {
     const result = await api(repoId ? '/api/repo-settings/' + encodeURIComponent(repoId) : '/api/settings');
@@ -533,12 +544,13 @@ $('#settings').onclick = () => openSettings();
 $('#settings-close').onclick = closeSettings;
 $('#settings-cancel').onclick = settingsBack;
 $('#settings-back').onclick = settingsBack;
-for (const page of ['schedule', 'notifications', 'updates', 'help', 'access']) {
+for (const page of ['schedule', 'notifications', 'appearance', 'updates', 'help', 'access']) {
   $('#settings-nav-' + page).onclick = () => page === 'schedule'
     ? openSettings(null, 'schedule') : showSettingsPage(page);
 }
 $('#settings-form').onsubmit = async event => {
   event.preventDefault();
+  if (activeSettingsPage !== 'schedule') return;
   if (savingSchedule || !scheduleDirty()) return;
   const settings = scheduleDraft();
   savingSchedule = true;
@@ -566,7 +578,7 @@ $('#settings-form').onsubmit = async event => {
   }
 };
 window.RepoHubSettings = {
-  confirmDiscard, leaveSchedule,
+  confirmDiscard, leaveSchedule: leaveSettingsPage,
   showHome: () => showSettingsPage('home'),
   openAccess: async () => { if (await openSettings()) showSettingsPage('access'); },
   workspaceOpened: () => {

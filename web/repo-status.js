@@ -143,6 +143,45 @@
       ready: original.ready || finderBackedUp, category, label, headline, detail, technicalDetail};
   }
 
+  // Aggregate existing presentations; never inspect raw change evidence here.
+  function summarizeMenuBar(states, mode = 'pending', backup = {}, dataCloud = {}) {
+    const confirmedLabels = new Set([
+      'Edits confirmed', 'Only Git data changed',
+      'Only Git and file metadata changed', 'Only file metadata changed',
+    ]);
+    const pending = states.filter(state => state.category === 'backup_pending').length;
+    const edits = states.filter(state => state.category === 'backup_pending'
+      && confirmedLabels.has(state.label)).length;
+    const ready = states.filter(state => state.ready).length;
+    const count = mode === 'edits' ? edits : mode === 'none' ? 0 : pending;
+    const noun = count === 1 ? 'repo' : 'repos';
+    const description = mode === 'none' ? `${ready} of ${states.length} repos backed up`
+      : mode === 'edits' ? `${count} ${noun} with confirmed changes`
+        : `${count} ${noun} waiting for backup`;
+    let title = count > 0 ? ` ${count}` : '';
+    let activity = '';
+    if (states.some(state => ['failure', 'status_unavailable'].includes(state.category))
+        || backup.errors?.length || dataCloud.state === 'error') {
+      title = ' !';
+      activity = 'Needs attention';
+    } else if (backup.running || states.some(state => ['copying', 'verifying'].includes(state.phase))) {
+      title = ' ↻';
+      activity = 'Backup or checks in progress';
+    } else if (!count && states.some(state => state.phase === 'uploading'
+        || state.category === 'upload_unconfirmed')) {
+      title = ' ↑';
+      activity = states.some(state => state.phase === 'uploading')
+        ? 'Upload in progress' : 'Upload not confirmed';
+    }
+    return {title, tooltip: `RepoHub: ${description}${activity ? ' · ' + activity : ''}`,
+      mode, count};
+  }
+
+  function menuBar(status, mode = 'pending') {
+    return summarizeMenuBar((status.repos || []).map(repo => present(repo, status.backup)),
+      mode, status.backup, status.data_cloud);
+  }
+
   function timing(repo, backup = {}, freshness = 'current') {
     const schedule = repo.schedule_evidence || {};
     const location = repo.backup_location || {};
@@ -352,5 +391,5 @@
       ${group.explanation ? `<p>${group.explanation}</p>` : ''}
       ${group.note ? `<p class="guide-note">${group.note}</p>` : ''}</section>`).join('');
   }
-  const policy={view,present,timing,compactTiming,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-6'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,menuBar,summarizeMenuBar,timing,compactTiming,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-6'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

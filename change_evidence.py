@@ -286,6 +286,7 @@ class ChangeEvidence:
         self.lock = threading.RLock()
         self.last_repo = {}
         self.snapshots = OrderedDict()
+        self.menu_contexts = {}
         self.clients = OrderedDict()
         self.displays = {}
 
@@ -336,10 +337,15 @@ class ChangeEvidence:
                 'copying': copying,
                 'schedule_evidence': schedule_evidence,
                 'backup_location': json.loads(json.dumps(row.get('backup_location', {})))}
-        identity = hashlib.sha256(json.dumps(projection, sort_keys=True, separators=(',', ':')).encode()).hexdigest()[:24]
+        menu_context = {'running': bool(backup.get('running')),
+                        'has_errors': bool(backup.get('errors')),
+                        'data_error': status.get('data_cloud', {}).get('state') == 'error'}
+        identity = hashlib.sha256(json.dumps([projection, menu_context], sort_keys=True,
+                                           separators=(',', ':')).encode()).hexdigest()[:24]
         with self.lock:
             if identity not in self.snapshots:
                 self.snapshots[identity] = projection
+                self.menu_contexts[identity] = menu_context
                 self.log.emit('status_snapshot', observation_id=identity, scan_id=status.get('scan_id'), repo_count=len(projection))
                 for facts in projection.values():
                     self.log.emit('status_repo', observation_id=identity, scan_id=status.get('scan_id'),
@@ -354,8 +360,62 @@ class ChangeEvidence:
                 while len(self.snapshots) > 16:
                     old, _ = self.snapshots.popitem(last=False)
                     self.displays.pop(old, None)
+                    self.menu_contexts.pop(old, None)
             self.last_repo = {key: value for key, value in self.last_repo.items() if key in projection}
         return identity
+
+    def menu_bar_presentation(self, payload):
+        """Check the native aggregate against the existing diagnostic status oracle."""
+        import re
+        if (not isinstance(payload, dict) or set(payload) != {
+                'observation_id', 'policy_version', 'mode', 'count', 'title'}
+                or payload.get('policy_version') != 'status-clarity-6'
+                or not isinstance(payload.get('observation_id'), str)
+                or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
+                or not isinstance(payload.get('mode'), str)
+                or payload['mode'] not in {'pending', 'edits', 'none'}
+                or type(payload.get('count')) is not int or not 0 <= payload['count'] <= 4096
+                or not isinstance(payload.get('title'), str)
+                or not re.fullmatch(r'(?: [1-9][0-9]{0,3}| [!↻↑])?', payload['title'])):
+            raise ValueError('Invalid menu bar observation')
+        with self.lock:
+            snapshot = self.snapshots.get(payload['observation_id'])
+            if snapshot is None:
+                raise FileExistsError('Observed status expired; request fresh status')
+            context = self.menu_contexts[payload['observation_id']]
+            states = []
+            for facts in snapshot.values():
+                phase = next(phase for phase in sorted(PHASES) if icon_reason(
+                    {'phase': phase, 'ready': phase == 'ready'}, facts,
+                    payload['policy_version']) != 'presentation_inputs_disagree')
+                states.append({'phase': phase, **presentation_text(
+                    facts, phase, payload['policy_version'])})
+            selected = [row for row in states if row['category'] == 'backup_pending']
+            if payload['mode'] == 'edits':
+                labels = {PRESENTATION_TEXT[key][1] for key in ('edits', 'git', 'git_metadata', 'metadata')}
+                selected = [row for row in selected if row['display_label'] in labels]
+            count = 0 if payload['mode'] == 'none' else len(selected)
+            title = f' {count}' if count else ''
+            if (context['has_errors'] or context['data_error']
+                    or any(row['category'] in {'failure', 'status_unavailable'} for row in states)):
+                title = ' !'
+            elif context['running'] or any(row['phase'] in {'copying', 'verifying'} for row in states):
+                title = ' ↻'
+            elif not count and any(row['phase'] == 'uploading'
+                                   or row['category'] == 'upload_unconfirmed' for row in states):
+                title = ' ↑'
+            matches = payload['count'] == count and payload['title'] == title
+            symbol = {' !': 'attention', ' ↻': 'activity', ' ↑': 'upload', '': 'none'}.get(
+                payload['title'], 'count')
+            self.log.emit('menu_bar_presented', observation_id=payload['observation_id'],
+                          policy_version=payload['policy_version'], native=True,
+                          menu_count_mode=payload['mode'], menu_count=payload['count'],
+                          menu_symbol=symbol, result='complete' if matches else 'failed')
+            if not matches:
+                self.log.emit('menu_bar_disagreement', severity='warning',
+                              observation_id=payload['observation_id'], result='failed',
+                              reason='presentation_inputs_disagree')
+            return {'recorded': True}
 
     def presentation(self, payload):
         import re

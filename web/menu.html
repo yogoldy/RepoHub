@@ -91,6 +91,7 @@
         <button type="button" id="settings-nav-schedule" class="settings-row"><span><strong>Backup schedule</strong><small>Battery and power adapter schedules</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="workspace-open" class="settings-row"><span><strong>Folders to back up</strong><small>Choose and review monitored folders</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="settings-nav-notifications" class="settings-row"><span><strong>Notifications</strong><small>Optional backup notifications</small></span><span aria-hidden="true">›</span></button>
+        <button type="button" id="settings-nav-appearance" class="settings-row"><span><strong>Menu bar appearance</strong><small>Choose what the number counts</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="settings-nav-updates" class="settings-row"><span><strong>App updates</strong><small>Check for a newer version</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="settings-nav-help" class="settings-row"><span><strong>Help &amp; diagnostics</strong><small>Report a problem or suggest a feature</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="settings-nav-access" class="settings-row"><span><strong>Access &amp; permissions</strong><small>Check folder and background access</small></span><span aria-hidden="true">›</span></button>
@@ -123,6 +124,28 @@
         <div class="readiness-actions">
           <button type="button" id="readiness-enable">Enable notifications</button>
           <button type="button" id="readiness-notification-settings">Notification settings</button>
+        </div>
+      </section>
+      <section id="settings-page-appearance" data-settings-page="appearance" hidden>
+        <p>Choose what the number beside the RepoHub icon counts.</p>
+        <label class="appearance-label" for="menu-count-mode">Show a count of</label>
+        <select id="menu-count-mode">
+          <option value="pending">Repos waiting for backup</option>
+          <option value="edits">Repos with confirmed changes</option>
+          <option value="none">No number</option>
+        </select>
+        <p id="menu-count-description" class="settings-note"></p>
+        <div class="menu-appearance-preview" aria-label="Menu bar preview">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 9-5 9 5-9 5Zm0 5 9 5 9-5M3 17l9 5 9-5"/></svg>
+          <span id="menu-count-preview"></span>
+        </div>
+        <p id="menu-count-caption" class="settings-note" role="status"></p>
+        <p class="settings-note">Activity and warning symbols still appear. A zero count is hidden.</p>
+        <p id="menu-appearance-note" class="settings-note"></p>
+        <p id="menu-appearance-error" role="alert"></p>
+        <div class="settings-actions">
+          <button type="button" id="menu-appearance-cancel">Cancel</button>
+          <button type="button" id="menu-appearance-save" class="primary" disabled>Save changes</button>
         </div>
       </section>
       <section id="settings-page-updates" data-settings-page="updates" hidden>
@@ -191,4 +214,5 @@
 <p id="report-error" role="alert"></p><div class="settings-actions"><button type="button" id="report-back" hidden>Edit report</button><button type="button" id="report-cancel">Close</button><button type="submit" id="report-review" class="primary">Preview report</button><button type="button" id="report-send" class="primary" disabled hidden>Send to GitHub</button></div></form></dialog>
 
 
+<script src="/menu-appearance.js"></script>
 </body></html>

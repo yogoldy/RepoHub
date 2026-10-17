@@ -18,6 +18,29 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 ## Rule register
 
+### Menu bar appearance must reuse repository presentations
+
+The menu bar previously interpreted raw `needs_backup` and verification fields
+separately from the cards. That missed the approved Finder-only backed-up
+exception. Menu-bar counts now aggregate the existing `RepoStatus.present` results;
+Swift executes that same shipped policy in the owned WebKit page. It contains no
+repository-state classifier. The waiting count includes existing backup-pending
+statuses; confirmed changes count the existing confirmed file/Git/metadata labels.
+First backups and unclassified differences are not confirmed changes.
+
+The preference is stored per Mac in the app's UserDefaults only after Save changes.
+Navigation guards unsaved drafts, conflicts preserve them, and a pending save
+cannot be duplicated or interrupted. Native bridge requests retain exact-page,
+main-frame, fixed-mode and request-ID checks. The logo is unchanged.
+
+`menu_bar_presented` records a bounded mode, count and symbol read back after the
+native title is set. Independent diagnostics reuse the existing status oracle to
+detect wrong counts or symbols; `menu_bar_disagreement` is a failure, not evidence
+that the cards themselves changed. Exports contain fixed enums and capped counts,
+never tooltip prose. GR06 and GR22 register the regression tests. Browser preview
+cannot save native preferences. Actual installed menu-bar layout and restart
+acceptance remain required when this local candidate is delivered.
+
 ### GR01 — Preserve complete contained workspace bytes
 
 **Susceptible boundary:** Hidden, ignored and uncommitted files silently omitted; archive member handling loses directories or modes.

@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCK = ROOT / 'tools/update-dependencies.json'
 NATIVE = ('RepoHub.swift', 'HelperLaunch.swift', 'BackupReadiness.swift',
           'ProblemAlerts.swift', 'MenuBridge.swift', 'GitHubConnection.swift',
-          'PackagedApplication.swift', 'AppUpdates.swift')
+          'PackagedApplication.swift', 'AppUpdates.swift', 'MenuAppearance.swift')
 
 
 def sha256(path):

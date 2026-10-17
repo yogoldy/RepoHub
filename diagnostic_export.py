@@ -14,6 +14,7 @@ from change_evidence import PRESENTATION_TEXT, TIMING_STATES, TIMING_REASONS, LO
 
 EVENTS = frozenset("application_update update_checkpoint ui_timing timing_disagreement access_readiness workspace_review workspace_configuration scan_retry_requested report_delivery helper_started heartbeat runtime_gap runtime_error scan_started scan_finished repo_checked status_snapshot status_repo ui_frame ui_presented presentation_input_disagreement presentation_disagreement schedule_decision backup_deferred backup_interrupted backup_started backup_paused backup_failed backup_finished repo_backup_started archive_stage archive_verified archive_repair_needed archive_reused repo_backup_finished repo_backup_failed verification_deferred upload_observed upload_stale retention_decision retention_verified retention_failed prune_started prune_finished".split())
 IDENTITIES = frozenset("session_id report_ref repo_ref archive_ref previous_archive_ref verification_archive_ref cloud_archive_ref run_id previous_run_id scan_id previous_scan_id observation_id client_id build_id backup_hash_ref edit_signature previous_signature source_signature backup_signature content_signature archive_content_signature path_ref".split())
+EVENTS = EVENTS | {'menu_bar_presented', 'menu_bar_disagreement'}
 BOOLEANS = frozenset("after_edits archive_dataless copying has_error has_backup ignored_finder_only backup_required cached needs_backup metadata_changed fresh scan_running backup_running native".split())
 ENUMS = {
     'update_phase': UPDATE_PHASES,
@@ -21,6 +22,8 @@ ENUMS = {
     'schedule_state': TIMING_STATES,
     'timing_reason': TIMING_REASONS,
     'timing_surface': {'card', 'detail'},
+    'menu_count_mode': {'pending', 'edits', 'none'},
+    'menu_symbol': {'count', 'activity', 'upload', 'attention', 'none'},
     'view_scope': {'overview', 'expanded'},
     'location_state': LOCATION_STATES,
     'inclusion_state': INCLUSION_STATES,
@@ -120,6 +123,8 @@ def export_bundle(log_dir, output_root, *, hours=24, max_events=10000,
             return value if type(value) is int and value in ERROR_CODES else None
         if field == 'remaining_minutes':
             return value if type(value) is int and 0 <= value <= 1440 else None
+        if field == 'menu_count':
+            return min(value, COUNT_LIMIT) if type(value) is int and 0 <= value <= 4096 else None
         if field == 'frequency_minutes':
             return value if type(value) is int and value in FREQUENCIES else None
         if field == 'edit_delay_minutes':
