@@ -19,7 +19,8 @@ import tarfile
 import threading
 import time
 from datetime import datetime, timezone
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer as StandardThreadingHTTPServer
+from socketserver import TCPServer
 from urllib.parse import unquote, urlparse
 from backup_policy import BackupScheduler, default_settings, validate_settings, power_source, project_schedule
 from status_health import annotate_health, ProblemTracker, age, backup_location
@@ -1194,6 +1195,18 @@ class Handler(BaseHTTPRequestHandler):
             return self.send({"error": "Not found"}, 404)
         except (ValueError, KeyError, OSError) as e:
             return self.send({"error": str(e)}, 400)
+
+
+class ThreadingHTTPServer(StandardThreadingHTTPServer):
+    """The local helper needs no hostname discovery or reverse DNS."""
+    def server_bind(self):
+        if self.server_address[0] != "127.0.0.1":
+            raise ValueError("Loopback address required")
+        # HTTPServer.server_bind calls socket.getfqdn, which can block on the
+        # host's resolver before listen(). Keep TCP binding and explicit facts.
+        TCPServer.server_bind(self)
+        self.server_name = "127.0.0.1"
+        self.server_port = self.server_address[1]
 
 
 def main():

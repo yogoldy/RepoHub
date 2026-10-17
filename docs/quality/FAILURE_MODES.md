@@ -574,3 +574,15 @@ backup that begins after a native idle check. The updater never sends SIGKILL.
 Actual signed-upgrade/failure recovery remains acceptance work. Production
 signing, notarization and permission continuity are not established by ad-hoc
 test signatures. No daily installation or launch registration is changed.
+
+
+### Loopback startup must not depend on hostname resolution
+
+The first updater CI run timed out starting the synthetic helper. Isolating
+scheduler/proxy inputs did not fix it. The retained child stack from the second
+run showed `HTTPServer.server_bind` blocked in `socket.getfqdn` under the runner's
+Python 3.15. Bind with TCPServer and assign the fixed loopback name/actual port;
+no resolver is needed. A deterministic regression makes getfqdn raise, confirms
+the standard server counterexample, and requires the RepoHub server to bind.
+Wildcard binding is rejected. This is an application change, so prior native
+updater acceptance is historical until repeated for the new candidate.

@@ -447,9 +447,10 @@
         "test_update_recovery.UpdateRecoveryTests.test_old_or_unrelated_helper_cannot_confirm_replacement",
         "test_update_shutdown.UpdateShutdownTests.test_bundled_sigterm_waits_for_archive_publication_and_preserves_prior_copy",
         "test_update_feed.UpdateFeedTests.test_feed_uses_actual_build_signature_and_exact_length",
-        "test_update_feed.UpdateFeedTests.test_key_file_must_be_private_regular_and_owned"
+        "test_update_feed.UpdateFeedTests.test_key_file_must_be_private_regular_and_owned",
+        "test_update_shutdown.UpdateShutdownTests.test_loopback_startup_does_not_wait_for_hostname_resolution"
       ],
-      "remaining_gap": "Native isolated acceptance on application source ad29dc9 passed signed replacement, invalid signature, truncated archive, equal-version refusal, busy-backup refusal and automatic rollback after injected helper failure, with unchanged synthetic archive/configuration hashes. Gate checks native integrity, real complete Sparkle packaging and signing-key matching. Developer ID, notarization, permission continuity, production key/feed custody and the first coordinated migration of existing launchd registrations remain open. No daily Mac was deployed."
+      "remaining_gap": "Native isolated updater acceptance passed on ad29dc9, but CI exposed a helper startup stall in standard-library hostname resolution. The loopback server now binds without DNS and a resolver-failure regression protects it. This application change requires new native candidate acceptance; earlier receipts remain historical. Developer ID/notarization, permission continuity, production key/feed custody and first coordinated launchd migration remain open. Daily Macs remain unchanged."
     }
   ]
 }

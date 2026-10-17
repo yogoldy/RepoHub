@@ -12,12 +12,28 @@ import unittest
 import urllib.error
 import urllib.request
 
-from repohub import Hub
+from repohub import Hub, Handler, ThreadingHTTPServer, StandardThreadingHTTPServer
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class UpdateShutdownTests(unittest.TestCase):
+    def test_loopback_startup_does_not_wait_for_hostname_resolution(self):
+        with patch('socket.getfqdn', side_effect=RuntimeError('controlled resolver stall')):
+            # This is the standard-library call observed in the CI stack trace.
+            with self.assertRaisesRegex(RuntimeError, 'resolver stall'):
+                StandardThreadingHTTPServer(('127.0.0.1', 0), Handler)
+            server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+            try:
+                self.assertGreater(server.server_port, 0)
+                self.assertEqual(server.server_name, '127.0.0.1')
+                self.assertEqual(server.server_port, server.socket.getsockname()[1])
+            finally:
+                server.server_close()
+        with self.assertRaisesRegex(ValueError, 'Loopback'):
+            ThreadingHTTPServer(('0.0.0.0', 0), Handler)
+
     def test_bundled_sigterm_waits_for_archive_publication_and_preserves_prior_copy(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder).resolve()
