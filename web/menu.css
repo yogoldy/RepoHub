@@ -443,6 +443,18 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   color: var(--text);
 }
 
+.status-refresh {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.status-explanation[data-category="status_unavailable"],
+.technical-explanation[data-category="status_unavailable"] {
+  color: var(--muted);
+}
+
 /* Put each status label beside its own short explanation. */
 .guide-definitions {
   margin: 12px 0 0;

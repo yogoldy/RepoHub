@@ -29,7 +29,7 @@ class MenuCardTests(unittest.TestCase):
                     before = len(list(read_events(log.directory)))
                     evidence.presentation({'surface': 'menu', 'native': False,
                         'client_id': f'{index:024x}', 'observation_id': observation,
-                        'policy_version': 'status-clarity-6', 'client_freshness': 'current',
+                        'policy_version': 'status-clarity-7', 'client_freshness': 'current',
                         'selected_repo_id': proof['selected'], 'rows': proof['rows']})
                     events = list(read_events(log.directory))[before:]
                     failures = [row for row in events if row['event'] == 'timing_disagreement']

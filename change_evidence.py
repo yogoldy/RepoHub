@@ -36,6 +36,7 @@ PRESENTATION_TEXT = {
     'uploading': ('working', 'Uploading', 'macOS is uploading your backup…'),
     'pending': ('upload_unconfirmed', 'Awaiting upload confirmation', 'macOS hasn’t confirmed the upload yet.'),
     'stale': ('status_unavailable', 'Current status unavailable', 'RepoHub can’t get current backup status.'),
+    'stale_waiting': ('status_unavailable', 'Waiting for fresh checks', 'Waiting for fresh backup status.'),
     'error': ('failure', 'Needs attention — failure', 'Needs attention — failure.'),
     'unknown': ('upload_unconfirmed', 'Upload status unavailable', 'RepoHub can’t read the upload status.'),
 }
@@ -66,7 +67,7 @@ def presentation_text(facts, phase, version='status-clarity-1'):
                 code = 'git_finder' if counts['finder_metadata'] > 0 else 'git'
             elif counts['finder_metadata'] > 0:
                 code = 'finder_pending'
-    if version in {'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6'}:
+    if version in {'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6', 'status-clarity-7'}:
         if phase == 'background':
             code = 'view_settings'
         elif phase == 'changed' and facts['has_backup']:
@@ -78,6 +79,8 @@ def presentation_text(facts, phase, version='status-clarity-1'):
                 code = 'unclassified'
             elif counts['repo_files'] == 0:
                 code = ('git_metadata' if counts['finder_metadata'] else 'git') if counts['git_data'] else 'metadata'
+    if phase == 'stale' and version == 'status-clarity-7':
+        code = 'stale_waiting'
     category, label, headline = PRESENTATION_TEXT.get(code, PRESENTATION_TEXT['unknown'])
     return {'category': category, 'display_label': label, 'display_headline': headline}
 
@@ -246,7 +249,7 @@ def icon_reason(rendered, facts, version=None):
           and facts['has_backup'] and facts['backup_hash_ref'] and same_verification
           and facts['verification_state'] == 'different'):
         expected, reason = cloud_icon(facts, same_cloud, finder=True)
-        if version in {'status-clarity-5', 'status-clarity-6'} and expected == 'background':
+        if version in {'status-clarity-5', 'status-clarity-6', 'status-clarity-7'} and expected == 'background':
             expected = 'ready'
     elif facts['verification_state'] != 'matched' or not same_verification:
         expected, reason = 'verifying', 'awaiting_hash_verification'
@@ -369,7 +372,8 @@ class ChangeEvidence:
         import re
         if (not isinstance(payload, dict) or set(payload) != {
                 'observation_id', 'policy_version', 'mode', 'count', 'title'}
-                or payload.get('policy_version') != 'status-clarity-6'
+                or not isinstance(payload.get('policy_version'), str)
+                or payload.get('policy_version') not in {'status-clarity-6', 'status-clarity-7'}
                 or not isinstance(payload.get('observation_id'), str)
                 or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
                 or not isinstance(payload.get('mode'), str)
@@ -425,7 +429,7 @@ class ChangeEvidence:
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
                 or not isinstance(payload['policy_version'], str)
-                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6'}
+                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6', 'status-clarity-7'}
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
         freshness = payload.get('client_freshness', 'current')
@@ -436,8 +440,8 @@ class ChangeEvidence:
             if snapshot is None:
                 raise FileExistsError('Observed status expired; request fresh status')
             rows = payload['rows']
-            timing_frame = payload['policy_version'] in {'status-clarity-4', 'status-clarity-5', 'status-clarity-6'} and payload['surface'] == 'menu'
-            compact_frame = payload['policy_version'] == 'status-clarity-6' and payload['surface'] == 'menu'
+            timing_frame = payload['policy_version'] in {'status-clarity-4', 'status-clarity-5', 'status-clarity-6', 'status-clarity-7'} and payload['surface'] == 'menu'
+            compact_frame = payload['policy_version'] in {'status-clarity-6', 'status-clarity-7'} and payload['surface'] == 'menu'
             selected = payload.get('selected_repo_id')
             if compact_frame and 'selected_repo_id' not in payload:
                 raise ValueError('Missing expansion selection')
@@ -446,7 +450,9 @@ class ChangeEvidence:
                     raise ValueError('Invalid selected timing repo')
             if not timing_frame and 'selected_repo_id' in payload:
                 raise ValueError('Unexpected timing selection')
-            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6'}
+            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6', 'status-clarity-7'}
+            stale_label = (presentation_text({}, 'stale', payload['policy_version'])['display_label']
+                           if modern else 'Status outdated')
             row_fields = {'repo_id', 'phase', 'display_label', 'ready'}
             if modern:
                 row_fields |= {'category', 'display_headline'}
@@ -490,7 +496,7 @@ class ChangeEvidence:
                 repo_ref = snapshot[key]['repo_ref']
                 if previous.get(key) != signature:
                     reason = (icon_reason(row, snapshot[key], payload['policy_version']) if freshness == 'current' else
-                              ('client_' + freshness if row['phase'] == 'stale' and row['ready'] is False and row['display_label'] == ('Current status unavailable' if modern else 'Status outdated') else 'presentation_inputs_disagree'))
+                              ('client_' + freshness if row['phase'] == 'stale' and row['ready'] is False and row['display_label'] == stale_label else 'presentation_inputs_disagree'))
                     if modern:
                         expected = presentation_text(snapshot[key], row['phase'], payload['policy_version'])
                         if any(row[field] != value for field, value in expected.items()):

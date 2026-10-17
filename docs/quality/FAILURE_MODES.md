@@ -141,6 +141,24 @@ acceptance remain required when this local candidate is delivered.
 
 ### GR06 — Display decisions need fresh evidence
 
+Post-sleep recovery can briefly leave scan/hash evidence stale while the helper
+catches up. Treating that wait as “can’t get current backup status” sounded like
+a failed backup. Policy `status-clarity-7` uses “Waiting for fresh checks” and
+“Waiting for fresh backup status.” The underlying stale phase, false readiness,
+freshness thresholds and persistent-problem notifications are unchanged. The
+summary describes missing fresh status rather than implying every backup is lost.
+Technical details retain the observed reasons; the display does not claim sleep
+caused a particular case without evidence. Old policy wording remains valid for
+historical receipts.
+
+The menu's Rescan now uses the existing guarded `/api/scan` endpoint. Acceptance
+means a request was accepted, not that the scan or a backup completed. The actual
+controller test covers fresh tokens, duplicate requests and failed requests; an
+isolated HTTP regression verifies origin/Host/token guards, a real forced scan,
+preserved archive bytes/index and no call to backup. Actual card/detail mutations
+and stale-to-fresh recovery remain subject to the independent diagnostic oracle.
+Private sleep/diagnostic case records remain outside Git.
+
 **Susceptible boundary:** Green check uses old archive data, stale hashes, missing upload flags or an unavailable helper.
 
 **Cause / solution:** Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts.

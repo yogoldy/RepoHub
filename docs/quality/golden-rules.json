@@ -121,6 +121,9 @@
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
       "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics. Policy 6 checks every horizontal card receipt while details are collapsed or expanded, plus the one selected expanded timing line when present. Missing, hidden or incorrect compact text cannot be proven by an expanded-panel receipt.",
       "test_ids": [
+        "test_status_clarity.ClarityTests.test_waiting_copy_keeps_stale_evidence_non_green_and_recovers_without_backup",
+        "test_rescan.RescanTests.test_menu_rescan_controller_requests_only_scanning_and_recovers_from_rejection",
+        "test_rescan.RescanTests.test_scan_api_guards_request_and_preserves_backup_when_files_change",
         "test_menu_appearance.MenuAppearanceTests.test_counts_consume_existing_card_statuses_including_finder_and_unknown",
         "test_menu_appearance.MenuAppearanceTests.test_native_counts_have_independent_diagnostics_and_private_export",
         "test_menu_appearance.MenuAppearanceTests.test_native_readback_receipt_and_http_origin_token_guards",

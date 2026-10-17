@@ -118,9 +118,9 @@
           : 'RepoHub is waiting for verification and upload evidence for this archive.';
         break;
       case 'stale':
-        category = 'status_unavailable'; label = 'Current status unavailable';
-        headline = 'RepoHub can’t get current backup status.';
-        detail = 'Expected checks are not providing fresh evidence. This is separate from your backup schedule.';
+        category = 'status_unavailable'; label = 'Waiting for fresh checks';
+        headline = 'Waiting for fresh backup status.';
+        detail = 'Status will update automatically when fresh checks arrive. You can also choose Rescan now. This does not mean your backup failed.';
         break;
       case 'error':
         category = 'failure'; label = 'Needs attention — failure';
@@ -376,9 +376,9 @@
           ['Upload status unavailable', 'RepoHub can’t determine whether the upload finished.'],
         ],
         note: 'A local backup file does not prove upload completion. These statuses do not prove that the upload failed.'},
-      {category: 'status_unavailable', icon: 'stale', title: 'Current status unavailable',
+      {category: 'status_unavailable', icon: 'stale', title: 'Waiting for fresh checks',
         explanation: 'RepoHub doesn’t have a recent, reliable check of your backup status.',
-        note: 'See Technical details or choose Report this status. Waiting between scheduled backups is normal and does not cause this status.'},
+        note: 'This can happen after sleep while checks catch up. Wait for the next refresh or choose Rescan now. If it persists, open Technical details or Report this status. A normal backup schedule does not cause this status.'},
       {category: 'failure', icon: 'error', title: 'Needs attention — failure',
         explanation: 'A backup or related operation failed. The repo’s expanded view shows the available error.',
         note: 'Open Technical details or use Retry check now when offered. Report this status lets you review a report; nothing is sent until you choose Send.'}
@@ -391,5 +391,5 @@
       ${group.explanation ? `<p>${group.explanation}</p>` : ''}
       ${group.note ? `<p class="guide-note">${group.note}</p>` : ''}</section>`).join('');
   }
-  const policy={view,present,menuBar,summarizeMenuBar,timing,compactTiming,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-6'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,menuBar,summarizeMenuBar,timing,compactTiming,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-7'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

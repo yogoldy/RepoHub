@@ -167,6 +167,22 @@ assert.ok(last()[1].every(row => row.card_timing.text_matches && !row.detail_tim
 assert.equal(get('position').textContent, '1–3 of 13 repos');
 assert.equal(get('previous').disabled, true);
 captureProof('collapsed');
+// A post-sleep stale frame stays non-green on both actual render surfaces.
+state.repos[0].health = {fresh: false, reasons: ['Repo checks stopped updating']};
+vm.runInContext("selectedId = 'id-0'", context);
+render();
+assert.equal(cards()[0].querySelector('.card-status').textContent, 'Waiting for fresh checks');
+assert.equal(cards()[0].classList.contains('ready'), false);
+assert.equal(get('detail').querySelector('.status-headline').textContent, 'Waiting for fresh backup status.');
+assert.match(get('summary').textContent, /1 awaiting fresh checks/);
+captureProof('stale-card-and-detail');
+state.repos.forEach(row => { row.health = {fresh: false}; });
+render();
+assert.equal(get('summary').textContent, 'Waiting for fresh status · 13 repos');
+state.repos.forEach(row => { row.health = {fresh: true}; });
+vm.runInContext('selectedId = null', context);
+render();
+assert.equal(cards()[0].querySelector('.card-status').textContent, 'Backed up');
 get('next').click();
 assert.equal(get('position').textContent, '4–6 of 13 repos');
 assert.equal(get('previous').disabled, false);

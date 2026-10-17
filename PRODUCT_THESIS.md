@@ -32,6 +32,12 @@ scope; this batch stays local until promotion is authorized.
   or linked required files fail packaging. The existing 17 served assets remain.
   GR20 requires resource-selection and omitted-route counterexamples; the macOS
   gate also builds the complete app. See [the packaging boundary](docs/quality/FAILURE_MODES.md#gr20--coordinated-app-replacement).
+- [x] **Calmer stale-status display and Rescan now:** missing fresh evidence uses
+  neutral waiting copy on the cards and detail pane, while raw freshness and
+  non-green readiness remain unchanged. A visible scan action uses the existing
+  guarded scan API without creating a backup. Diagnostic policy 7 retains older
+  wording for historical receipts; GR06 covers the waiting/recovery and request
+  boundaries. Installed-Mac delivery remains part of the next update.
 
 ## Existing foundation
 
