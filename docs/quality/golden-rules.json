@@ -451,6 +451,23 @@
         "test_update_shutdown.UpdateShutdownTests.test_loopback_startup_does_not_wait_for_hostname_resolution"
       ],
       "remaining_gap": "Final native isolated acceptance on application source 985814d passed cancellation, signed replacement, invalid signature, truncated archive, equal-version refusal, busy-backup refusal and automatic rollback after injected helper failure, with unchanged synthetic archive/configuration hashes. Clean local gate: 233 tests, 20 rules, 25 commands; GitHub automated-contract passed that exact source. Production Developer ID/notarization, permission continuity, key/feed custody, first coordinated launchd migration and persistent recovery explanation remain open. Daily Macs unchanged."
+    },
+    {
+      "id": "GR21",
+      "title": "Only accepted main source becomes an update",
+      "breakpoint": "A branch check, stale run, partial upload or broad cleanup can publish unaccepted bytes or remove unrelated releases.",
+      "diagnostic_events": [
+        "application_update"
+      ],
+      "cause_and_solution": "Require a successful exact-main push gate and matching job, monotonic versions, production receipts and scoped current-plus-three package retention. Git tags stay intact.",
+      "required_behavior": "No publication from forks or PRs; no stale-main promotion; no test archive or unrelated release deletion.",
+      "test_ids": [
+        "test_release_policy.ReleasePolicyTests.test_only_exact_successful_main_push_can_release",
+        "test_release_policy.ReleasePolicyTests.test_versions_increase_and_failed_drafts_reserve_numbers",
+        "test_release_policy.ReleasePolicyTests.test_retention_keeps_current_plus_three_without_deleting_tags_or_unrelated_releases",
+        "test_release_policy.ReleasePolicyTests.test_retention_requires_a_matching_production_receipt"
+      ],
+      "remaining_gap": "Production signing, notarization, GitHub publication and permission continuity await Apple credentials and a first signed release. Policy tests do not establish those external results."
     }
   ]
 }
