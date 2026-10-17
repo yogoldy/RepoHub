@@ -392,11 +392,16 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   overflow-wrap: anywhere;
 }
 
-/* The footer Quit control should not pick up the generic button fill on hover. */
-footer button:hover {
+/* Navigation and Quit share the same subtle text-only hover transition. */
+.quiet-action {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  transition: color 150ms ease;
+}
+.quiet-action:hover {
   background: transparent;
   color: var(--text);
-  transition: color 150ms ease;
 }
 
 /* Put each status label beside its own short explanation. */
@@ -564,8 +569,6 @@ footer button:hover {
 }
 #all-repos {
   padding: 4px 8px;
-  background: transparent;
-  color: var(--text);
 }
 #all-repos[hidden] {
   display: none;
