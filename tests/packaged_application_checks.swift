@@ -39,6 +39,17 @@ import CryptoKit
         rejected()
         try FileManager.default.createSymbolicLink(at: helper, withDestinationURL: URL(fileURLWithPath: "/etc/passwd"))
         rejected()
+        let outcomes: [(Bool, Bool, Int?, String, String)] = [
+            (true, false, 1001, "ready", "no_update"),
+            (true, false, 4007, "ready", "user_cancelled"),
+            (false, false, nil, "ready", "check_finished"),
+            (false, true, 1, "waiting", "backup_busy"),
+            (false, false, 1001, "failed", "sparkle_aborted"),
+            (true, false, 3001, "failed", "sparkle_aborted")]
+        for (sparkle, busy, code, phase, reason) in outcomes {
+            let result = UpdateCycleOutcome.result(isSparkle: sparkle, isBackupBusy: busy, code: code)
+            precondition(result.0 == phase && result.1 == reason)
+        }
         print("Native package identity and altered/missing/foreign/escaping-resource checks passed")
     }
 }

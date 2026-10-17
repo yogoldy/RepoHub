@@ -3,6 +3,18 @@ import AppKit
 import Sparkle
 #endif
 
+enum UpdateCycleOutcome {
+    static func result(isSparkle: Bool, isBackupBusy: Bool, code: Int?) -> (String, String) {
+        if isBackupBusy { return ("waiting", "backup_busy") }
+        // Values from the pinned Sparkle SUErrors.h. These are normal outcomes,
+        // despite Sparkle reporting them through its error callback.
+        if code == nil { return ("ready", "check_finished") }
+        if isSparkle && code == 1001 { return ("ready", "no_update") }
+        if isSparkle && code == 4007 { return ("ready", "user_cancelled") }
+        return ("failed", "sparkle_aborted")
+    }
+}
+
 // Sparkle handles archive authentication and replacement. This adapter owns the
 // helper shutdown boundary; a successful download alone is not an installed app.
 final class AppUpdates: NSObject {
@@ -118,7 +130,24 @@ extension AppUpdates: SPUUpdaterDelegate {
 
     func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
         // Sparkle owns the detailed native error dialog. Shareable evidence is bounded.
-        record("failed", reason: "sparkle_aborted")
+        recordOutcome(error)
+    }
+
+    func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: Error?) {
+        recordOutcome(error)
+    }
+
+    func userDidCancelDownload(_ updater: SPUUpdater) {
+        record("ready", reason: "user_cancelled")
+    }
+
+    private func recordOutcome(_ error: Error?) {
+        let value = error as NSError?
+        let outcome = UpdateCycleOutcome.result(
+            isSparkle: value?.domain == SUSparkleErrorDomain,
+            isBackupBusy: value?.domain == "RepoHubUpdate" && value?.code == 1,
+            code: value?.code)
+        record(outcome.0, reason: outcome.1)
     }
 }
 #endif

@@ -183,7 +183,7 @@ def main():
             command('bridge-checks',[str(evidence/'bridge')])
             command('helper-launch-build',swift+[str(ROOT/'native/HelperLaunch.swift'),str(ROOT/'tests/helper_launch_checks.swift'),'-o',str(evidence/'helper-launch')])
             command('helper-launch-checks',[str(evidence/'helper-launch')])
-            command('packaged-integrity-build',swift+[str(ROOT/'native/PackagedApplication.swift'),str(ROOT/'tests/packaged_application_checks.swift'),'-o',str(evidence/'packaged-integrity')])
+            command('packaged-integrity-build',swift+[str(ROOT/'native/PackagedApplication.swift'),str(ROOT/'native/AppUpdates.swift'),str(ROOT/'tests/packaged_application_checks.swift'),'-o',str(evidence/'packaged-integrity')])
             command('packaged-integrity-checks',[str(evidence/'packaged-integrity')])
             command('coordinated-sparkle-package',[
                 sys.executable,str(ROOT/'tools/package_app.py'),'--output',str(evidence/'RepoHub Gate.app'),

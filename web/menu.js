@@ -31,6 +31,9 @@ $('#show-folder').onclick=()=>{
 window.addEventListener('repoHubFinderError',e=>{$('#notice').textContent=e.detail;});
 function percentLabel(percent){return percent.toFixed(1).replace(/\.0$/,'')+'%';}
 function render(){
+  $('#quit').title = menuState.application_release
+    ? 'Quit RepoHub after any current backup finishes'
+    : 'Quit menu-bar app; the backup helper keeps running';
   const repos=menuState.repos||[];
   if(!repos.some(r=>r.id===selectedId))selectedId=repos[0]?.id||null;
   const ready=repos.filter(r=>view(r).ready).length;
