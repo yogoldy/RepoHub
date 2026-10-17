@@ -305,15 +305,13 @@
       {category: 'status_unavailable', icon: 'stale', title: 'Current status unavailable',
         explanation: 'RepoHub doesn’t have a recent, reliable check of your backup status.',
         note: 'See Technical details or choose Report this status. Waiting between scheduled backups is normal and does not cause this status.'},
-      {category: 'failure', icon: 'error', title: 'An operation failed',
-        labels: 'Needs attention — failure',
-        explanation: 'RepoHub or macOS reported a failure. The expanded view shows the available error; Technical details retain supporting evidence.',
-        note: 'Use Retry check now when offered, or Report this status to describe the issue and optionally attach sanitized diagnostics. Review the preview and explicitly Send; opening a report sends nothing.'}
+      {category: 'failure', icon: 'error', title: 'Needs attention — failure',
+        explanation: 'A backup or related operation failed. The repo’s expanded view shows the available error.',
+        note: 'Open Technical details or use Retry check now when offered. Report this status lets you review a report; nothing is sent until you choose Send.'}
     ];
     return groups.map(group => `<section class="status-guide-item" data-category="${group.category}">
       <div class="guide-heading"><span class="guide-symbol" aria-hidden="true">${icon(group.icon)}</span>
         <h4>${group.title}</h4></div>
-      ${group.labels ? `<p class="guide-labels">${group.labels}</p>` : ''}
       ${group.definitions ? `<dl class="guide-definitions">${group.definitions.map(
         ([label, meaning]) => `<dt>${label}</dt><dd>${meaning}</dd>`).join('')}</dl>` : ''}
       ${group.explanation ? `<p>${group.explanation}</p>` : ''}

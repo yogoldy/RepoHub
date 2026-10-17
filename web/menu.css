@@ -207,10 +207,6 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   margin: 8px 0 0;
   overflow-wrap: anywhere;
 }
-.status-guide-item .guide-labels {
-  color: var(--gold);
-  font-size: 10px;
-}
 .status-guide-item .guide-note {
   color: var(--muted);
 }
@@ -253,7 +249,6 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 
 #info-dialog h3, .guide-heading h4 { font-size: 14px; }
 .status-guide-item p, #info-dialog .things-key p { font-size: 13px; }
-.status-guide-item .guide-labels { font-size: 12px; }
 
 /* Green is a prose treatment here; pending work keeps its existing icon. */
 .status-explanation[data-category="backup_pending"],

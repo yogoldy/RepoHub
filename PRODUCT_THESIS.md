@@ -338,4 +338,11 @@ The card and headline use the normal Backed up presentation; Technical details
 retain the difference. The summary counts repos backed up to iCloud. Raw backup
 evidence, eligibility and retention remain unchanged. Diagnostic display policy 5
 records the exception explicitly and continues interpreting older policy versions.
-This stage does not yet revise the guide copy or authorize a push/install.
+After the rule passed its clean Golden Gate, the six guide sections were revised
+in separate local commits: Backed up, waiting to run, work in progress, upload
+confirmation, unavailable status and failure. Short definitions explain each
+remaining card label; repeated label lines and long combined paragraphs are removed.
+The guide still distinguishes scanning, creating and uploading; unknown upload
+evidence does not prove success or failure; scheduled waiting does not cause stale
+status; reports are reviewed before Send. This batch does not authorize a push or
+installed-app update.
