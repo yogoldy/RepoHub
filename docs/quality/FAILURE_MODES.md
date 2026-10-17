@@ -599,3 +599,14 @@ receipt prevents all cleanup. Cleanup retains current plus three prior managed
 packages and preserves tags and unrelated releases. The workflow is syntax-checked
 by pinned actionlint inside the macOS Golden Gate. Real Apple service/GitHub
 publication remains open until credentials and the first production release.
+
+### GitHub drafts do not yet create their Git tag
+
+The first local publishing gate passed, but a real disposable GitHub draft probe
+showed the draft's exact target was present while no tag existed. An immediate
+`commits/<tag>` verification would therefore stop every first publication. Check
+for conflicting existing tags before creating the draft; validate the draft's
+exact target SHA, and resolve the tag after publication. The regression includes
+a missing-tag normal case, foreign tag collision and moving-branch draft target.
+The actual text-fixture upload/download matched and its draft/assets were removed.
+No production update was published.

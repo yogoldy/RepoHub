@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.package_app import sha256
-from tools.publish_release import publish_verified, require_gate, signing_material, verify_artifacts
+from tools.publish_release import GitHub, publish_verified, require_gate, signing_material, verify_artifacts
 from tools.release_policy import release_plan
 from tools.update_feed import appcast
 
@@ -176,3 +176,23 @@ class PublishReleaseTests(unittest.TestCase):
             self.assertFalse((work / 'sparkle.key').exists())
         self.assertIn(['security', 'list-keychains', '-d', 'user', '-s', '/synthetic/login.keychain-db'], calls)
         self.assertEqual(calls[-1][1], 'delete-keychain')
+
+    def test_draft_without_created_tag_uses_exact_target_and_rejects_collisions(self):
+        plan = release_plan([], SHA)
+        github = GitHub()
+        draft = {'isDraft': True, 'targetCommitish': SHA, 'tagName': plan['tag']}
+        with patch.object(github, 'api', return_value=[]) as api:
+            with patch('tools.publish_release.command', side_effect=['', json.dumps(draft)]):
+                github.create_draft(plan)
+            self.assertEqual(api.call_args_list[0].args, ('git/matching-refs/tags/' + plan['tag'],))
+            self.assertEqual(api.call_count, 1)  # No premature commits/<tag> lookup.
+        collision = [{'ref': 'refs/tags/' + plan['tag'], 'object': {'sha': 'b' * 40}}]
+        with patch.object(github, 'api', return_value=collision):
+            with patch('tools.publish_release.command') as command:
+                with self.assertRaises(ValueError):
+                    github.create_draft(plan)
+                command.assert_not_called()
+        with patch.object(github, 'api', return_value=[]):
+            with patch('tools.publish_release.command', side_effect=['', json.dumps(dict(draft, targetCommitish='main'))]):
+                with self.assertRaises(ValueError):
+                    github.create_draft(plan)

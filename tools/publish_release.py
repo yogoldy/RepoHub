@@ -70,12 +70,22 @@ class GitHub:
         return receipt
 
     def create_draft(self, plan):
+        # GitHub has no tag for a new draft yet. Reject a conflicting existing
+        # tag first, then verify the draft's exact target instead of resolving it.
+        refs = self.api('git/matching-refs/tags/' + plan['tag'])
+        for ref in refs:
+            if (ref['ref'] == 'refs/tags/' + plan['tag']
+                    and ref['object']['sha'] != plan['source_revision']):
+                raise ValueError('release_tag_source_mismatch')
         command(['gh', 'release', 'create', plan['tag'], '--repo', REPOSITORY,
                  '--target', plan['source_revision'], '--draft', '--title', 'RepoHub ' + plan['version'],
                  '--notes', 'Automated Golden Gate passed. Native Mac testing follows delivery.\nSource: '
                  + plan['source_revision'] + '\nBuild: ' + plan['build']])
-        if self.api('commits/' + plan['tag'])['sha'] != plan['source_revision']:
-            raise ValueError('release_tag_source_mismatch')
+        draft = json.loads(command(['gh', 'release', 'view', plan['tag'], '--repo', REPOSITORY,
+                                    '--json', 'isDraft,targetCommitish,tagName']))
+        if (draft.get('isDraft') is not True or draft.get('tagName') != plan['tag']
+                or draft.get('targetCommitish') != plan['source_revision']):
+            raise ValueError('release_draft_source_mismatch')
 
     def upload(self, plan, artifacts):
         command(['gh', 'release', 'upload', plan['tag'], '--repo', REPOSITORY,
@@ -84,6 +94,8 @@ class GitHub:
     def publish(self, plan):
         command(['gh', 'release', 'edit', plan['tag'], '--repo', REPOSITORY,
                  '--draft=false', '--latest'])
+        if self.api('commits/' + plan['tag'])['sha'] != plan['source_revision']:
+            raise ValueError('published_tag_source_mismatch_no_cleanup')
 
     def latest(self):
         return self.api('releases/latest')

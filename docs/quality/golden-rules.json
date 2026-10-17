@@ -471,7 +471,8 @@
         "test_publish_release.PublishReleaseTests.test_unconfirmed_latest_or_foreign_historical_receipt_prevents_all_deletion",
         "test_publish_release.PublishReleaseTests.test_missing_altered_or_test_artifacts_are_rejected",
         "test_publish_release.PublishReleaseTests.test_gate_must_be_clean_exact_macos_and_passed",
-        "test_publish_release.PublishReleaseTests.test_signing_requires_complete_secrets_and_always_restores_keychain_search"
+        "test_publish_release.PublishReleaseTests.test_signing_requires_complete_secrets_and_always_restores_keychain_search",
+        "test_publish_release.PublishReleaseTests.test_draft_without_created_tag_uses_exact_target_and_rejects_collisions"
       ],
       "remaining_gap": "Production signing, notarization, GitHub publication and permission continuity await Apple credentials and a first signed release. Policy tests do not establish those external results."
     }

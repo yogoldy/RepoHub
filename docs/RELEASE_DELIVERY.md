@@ -50,6 +50,8 @@ Before enabling publication, confirm recovery custody, configure Apple credentia
 
 ## Current verification limits
 
+A real unpublished GitHub draft probe confirmed exact-source targeting, uploaded/downloaded fixture-byte equality and complete probe cleanup. It exposed and corrected premature tag resolution: new draft tags do not exist until publication. Production app publication still awaits Apple signing.
+
 Policy, publication-order/failure and secret-cleanup regressions run in the Golden Gate, along with pinned actionlint workflow validation. Simulated GitHub/signing cases prove the control flow, not Apple service acceptance or a live public release. No production release exists yet; the feed URL becomes live on the first successful signed publication. No installed Pro/Air app has been replaced by this work. Native permission continuity and the outstanding reliability matrix remain recorded separately. Apple activation is still user-reported pending.
 
 Sources: [GitHub workflow-run security and semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run), [Sparkle update signing](https://sparkle-project.org/documentation/), [Apple notarization](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow).
