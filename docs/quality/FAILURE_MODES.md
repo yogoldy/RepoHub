@@ -18,6 +18,29 @@ Public entries describe source policy and synthetic reproductions. Actual privat
 
 ## Rule register
 
+### Menu bar appearance must reuse repository presentations
+
+The menu bar previously interpreted raw `needs_backup` and verification fields
+separately from the cards. That missed the approved Finder-only backed-up
+exception. Menu-bar counts now aggregate the existing `RepoStatus.present` results;
+Swift executes that same shipped policy in the owned WebKit page. It contains no
+repository-state classifier. The waiting count includes existing backup-pending
+statuses; confirmed changes count the existing confirmed file/Git/metadata labels.
+First backups and unclassified differences are not confirmed changes.
+
+The preference is stored per Mac in the app's UserDefaults only after Save changes.
+Navigation guards unsaved drafts, conflicts preserve them, and a pending save
+cannot be duplicated or interrupted. Native bridge requests retain exact-page,
+main-frame, fixed-mode and request-ID checks. The logo is unchanged.
+
+`menu_bar_presented` records a bounded mode, count and symbol read back after the
+native title is set. Independent diagnostics reuse the existing status oracle to
+detect wrong counts or symbols; `menu_bar_disagreement` is a failure, not evidence
+that the cards themselves changed. Exports contain fixed enums and capped counts,
+never tooltip prose. GR06 and GR22 register the regression tests. Browser preview
+cannot save native preferences. Actual installed menu-bar layout and restart
+acceptance remain required when this local candidate is delivered.
+
 ### GR01 — Preserve complete contained workspace bytes
 
 **Susceptible boundary:** Hidden, ignored and uncommitted files silently omitted; archive member handling loses directories or modes.
@@ -683,3 +706,24 @@ that archive. They retain finder_only_project_match instead of claiming exact
 current byte equality. Technical details disclose the .DS_Store difference. GR06
 registers positive, conservative, legacy-version and real temporary-backup/export
 regressions. Native pixels and installed-app acceptance remain pending.
+
+## A correct expanded time does not prove a compact card displayed it — October 17, 2026
+
+The collapsed card overview adds a second timing location. Policies 4 and 5
+check only the selected expanded receipt, so they cannot establish that every
+card showed its time. Policy 6 requires each card's scheduler receipt and a
+small DOM observation of its compact meaning, date attribute and actual text.
+The horizontal overview always supplies all card receipts. When a repo is
+selected it adds exactly one expanded-line observation; a collapsed overview
+uses a null selection. Only the actively selected repo has technical details.
+The scrolling-grid prototype is preserved in local commit 792e925. The presentation is computed once
+per repo per render and shared by both locations. Diagnostic expectations remain
+independent of the renderer. Missing, hidden or incorrect card lines are tested
+without using the expanded line as their evidence. Earlier policies retain their
+original contracts.
+
+Only the fixed card/detail surface code and existing bounded timing facts enter
+logs and shareable exports; exact dates remain in the private comparison request.
+GR06 and GR09 register the regressions. Existing Python discovery runs them in
+GitHub Actions without a YAML change. Browser layout and native WebKit acceptance
+remain separate from these DOM-observation and evidence-contract tests.

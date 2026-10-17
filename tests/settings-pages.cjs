@@ -56,7 +56,7 @@ function change(id, value) {
   get('settings-form').listeners.change();
 }
 (async () => {
-  await context.openSettings();
+  await context.openSettings(null, 'schedule');
   assert(get('settings-dialog').open);
   assert(get('settings-save').disabled, 'No-change saves are disabled');
   await submit(); assert.equal(writes.length, 0);
@@ -137,7 +137,7 @@ function change(id, value) {
   assert(!get('settings-home').hidden);
   assert.equal(Number(get('adapter-frequency').value), 240);
   assert.equal(writes.length, 3, 'Back/discard does not save');
-  for (const page of ['notifications', 'updates', 'help', 'access']) {
+  for (const page of ['notifications', 'appearance', 'updates', 'help', 'access']) {
     get('settings-nav-' + page).onclick();
     assert(!get('settings-page-' + page).hidden);
     assert(get('settings-home').hidden);
@@ -154,7 +154,7 @@ function change(id, value) {
   assert(html.indexOf('id="settings-close"') < html.indexOf('id="settings-content"'));
   assert(html.indexOf('id="settings-content"') < html.indexOf('id="settings-form"'));
   const rows = [...html.matchAll(/id="(settings-nav-[^"]+|workspace-open)" class="settings-row"/g)].map(m => m[1]);
-  assert.equal(rows.length, 6);
+  assert.equal(rows.length, 7);
   assert.equal(rows.at(-1), 'settings-nav-access');
   console.log('Actual settings controller: explicit save, discard/Escape, failed and duplicate saves, and revision-checked inheritance passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

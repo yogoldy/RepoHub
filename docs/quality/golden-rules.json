@@ -114,11 +114,16 @@
         "ui_presented",
         "presentation_input_disagreement",
         "presentation_disagreement",
+        "menu_bar_presented",
+        "menu_bar_disagreement",
         "upload_stale"
       ],
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
-      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics.",
+      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics. Policy 6 checks every horizontal card receipt while details are collapsed or expanded, plus the one selected expanded timing line when present. Missing, hidden or incorrect compact text cannot be proven by an expanded-panel receipt.",
       "test_ids": [
+        "test_menu_appearance.MenuAppearanceTests.test_counts_consume_existing_card_statuses_including_finder_and_unknown",
+        "test_menu_appearance.MenuAppearanceTests.test_native_counts_have_independent_diagnostics_and_private_export",
+        "test_menu_appearance.MenuAppearanceTests.test_native_readback_receipt_and_http_origin_token_guards",
         "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
         "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
         "test_backup_lifecycle.LifecycleTests.test_green_icon_with_missing_upload_is_logged_as_input_disagreement",
@@ -136,7 +141,15 @@
         "test_status_clarity.ClarityTests.test_finder_display_success_preserves_raw_difference_and_exact_upload_requirement",
         "test_status_clarity.ClarityTests.test_finder_display_rejects_uncertain_stale_busy_and_meaningful_changes",
         "test_status_clarity.ClarityTests.test_finder_diagnostics_keep_previous_display_versions_interpretable",
-        "test_change_evidence.EvidenceTests.test_finder_only_green_display_keeps_real_backup_and_diagnostic_evidence"
+        "test_change_evidence.EvidenceTests.test_finder_only_green_display_keeps_real_backup_and_diagnostic_evidence",
+        "test_card_timing.CardTimingTests.test_all_cards_are_checked_with_no_expanded_selection",
+        "test_card_timing.CardTimingTests.test_missing_wrong_or_hidden_card_time_is_detected_independently_of_detail",
+        "test_card_timing.CardTimingTests.test_missing_receipts_and_inconsistent_expansion_fail_closed",
+        "test_card_timing.CardTimingTests.test_actual_compact_javascript_uses_same_timing_contract_for_every_state",
+        "test_menu_cards.MenuCardTests.test_actual_card_controller_and_timing_dom_faults",
+        "test_menu_cards.MenuCardTests.test_real_controller_observations_reach_independent_diagnostic_checks",
+        "test_card_timing.CardTimingTests.test_rendered_clock_text_and_day_labels_match_known_utc_times",
+        "test_card_timing.CardTimingTests.test_expanded_checks_all_cards_and_only_selected_detail"
       ],
       "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },
@@ -205,7 +218,8 @@
         "test_report_preview.ReportPreviewTests.test_bug_has_exact_share_files_and_private_local_draft",
         "test_status_clarity.ClarityTests.test_new_export_fields_are_typed_and_never_copy_exception_prose",
         "test_timing_diagnostics.TimingDiagnosticTests.test_new_exports_are_bounded_and_exclude_private_calendar_evidence",
-        "test_timing_diagnostics.TimingDiagnosticTests.test_malformed_or_missing_selected_timing_receipts_fail_closed"
+        "test_timing_diagnostics.TimingDiagnosticTests.test_malformed_or_missing_selected_timing_receipts_fail_closed",
+        "test_card_timing.CardTimingTests.test_card_exports_identify_surfaces_without_calendar_or_private_text"
       ],
       "remaining_gap": "Operational patterns remain bounded facts. User-written report prose is separate; a preview and confidentiality reminder cannot guarantee it contains no personal information."
     },
@@ -504,6 +518,8 @@
       "cause_and_solution": "Keep local drafts, guard Back/Close/Escape, serialize saves and preserve the existing session-token and revision-checked API boundary. Folder persistence has workspace_configuration evidence; effective saved scheduling policy appears in schedule_decision. Discard-only UI paths are covered by controller regressions, not claimed as save events.",
       "required_behavior": "No persistence from editing or navigation. Failed saves keep the draft. Folder choices retain review and revision protections.",
       "test_ids": [
+        "test_menu_appearance.MenuAppearanceTests.test_appearance_page_explicit_save_discard_conflict_and_duplicate_submit",
+        "test_menu_appearance.MenuAppearanceTests.test_native_bridge_persistence_and_exact_shared_javascript_execution",
         "test_settings_pages.SettingsPagesTests.test_explicit_save_discard_busy_and_failure_preserve_drafts_and_revision_guards",
         "test_settings_pages.SettingsPagesTests.test_folder_review_cancel_conflict_and_navigation_keep_saved_sources_intact"
       ],

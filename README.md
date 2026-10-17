@@ -80,7 +80,15 @@ Back up now, Repository Backups, Backup notifications, and the settings gear use
 
 The native bridge accepts only openBackups, openRepo, toggleNotifications, connectGitHub, and quit from this popover's exact top-level http://127.0.0.1:8767/menu.html document. Other origins, ports, paths, subframes, extra fields and arbitrary path/command requests are rejected. openRepo accepts only a workspace ID and resolves its path from fresh helper status and the registry's exact approved ID/path pair, requiring an existing canonical non-symlink directory. Older single-root helper status retains its immediate-child check. HTML views never receive this bridge. Backups and settings still go through authenticated loopback POST endpoints, obtaining the current process token for each write so a helper restart does not strand the panel with an old token. Browser-only previews disable the three native controls.
 
-Menu checks: `node tests/menu-status.cjs`; compile `native/MenuBridge.swift` with `tests/menu_bridge_checks.swift` and run the executable. Existing Python security/backup and Swift notification-readiness checks still apply. The menu-bar foundation started from 9f442b8; its fixed adapter and per-repo schedules remain in the current app. Broader independent cloud restore coverage remains a separate pass.
+Menu checks: `node tests/menu-status.cjs`; compile `native/MenuBridge.swift` and `native/MenuAppearance.swift` with `tests/menu_bridge_checks.swift` and run the executable. Existing Python security/backup and Swift notification-readiness checks still apply. The menu-bar foundation started from 9f442b8; its fixed adapter and per-repo schedules remain in the current app. Broader independent cloud restore coverage remains a separate pass.
+
+Settings → **Menu bar appearance** chooses what the number counts: repos waiting
+for backup, repos with confirmed changes, or no number. The default remains waiting
+for backup. Counts aggregate the same statuses as the repo cards; Finder-only
+Backed up does not become pending or upload-unconfirmed. Confirmed changes excludes
+first backups and comparisons that still need verification. A zero number is
+hidden, and activity/warning symbols remain available. Save changes stores this
+preference separately on each Mac without changing backup settings or schedules.
 
 ## Individual repo schedules and status icons
 

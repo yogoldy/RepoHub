@@ -310,10 +310,49 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   font-size: 18px;
   overflow-wrap: anywhere;
 }
-#settings-back, #info-back {
-  padding: 8px;
-  font-size: 12px;
+.appearance-label {
+  display: block;
+  margin: 18px 0 8px;
+}
+.menu-appearance-preview {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 20px;
+  min-height: 32px;
+  font-size: 16px;
+}
+.menu-appearance-preview svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+#menu-appearance-error {
+  color: var(--red);
+}
+#menu-appearance-error:empty {
+  display: none;
+}
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   white-space: nowrap;
+}
+.back-button svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 #settings-back[hidden], #info-back[hidden], [data-info-page][hidden],
 [data-settings-page][hidden], #schedule-actions[hidden] {
@@ -392,11 +431,16 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   overflow-wrap: anywhere;
 }
 
-/* The footer Quit control should not pick up the generic button fill on hover. */
-footer button:hover {
+/* Navigation and Quit share the same subtle text-only hover transition. */
+.quiet-action {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  transition: color 150ms ease;
+}
+.quiet-action:hover {
   background: transparent;
   color: var(--text);
-  transition: color 150ms ease;
 }
 
 /* Put each status label beside its own short explanation. */
@@ -413,4 +457,124 @@ footer button:hover {
   font-size: 13px;
   line-height: 1.65;
   overflow-wrap: anywhere;
+}
+
+/* Things to know uses the same reading rhythm as the status guide. */
+.info-content > .things-key {
+  margin-top: 0;
+}
+.things-key #things-panel {
+  gap: 0;
+  padding: 0;
+}
+.things-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.things-section:first-child {
+  padding-top: 0;
+}
+.things-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.things-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.things-heading .folder-tip {
+  flex: none;
+  margin-right: 0;
+}
+#info-dialog .things-section h3 {
+  margin: 0;
+  line-height: 1.4;
+}
+.things-key #things-panel p {
+  margin-top: 8px;
+}
+.things-key #things-panel button {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+.things-key #things-panel button::before {
+  content: none;
+}
+.things-key #things-panel button:hover:not(:disabled) {
+  background: #263347;
+}
+.things-key #things-panel .show-me {
+  color: var(--gold);
+}
+
+/* A horizontal overview shares one selected detail region below the cards. */
+.card-rail .card-slot {
+  display: flex;
+}
+.card-rail .repo-card {
+  height: 100%;
+  min-height: 168px;
+}
+.card-rail .card-status {
+  margin-top: auto;
+  padding-top: 16px;
+  font-size: 12px;
+}
+.card-next {
+  display: block;
+  width: 100%;
+  padding-right: 12px;
+  margin-top: 6px;
+  color: var(--green);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.card-next[data-kind="unavailable"],
+.card-next[data-kind="blocked"] {
+  color: var(--muted);
+}
+.card-disclosure {
+  position: absolute;
+  right: 9px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.card-disclosure svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.repo-card[aria-expanded="true"] .card-disclosure {
+  transform: rotate(180deg);
+  color: var(--gold);
+}
+.repo-expansion {
+  margin-top: 10px;
+}
+.repo-expansion[hidden],
+.repo-expansion .detail[hidden],
+.repo-expansion #technical-panel[hidden] {
+  display: none;
+}
+.repo-expansion .detail {
+  margin-top: 0;
+}
+#all-repos {
+  padding: 4px 8px;
+}
+#all-repos[hidden] {
+  display: none;
 }

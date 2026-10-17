@@ -1,7 +1,7 @@
 import Foundation
 
 enum MenuAction: String {
-    case requestNotifications, notificationSettings, privacySettings, loginSettings, openBackups, openRepo, toggleNotifications, connectGitHub, chooseRepoHome, chooseRepoFolders, checkForUpdates, quit
+    case requestNotifications, notificationSettings, privacySettings, loginSettings, openBackups, openRepo, toggleNotifications, connectGitHub, chooseRepoHome, chooseRepoFolders, checkForUpdates, getMenuAppearance, saveMenuAppearance, quit
 }
 
 enum MenuBridge {
@@ -28,6 +28,16 @@ enum MenuBridge {
         } else if action == .chooseRepoHome || action == .chooseRepoFolders {
             guard Set(payload.keys) == ["action", "request_id"], let id = payload["request_id"] as? String,
                   id.range(of: "^[a-f0-9]{24}$", options: .regularExpression) != nil else { return nil }
+        } else if action == .getMenuAppearance || action == .saveMenuAppearance {
+            let keys: Set<String> = action == .getMenuAppearance
+                ? ["action", "request_id"] : ["action", "request_id", "mode", "revision"]
+            guard Set(payload.keys) == keys, let id = payload["request_id"] as? String,
+                  id.range(of: "^[a-f0-9]{24}$", options: .regularExpression) != nil else { return nil }
+            if action == .saveMenuAppearance {
+                guard let mode = payload["mode"] as? String, MenuBarCountMode(rawValue: mode) != nil,
+                      let revision = payload["revision"] as? String,
+                      MenuBarCountMode(rawValue: revision) != nil else { return nil }
+            }
         } else if payload.count != 1 { return nil }
         return action
     }

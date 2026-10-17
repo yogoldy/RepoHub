@@ -55,6 +55,41 @@ const {create,displayState}=require('../web/diagnostics-client.js');
   globalThis.RepoStatus.version = 'status-clarity-4';
   await timingClient.observe(backend, rows, 'current', 'known');
   assert.equal(timingFrames[1].selected_repo_id, 'known');
+  globalThis.RepoStatus.version = 'status-clarity-6';
+  await timingClient.observe(backend, rows, 'current', null);
+  assert.equal(timingFrames[2].selected_repo_id, null);
+  assert.equal(timingFrames[2].policy_version, 'status-clarity-6');
   delete globalThis.RepoStatus;
   console.log('Diagnostic delivery checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+// Observe the text and time nodes, rather than accepting a model receipt as DOM proof.
+const {readCardTiming, readDetailTiming} = require('../web/diagnostics-client.js');
+const compact = {kind: 'check', dueAt: '2026-10-17T23:00:00+00:00',
+  text: 'Next check Oct 17, 7:00 PM'};
+const time = {getAttribute: () => compact.dueAt};
+const line = {dataset: {kind: 'check'}, textContent: compact.text, hidden: false,
+  getClientRects: () => [1], querySelector: () => time};
+const button = {querySelector: () => line};
+assert.deepEqual(readCardTiming(button, compact), {
+  kind: 'check', due_at: compact.dueAt, text_matches: true,
+});
+line.textContent = 'Next check Oct 17, 8:00 PM';
+assert.equal(readCardTiming(button, compact).text_matches, false);
+line.textContent = compact.text;
+line.hidden = true;
+assert.equal(readCardTiming(button, compact).text_matches, false);
+line.hidden = false;
+line.getClientRects = () => [];
+assert.equal(readCardTiming(button, compact).text_matches, false);
+line.getClientRects = () => [1];
+line.querySelector = () => null;
+assert.equal(readCardTiming(button, compact).due_at, null);
+assert.equal(readCardTiming({querySelector: () => null}, compact).text_matches, false);
+const timing = {receipt: {schedule_state: 'scheduled'}, nextLine: 'Next scheduled check due: 7 PM'};
+const detailLine = {textContent: timing.nextLine, getClientRects: () => [1]};
+const panel = {hidden: false, querySelector: () => detailLine};
+assert.equal(readDetailTiming(panel, timing).text_matches, true);
+detailLine.textContent = 'Next scheduled check due: 8 PM';
+assert.equal(readDetailTiming(panel, timing).text_matches, false);
+console.log('Card and expanded timing observations detect missing, hidden and wrong text');

@@ -7,17 +7,37 @@
   </button>
 <button id="settings" class="icon-button" aria-label="Settings" title="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.6 2.2-1.7 1L5 5.6 2.5 9.9l1.6 1.6v2L2.5 15 5 19.4l2.2-.6 1.7 1 .6 2.2h5l.6-2.2 1.7-1 2.2.6 2.5-4.4-1.6-1.5v-2l1.6-1.6L19 5.6l-2.2.6-1.7-1-.6-2.2Z"/><circle cx="12" cy="12.5" r="3"/></svg></button></div></header>
 <p id="notice" role="status"></p>
-<section aria-label="Repository cards"><div class="rail-heading"><span id="position">Your repos</span><div><button id="previous" class="arrow" aria-label="Previous repos">‹</button><button id="next" class="arrow" aria-label="Next repos">›</button></div></div><div id="cards" class="card-rail" role="group" aria-label="Scroll through repos"><p class="empty">Reading backup status…</p></div></section>
-<section id="detail" class="detail" aria-label="Selected repository details"><p class="empty">Select a repo to see its backup.</p></section>
-<section id="technical-panel" aria-label="Selected repository technical details"></section>
+<section aria-label="Repository cards">
+  <div class="rail-heading">
+    <span id="position">Your repos</span>
+    <div>
+      <button id="all-repos" class="back-button quiet-action" type="button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m8-8-8 8 8 8"/></svg>
+        <span>All repos</span>
+      </button>
+      <button id="previous" class="arrow" aria-label="Previous repos">‹</button>
+      <button id="next" class="arrow" aria-label="Next repos">›</button>
+    </div>
+  </div>
+  <div id="cards" class="card-rail" role="group" aria-label="Scroll through repos">
+    <p class="empty">Reading backup status…</p>
+  </div>
+</section>
+<div id="repo-expansion" class="repo-expansion" hidden>
+  <section id="detail" class="detail" aria-label="Selected repository details" hidden></section>
+  <section id="technical-panel" aria-label="Selected repository technical details" hidden></section>
+</div>
 <div class="controls"><button id="backup" class="action primary"><span class="action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 1 0 0 8m0-13v5h-5"/></svg></span><span>Back up now</span></button><button id="open-backups" class="action"><span class="action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5h6l2 2h10v13H3Z"/></svg></span><span>Repository Backups</span></button><button id="notifications" class="action notification-action" aria-pressed="false"><span class="switch-track"><span></span></span><span>Backup notifications</span><small id="notification-caption">Checking…</small></button></div>
-<footer><span id="checked">Live status · every 5 seconds</span><button id="quit">Quit</button></footer>
+<footer><span id="checked">Live status · every 5 seconds</span><button id="quit" class="quiet-action">Quit</button></footer>
 </main>
 <dialog id="info-dialog" aria-labelledby="info-title">
   <div class="settings-toolbar">
-    <button id="info-back" type="button" hidden>‹ About</button>
+    <button id="info-back" class="back-button icon-button" type="button" title="Back to About" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m8-8-8 8 8 8"/></svg>
+      <span class="sr-only">Back to About</span>
+    </button>
     <h2 id="info-title" tabindex="-1">About your backups</h2>
-    <button id="info-close" type="button" class="icon-button" aria-label="Close backup information">×</button>
+    <button id="info-close" type="button" class="icon-button" aria-label="Close backup information"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
   </div>
   <div id="info-content" class="info-content">
     <nav id="info-home" data-info-page="home" aria-label="Backup information sections">
@@ -28,15 +48,42 @@
       <div id="status-legend" class="status-legend"></div>
     </section>
     <section class="status-key things-key" data-info-page="things" hidden aria-label="Things to know">
-      <div id="things-panel"><p class="folder-tip-row"><span class="folder-shape folder-tip" aria-hidden="true"></span><span>The folder icon opens that repo on your Mac in Finder.</span><button id="show-folder" class="show-me" title="Highlight the folder button on the selected repo card">Show me</button></p><span id="folder-demo-status" class="sr-only" role="status"></span><p>Use Schedule on a repo card for custom timing. The main gear sets defaults.</p><p>Backups include ignored files and uncommitted work. Back up now checks every repo.</p><p><button id="connect-github" type="button">GitHub reporting connection</button> · Set up or disconnect securely in Keychain.</p></div>
+      <div id="things-panel">
+        <section class="things-section" aria-labelledby="things-folder-title">
+          <div class="things-heading">
+            <span class="folder-shape folder-tip" aria-hidden="true"></span>
+            <h3 id="things-folder-title">Open a repo in Finder</h3>
+          </div>
+          <p>Click a repo card’s folder icon to open that repo in Finder.</p>
+          <button id="show-folder" type="button" class="show-me">Show me</button>
+          <span id="folder-demo-status" class="sr-only" role="status"></span>
+        </section>
+        <section class="things-section" aria-labelledby="things-schedule-title">
+          <h3 id="things-schedule-title">Choose backup timing</h3>
+          <p>Use Schedule in a repo’s details to change its timing. Settings → Backup schedule controls the defaults.</p>
+        </section>
+        <section class="things-section" aria-labelledby="things-files-title">
+          <h3 id="things-files-title">What your backup includes</h3>
+          <p>RepoHub includes saved files that Git ignores and work you haven’t committed.</p>
+          <p>Back up now checks every monitored repo.</p>
+        </section>
+        <section class="things-section" aria-labelledby="things-reporting-title">
+          <h3 id="things-reporting-title">GitHub reporting</h3>
+          <p>Connect GitHub to send reports. Your connection is stored in macOS Keychain.</p>
+          <button id="connect-github" type="button">Manage GitHub connection</button>
+        </section>
+      </div>
     </section>
   </div>
 </dialog>
 <dialog id="settings-dialog" aria-labelledby="settings-title">
   <div class="settings-toolbar">
-    <button type="button" id="settings-back" hidden>‹ Settings</button>
+    <button type="button" id="settings-back" class="back-button icon-button" title="Back to Settings" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m8-8-8 8 8 8"/></svg>
+      <span id="settings-back-label" class="sr-only">Back to Settings</span>
+    </button>
     <h2 id="settings-title" tabindex="-1">Settings</h2>
-    <button type="button" id="settings-close" class="icon-button" aria-label="Close settings">×</button>
+    <button type="button" id="settings-close" class="icon-button" aria-label="Close settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
   </div>
   <div id="settings-content" class="settings-content">
     <form id="settings-form">
@@ -44,6 +91,7 @@
         <button type="button" id="settings-nav-schedule" class="settings-row"><span><strong>Backup schedule</strong><small>Battery and power adapter schedules</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="workspace-open" class="settings-row"><span><strong>Folders to back up</strong><small>Choose and review monitored folders</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="settings-nav-notifications" class="settings-row"><span><strong>Notifications</strong><small>Optional backup notifications</small></span><span aria-hidden="true">›</span></button>
+        <button type="button" id="settings-nav-appearance" class="settings-row"><span><strong>Menu bar appearance</strong><small>Choose what the number counts</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="settings-nav-updates" class="settings-row"><span><strong>App updates</strong><small>Check for a newer version</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="settings-nav-help" class="settings-row"><span><strong>Help &amp; diagnostics</strong><small>Report a problem or suggest a feature</small></span><span aria-hidden="true">›</span></button>
         <button type="button" id="settings-nav-access" class="settings-row"><span><strong>Access &amp; permissions</strong><small>Check folder and background access</small></span><span aria-hidden="true">›</span></button>
@@ -76,6 +124,28 @@
         <div class="readiness-actions">
           <button type="button" id="readiness-enable">Enable notifications</button>
           <button type="button" id="readiness-notification-settings">Notification settings</button>
+        </div>
+      </section>
+      <section id="settings-page-appearance" data-settings-page="appearance" hidden>
+        <p>Choose what the number beside the RepoHub icon counts.</p>
+        <label class="appearance-label" for="menu-count-mode">Show a count of</label>
+        <select id="menu-count-mode">
+          <option value="pending">Repos waiting for backup</option>
+          <option value="edits">Repos with confirmed changes</option>
+          <option value="none">No number</option>
+        </select>
+        <p id="menu-count-description" class="settings-note"></p>
+        <div class="menu-appearance-preview" aria-label="Menu bar preview">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 9-5 9 5-9 5Zm0 5 9 5 9-5M3 17l9 5 9-5"/></svg>
+          <span id="menu-count-preview"></span>
+        </div>
+        <p id="menu-count-caption" class="settings-note" role="status"></p>
+        <p class="settings-note">Activity and warning symbols still appear. A zero count is hidden.</p>
+        <p id="menu-appearance-note" class="settings-note"></p>
+        <p id="menu-appearance-error" role="alert"></p>
+        <div class="settings-actions">
+          <button type="button" id="menu-appearance-cancel">Cancel</button>
+          <button type="button" id="menu-appearance-save" class="primary" disabled>Save changes</button>
         </div>
       </section>
       <section id="settings-page-updates" data-settings-page="updates" hidden>
@@ -144,4 +214,5 @@
 <p id="report-error" role="alert"></p><div class="settings-actions"><button type="button" id="report-back" hidden>Edit report</button><button type="button" id="report-cancel">Close</button><button type="submit" id="report-review" class="primary">Preview report</button><button type="button" id="report-send" class="primary" disabled hidden>Send to GitHub</button></div></form></dialog>
 
 
+<script src="/menu-appearance.js"></script>
 </body></html>

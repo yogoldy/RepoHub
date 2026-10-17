@@ -6,7 +6,7 @@
     async function observe(status,rows,clientFreshness="current",selectedRepoId=null){
       if(!status?.diagnostic_observation_id)return false;
       const body={surface,native,client_id:clientId,observation_id:status.diagnostic_observation_id,policy_version:root.RepoStatus?.version||'change-evidence-1',client_freshness:clientFreshness,rows};
-      if(surface==='menu'&&['status-clarity-4','status-clarity-5'].includes(body.policy_version)) {
+      if(surface==='menu'&&['status-clarity-4','status-clarity-5','status-clarity-6'].includes(body.policy_version)) {
         body.selected_repo_id=selectedRepoId;
       }
       const signature=JSON.stringify(body),now=clock();
@@ -38,5 +38,55 @@
     if(reason==='current')return status;
     return {...status,repos:(status.repos||[]).map(repo=>({...repo,health:{fresh:false,reasons:['Local status unavailable · '+reason.replaceAll('_',' ')]}}))};
   }
-  const api={create,displayState};if(typeof module==='object'&&module.exports)module.exports=api;else root.RepoDiagnostics=api;
+  function readCardTiming(button, compact) {
+    const line = button.querySelector('.card-next');
+    const time = line?.querySelector('time');
+    return {
+      kind: line?.dataset.kind || 'unavailable',
+      due_at: time?.getAttribute('datetime') || null,
+      text_matches: !!line && !line.hidden && line.getClientRects().length > 0
+        && line.textContent === compact.text,
+    };
+  }
+
+  function readDetailTiming(panel, timing) {
+    const line = panel.querySelector('.next-backup');
+    return {
+      receipt: timing.receipt,
+      text_matches: !panel.hidden && !!line && !line.hidden
+        && line.getClientRects().length > 0 && line.textContent === timing.nextLine,
+    };
+  }
+
+  let lastMenuBar = '', lastMenuBarAt = 0;
+  async function recordMenuBar(status, summary, fetcher = root.fetch.bind(root)) {
+    if (!status?.diagnostic_observation_id) return false;
+    const receipt = {observation_id: status.diagnostic_observation_id,
+      policy_version: root.RepoStatus?.version, mode: summary.mode,
+      count: summary.count, title: summary.title};
+    const signature = JSON.stringify(receipt);
+    if (signature === lastMenuBar && Date.now() - lastMenuBarAt < 60000) return false;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    try {
+      const session = await fetcher('/api/session', {signal: controller.signal});
+      if (!session.ok) return false;
+      const token = (await session.json()).token;
+      const result = await fetcher('/api/diagnostics/menu-bar', {
+        method: 'POST', signal: controller.signal,
+        headers: {'Content-Type': 'application/json', 'X-RepoHub-Token': token},
+        body: signature,
+      });
+      if (!result.ok) return false;
+      lastMenuBar = signature;
+      lastMenuBarAt = Date.now();
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const api={create,displayState,readCardTiming,readDetailTiming,recordMenuBar};if(typeof module==='object'&&module.exports)module.exports=api;else root.RepoDiagnostics=api;
 })(typeof globalThis==='object'?globalThis:this);
