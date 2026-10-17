@@ -13,7 +13,25 @@ function view(repo){return RepoStatus.present(repo,menuState?.backup);}
 $('#status-legend').innerHTML=RepoStatus.legend();
 
 const infoDialog = $('#info-dialog');
-$('#info').onclick = () => infoDialog.showModal();
+function showInfoPage(page) {
+  const titles = {home: 'About your backups', status: 'What your backup status means',
+    things: 'Things to know'};
+  if (!Object.hasOwn(titles, page)) return;
+  for (const section of document.querySelectorAll('[data-info-page]')) {
+    section.hidden = section.dataset.infoPage !== page;
+  }
+  $('#info-title').textContent = titles[page];
+  $('#info-back').hidden = page === 'home';
+  $('#info-content').scrollTop = 0;
+  $('#info-title').focus({preventScroll: true});
+}
+$('#info').onclick = () => {
+  infoDialog.showModal();
+  showInfoPage('home');
+};
+$('#info-nav-status').onclick = () => showInfoPage('status');
+$('#info-nav-things').onclick = () => showInfoPage('things');
+$('#info-back').onclick = () => showInfoPage('home');
 $('#info-close').onclick = () => infoDialog.close();
 let folderDemoTimer=null;
 $('#show-folder').onclick=()=>{
@@ -122,7 +140,7 @@ function renderDetail() {
     if (focused) document.getElementById(focused)?.focus({preventScroll: true});
   }
   const technicalMarkup = `
-    <details id="technical-details" ${technicalOpen.has(repo.id) ? 'open' : ''}>
+    <details id="technical-details" data-repo-id="${escape(repo.id)}" ${technicalOpen.has(repo.id) ? 'open' : ''}>
       <summary id="technical-toggle">Technical details</summary>
       <p class="technical-explanation" data-category="${state.category}">${escape(state.technicalDetail)}</p>
       <div class="facts">

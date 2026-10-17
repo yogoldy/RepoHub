@@ -657,3 +657,13 @@ must not save; busy saves block duplicate submits and navigation; conflicts keep
 the selected draft and offer explicit reload. Only a successful reviewed save
 returns to Settings home. GR22 registers the actual controller regressions. Native
 picker, privacy prompts and installed WebKit behavior are separate acceptance cases.
+
+### Moving technical details must preserve repository identity
+
+A technical disclosure outside the summary still belongs to the selected repo.
+Include that identity in its markup, keep open/closed state per repo, and ignore
+queued toggle events from detached nodes. Otherwise identical technical text can
+reuse another repo's disclosure state. The isolated information-controller
+regression exercises switching, late toggles, refresh and an empty selection;
+GR06 registers it. Browser checks also cover the fixed About header, Back,
+Escape and the existing Show me action. Installed WebKit validation is pending.

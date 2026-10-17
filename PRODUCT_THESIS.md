@@ -322,3 +322,12 @@ visible while the list scrolled. Full local acceptance is recorded in the clean
 Golden Gate receipt outside Git. Installed WebKit/native folder picking and real
 permission actions remain future checks; this candidate does not change the running
 0.0.2 app or authorize publication.
+
+The same local candidate now gives About your backups a home page and separate
+status-guide and Things to know pages. Back, title and Close remain outside the
+scrolling content. Existing guide wording and the selected-folder demonstration
+are preserved; this is not the later tutorial expansion. The repo summary retains
+Report this status, with Technical details below it and above the global backup
+controls. Where, When and the next-check line use consistent vertical spacing.
+Controller regressions cover navigation, demonstration reset and repo-scoped
+technical disclosures. No publication or installed-app update is included.

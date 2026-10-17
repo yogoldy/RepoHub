@@ -167,12 +167,6 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   grid-template-columns: 1fr;
   gap: 16px;
 }
-#info-dialog > .settings-heading {
-  flex: none;
-  background: var(--bg);
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--line);
-}
 .status-guide-item {
   border-bottom: 1px solid var(--line);
   padding-bottom: 15px;
@@ -225,7 +219,8 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   min-height: 0;
   contain: layout paint;
   overflow-y: auto;
-  padding: 0 20px 20px;
+  padding: 18px;
+  overscroll-behavior: contain;
 }
 
 /* Larger reading text without changing status evidence or success icons. */
@@ -236,7 +231,7 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 #technical-details, #technical-details .facts { font-size: 12px; }
 #technical-details .fact small, .schedule-copy small { font-size: 11px; }
 #repo-schedule { font-size: 12px; }
-#info-dialog .settings-heading h2 { font-size: 20px; }
+
 #info-dialog h3, .guide-heading h4 { font-size: 14px; }
 .status-guide-item p, #info-dialog .things-key p { font-size: 13px; }
 .status-guide-item .guide-labels { font-size: 12px; }
@@ -301,12 +296,13 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   font-size: 18px;
   overflow-wrap: anywhere;
 }
-#settings-back {
+#settings-back, #info-back {
   padding: 8px;
   font-size: 12px;
   white-space: nowrap;
 }
-#settings-back[hidden], [data-settings-page][hidden], #schedule-actions[hidden] {
+#settings-back[hidden], #info-back[hidden], [data-info-page][hidden],
+[data-settings-page][hidden], #schedule-actions[hidden] {
   display: none !important;
 }
 .settings-content {
@@ -315,7 +311,7 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   padding: 18px;
   overscroll-behavior: contain;
 }
-#settings-home {
+#settings-home, #info-home {
   display: grid;
   gap: 9px;
 }
