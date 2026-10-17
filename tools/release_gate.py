@@ -185,6 +185,8 @@ def main():
             command('helper-launch-checks',[str(evidence/'helper-launch')])
             command('packaged-integrity-build',swift+[str(ROOT/'native/PackagedApplication.swift'),str(ROOT/'native/AppUpdates.swift'),str(ROOT/'tests/packaged_application_checks.swift'),'-o',str(evidence/'packaged-integrity')])
             command('packaged-integrity-checks',[str(evidence/'packaged-integrity')])
+            command('update-key-build',swift+['-parse-as-library',str(ROOT/'native/UpdateKey.swift'),'-o',str(evidence/'update-key')])
+            command('update-key-checks',[sys.executable,str(ROOT/'tools/update_key_checks.py'),'--checker',str(evidence/'update-key')])
             command('coordinated-sparkle-package',[
                 sys.executable,str(ROOT/'tools/package_app.py'),'--output',str(evidence/'RepoHub Gate.app'),
                 '--cache',str(evidence/'update-dependencies'),'--version','0.2.0','--build','100',

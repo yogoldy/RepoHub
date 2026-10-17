@@ -43,4 +43,14 @@ Stop promotion for any failed case. Continue narrow fixes and retests. Stop for 
 
 ## Current evidence
 
-2026-10-16: branch starts at `d4fc605`; no updater implementation or native acceptance yet. Developer Program purchase is user-reported; no usable Developer ID Application identity was found. Existing separate runtime packaging caused a failed preview installation and rollback; the installed daily app remains the older version. This goal addresses coordinated replacement, not backup-status logic.
+The branch started at `d4fc605`. Packaging, native Sparkle controls, bundled-helper ownership, bounded updater diagnostics, guarded archive/appcast preparation and a rollback watchdog are implemented. [The acceptance record](SIGNED_UPDATE_ACCEPTANCE_2026-10-16.md) distinguishes the actual isolated native results from production readiness.
+
+Developer Program purchase remains user-reported; no usable Developer ID Application certificate has been identified. Stable signing/notarization, actual permission continuity, production key/feed custody and first-install launchd migration remain open. Existing daily apps are unchanged. The personal migration installer was not run.
+
+## Local artifact preparation
+
+`tools/package_app.py --help` describes bundle construction. It creates a new path, requires clean source and pins all downloaded dependencies. Production builds require a Developer ID Application identity and HTTPS; disposable test identities may use a loopback feed. It does not install the bundle or register login items.
+
+`tools/update_feed.py --help` describes archive/appcast preparation. Supply a private seed file with owner-only permissions. The compiled key matcher must confirm its public key equals the app's embedded key; no login-Keychain fallback occurs. Production artifact preparation also requires a stapled notarization ticket and Gatekeeper assessment. The tool writes local artifacts and a hash receipt; it never publishes them. Release promotion additionally requires exact-source local/GitHub acceptance.
+
+The rollout of these coordinated bundles into legacy separate-runtime installations is not implemented by running these tools. It needs its own guarded first-install migration and deployment acceptance after stable signing. Subsequent Sparkle replacement works inside the coordinated architecture tested here.

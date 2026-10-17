@@ -445,9 +445,11 @@
         "test_update_evidence.UpdateEvidenceTests.test_update_facts_export_without_paths_or_raw_error_text",
         "test_update_recovery.UpdateRecoveryTests.test_rollback_must_belong_to_this_identity_and_state",
         "test_update_recovery.UpdateRecoveryTests.test_old_or_unrelated_helper_cannot_confirm_replacement",
-        "test_update_shutdown.UpdateShutdownTests.test_bundled_sigterm_waits_for_archive_publication_and_preserves_prior_copy"
+        "test_update_shutdown.UpdateShutdownTests.test_bundled_sigterm_waits_for_archive_publication_and_preserves_prior_copy",
+        "test_update_feed.UpdateFeedTests.test_feed_uses_actual_build_signature_and_exact_length",
+        "test_update_feed.UpdateFeedTests.test_key_file_must_be_private_regular_and_owned"
       ],
-      "remaining_gap": "The gate compiles the real pinned Sparkle framework into a complete signed test bundle and checks native integrity rejection. Actual native signed upgrade, invalid-download refusal, backup coordination and failed-start rollback require recorded isolated acceptance. Developer ID/notarization and permission continuity remain pending activation; neither daily Mac is deployed."
+      "remaining_gap": "Native isolated acceptance on application source ad29dc9 passed signed replacement, invalid signature, truncated archive, equal-version refusal, busy-backup refusal and automatic rollback after injected helper failure, with unchanged synthetic archive/configuration hashes. Gate checks native integrity, real complete Sparkle packaging and signing-key matching. Developer ID, notarization, permission continuity, production key/feed custody and the first coordinated migration of existing launchd registrations remain open. No daily Mac was deployed."
     }
   ]
 }

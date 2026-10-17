@@ -25,11 +25,13 @@ open. Current backup decisions and daily configuration are preserved.
 ## Signed updates — prerequisites
 
 Branch: `codex/signed-updates`, created from checked status/timing commit
-`249eb8f`. Sparkle implementation and new signing are not yet started.
+`249eb8f`. [Coordinated packaging and Sparkle acceptance](docs/SIGNED_UPDATE_ACCEPTANCE_2026-10-16.md) now record isolated native upgrade and rollback tests; neither daily Mac was deployed.
 
 - [x] Apple Developer Program membership purchased — Leo reported purchase on 2026-10-16. This records the purchase, not independently verified activation.
 - [ ] Confirm the membership is active and create or identify a usable Developer ID Application signing identity.
-- [ ] Establish coordinated application packaging and stable app/helper signing before integrating Sparkle.
+- [x] Build the native app, pinned Python/helper and web interface as one verified test bundle; integrate Sparkle and validate real signed isolated upgrades and rollback on application source `ad29dc9`.
+- [ ] Establish Developer ID signing/notarization and verify permission continuity after activation.
+- [ ] Set production signing-key custody and an HTTPS feed, then validate the first coordinated migration from existing launchd registrations with rollback before any daily deployment.
 
 ## Current foundation
 
