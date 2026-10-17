@@ -683,3 +683,22 @@ that archive. They retain finder_only_project_match instead of claiming exact
 current byte equality. Technical details disclose the .DS_Store difference. GR06
 registers positive, conservative, legacy-version and real temporary-backup/export
 regressions. Native pixels and installed-app acceptance remain pending.
+
+## A correct expanded time does not prove a compact card displayed it — October 17, 2026
+
+The proposed collapsed grid adds a second timing location. Policies 4 and 5
+check only the selected expanded receipt, so they cannot establish that every
+card showed its time. Policy 6 requires each card's scheduler receipt and a
+small DOM observation of its compact meaning, date attribute and actual text.
+The selected repo, when expanded, supplies a separate expanded-line observation;
+a fully collapsed grid uses a null selection. The presentation is computed once
+per repo per render and shared by both locations. Diagnostic expectations remain
+independent of the renderer. Missing, hidden or incorrect card lines are tested
+without using the expanded line as their evidence. Earlier policies retain their
+original contracts.
+
+Only the fixed card/detail surface code and existing bounded timing facts enter
+logs and shareable exports; exact dates remain in the private comparison request.
+GR06 and GR09 register the regressions. Existing Python discovery runs them in
+GitHub Actions without a YAML change. Browser layout and native WebKit acceptance
+remain separate from these DOM-observation and evidence-contract tests.

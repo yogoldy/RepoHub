@@ -117,7 +117,7 @@
         "upload_stale"
       ],
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
-      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics.",
+      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics. Policy 6 checks timing on every grid card, including when all details are collapsed, and separately checks the one expanded timing line. Missing, hidden or incorrect compact text cannot be proven by an expanded-panel receipt.",
       "test_ids": [
         "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
         "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
@@ -136,7 +136,11 @@
         "test_status_clarity.ClarityTests.test_finder_display_success_preserves_raw_difference_and_exact_upload_requirement",
         "test_status_clarity.ClarityTests.test_finder_display_rejects_uncertain_stale_busy_and_meaningful_changes",
         "test_status_clarity.ClarityTests.test_finder_diagnostics_keep_previous_display_versions_interpretable",
-        "test_change_evidence.EvidenceTests.test_finder_only_green_display_keeps_real_backup_and_diagnostic_evidence"
+        "test_change_evidence.EvidenceTests.test_finder_only_green_display_keeps_real_backup_and_diagnostic_evidence",
+        "test_grid_timing.GridTimingTests.test_all_cards_are_checked_with_no_expanded_selection",
+        "test_grid_timing.GridTimingTests.test_missing_wrong_or_hidden_card_time_is_detected_independently_of_detail",
+        "test_grid_timing.GridTimingTests.test_missing_receipts_and_inconsistent_expansion_fail_closed",
+        "test_grid_timing.GridTimingTests.test_actual_compact_javascript_uses_same_timing_contract_for_every_state"
       ],
       "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },
@@ -205,7 +209,8 @@
         "test_report_preview.ReportPreviewTests.test_bug_has_exact_share_files_and_private_local_draft",
         "test_status_clarity.ClarityTests.test_new_export_fields_are_typed_and_never_copy_exception_prose",
         "test_timing_diagnostics.TimingDiagnosticTests.test_new_exports_are_bounded_and_exclude_private_calendar_evidence",
-        "test_timing_diagnostics.TimingDiagnosticTests.test_malformed_or_missing_selected_timing_receipts_fail_closed"
+        "test_timing_diagnostics.TimingDiagnosticTests.test_malformed_or_missing_selected_timing_receipts_fail_closed",
+        "test_grid_timing.GridTimingTests.test_grid_exports_identify_surfaces_without_calendar_or_private_text"
       ],
       "remaining_gap": "Operational patterns remain bounded facts. User-written report prose is separate; a preview and confidentiality reminder cannot guarantee it contains no personal information."
     },

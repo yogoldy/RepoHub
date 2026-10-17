@@ -6,7 +6,7 @@
     async function observe(status,rows,clientFreshness="current",selectedRepoId=null){
       if(!status?.diagnostic_observation_id)return false;
       const body={surface,native,client_id:clientId,observation_id:status.diagnostic_observation_id,policy_version:root.RepoStatus?.version||'change-evidence-1',client_freshness:clientFreshness,rows};
-      if(surface==='menu'&&['status-clarity-4','status-clarity-5'].includes(body.policy_version)) {
+      if(surface==='menu'&&['status-clarity-4','status-clarity-5','status-clarity-6'].includes(body.policy_version)) {
         body.selected_repo_id=selectedRepoId;
       }
       const signature=JSON.stringify(body),now=clock();
@@ -38,5 +38,25 @@
     if(reason==='current')return status;
     return {...status,repos:(status.repos||[]).map(repo=>({...repo,health:{fresh:false,reasons:['Local status unavailable · '+reason.replaceAll('_',' ')]}}))};
   }
-  const api={create,displayState};if(typeof module==='object'&&module.exports)module.exports=api;else root.RepoDiagnostics=api;
+  function readCardTiming(button, compact) {
+    const line = button.querySelector('.card-next');
+    const time = line?.querySelector('time');
+    return {
+      kind: line?.dataset.kind || 'unavailable',
+      due_at: time?.getAttribute('datetime') || null,
+      text_matches: !!line && !line.hidden && line.getClientRects().length > 0
+        && line.textContent === compact.text,
+    };
+  }
+
+  function readDetailTiming(panel, timing) {
+    const line = panel.querySelector('.next-backup');
+    return {
+      receipt: timing.receipt,
+      text_matches: !panel.hidden && !!line && !line.hidden
+        && line.getClientRects().length > 0 && line.textContent === timing.nextLine,
+    };
+  }
+
+  const api={create,displayState,readCardTiming,readDetailTiming};if(typeof module==='object'&&module.exports)module.exports=api;else root.RepoDiagnostics=api;
 })(typeof globalThis==='object'?globalThis:this);

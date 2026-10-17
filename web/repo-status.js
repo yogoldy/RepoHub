@@ -229,6 +229,38 @@
     return {receipt, lastLine, locationLabel, createdLabel, nextLine, inclusionLine};
   }
 
+  function compactTiming(timing) {
+    const receipt = timing.receipt;
+    const state = receipt.schedule_state;
+    let kind = state;
+    let dueAt = null;
+    let label;
+    let timeLabel = '';
+    if (state === 'scheduled' || state === 'due') {
+      kind = receipt.inclusion_state === 'none' ? 'check' : 'backup';
+      if (state === 'scheduled' && receipt.due_at
+          && Number.isFinite(Date.parse(receipt.due_at))) {
+        dueAt = receipt.due_at;
+        label = kind === 'backup' ? 'Next backup' : 'Next check';
+        // Include the date so a check tomorrow cannot look due earlier today.
+        timeLabel = new Intl.DateTimeFormat(undefined, {
+          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        }).format(new Date(dueAt));
+      } else if (state === 'due') {
+        label = kind === 'backup' ? 'Backup due now' : 'Check due now';
+      } else {
+        kind = 'unavailable';
+      }
+    }
+    const labels = {
+      busy: 'Waiting for current backup', manual: 'Manual only',
+      awaiting_edits: 'After edits settle', blocked: 'Needs attention',
+      creating: 'Creating backup', unavailable: 'Time unavailable',
+    };
+    if (!label) label = labels[kind] || labels.unavailable;
+    return {kind, dueAt, label, timeLabel, text: label + (timeLabel ? ' ' + timeLabel : '')};
+  }
+
   function describeSchedule(repo, power) {
     const policy = repo.backup_settings?.[power];
     const scope = repo.schedule_override ? 'Custom schedule' : 'Default schedule';
@@ -317,5 +349,5 @@
       ${group.explanation ? `<p>${group.explanation}</p>` : ''}
       ${group.note ? `<p class="guide-note">${group.note}</p>` : ''}</section>`).join('');
   }
-  const policy={view,present,timing,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-5'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
+  const policy={view,present,timing,compactTiming,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-5'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);

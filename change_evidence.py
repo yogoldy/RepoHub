@@ -66,7 +66,7 @@ def presentation_text(facts, phase, version='status-clarity-1'):
                 code = 'git_finder' if counts['finder_metadata'] > 0 else 'git'
             elif counts['finder_metadata'] > 0:
                 code = 'finder_pending'
-    if version in {'status-clarity-3', 'status-clarity-4', 'status-clarity-5'}:
+    if version in {'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6'}:
         if phase == 'background':
             code = 'view_settings'
         elif phase == 'changed' and facts['has_backup']:
@@ -150,6 +150,35 @@ def validate_timing(row):
                 raise ValueError('Invalid timing date') from None
 
 
+
+def compact_timing_receipt(timing):
+    """Meaning of a card's short line, independently derived from scheduler evidence."""
+    state = timing['schedule_state']
+    if state in {'scheduled', 'due'}:
+        kind = 'backup' if timing['inclusion_state'] != 'none' else 'check'
+        due_at = timing['due_at'] if state == 'scheduled' else None
+        if state == 'scheduled' and due_at is None:
+            return {'kind': 'unavailable', 'due_at': None}
+        return {'kind': kind, 'due_at': due_at}
+    return {'kind': state if state in TIMING_STATES else 'unavailable', 'due_at': None}
+
+
+def validate_grid_timing(row, selected):
+    card = row['card_timing']
+    kinds = (TIMING_STATES - {'scheduled', 'due'}) | {'check', 'backup'}
+    if (not isinstance(card, dict) or set(card) != {'kind', 'due_at', 'text_matches'}
+            or not isinstance(card['kind'], str) or card['kind'] not in kinds
+            or type(card['text_matches']) is not bool):
+        raise ValueError('Invalid card timing observation')
+    validate_timing({**row['timing'], 'due_at': card['due_at']})
+    if row['repo_id'] == selected:
+        detail = row['detail_timing']
+        if (not isinstance(detail, dict) or set(detail) != {'receipt', 'text_matches'}
+                or type(detail['text_matches']) is not bool):
+            raise ValueError('Invalid expanded timing observation')
+        validate_timing(detail['receipt'])
+
+
 def repo_facts(row):
     backup, verification, cloud = row.get('last_backup') or {}, row.get('verification') or {}, row.get('cloud') or {}
     counts = verification.get('changes', {}).get('counts', {})
@@ -217,7 +246,7 @@ def icon_reason(rendered, facts, version=None):
           and facts['has_backup'] and facts['backup_hash_ref'] and same_verification
           and facts['verification_state'] == 'different'):
         expected, reason = cloud_icon(facts, same_cloud, finder=True)
-        if version == 'status-clarity-5' and expected == 'background':
+        if version in {'status-clarity-5', 'status-clarity-6'} and expected == 'background':
             expected = 'ready'
     elif facts['verification_state'] != 'matched' or not same_verification:
         expected, reason = 'verifying', 'awaiting_hash_verification'
@@ -336,7 +365,7 @@ class ChangeEvidence:
                 or not isinstance(payload['client_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['client_id'])
                 or not isinstance(payload['observation_id'], str) or not re.fullmatch(r'[0-9a-f]{24}', payload['observation_id'])
                 or not isinstance(payload['policy_version'], str)
-                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5'}
+                or payload['policy_version'] not in {'change-evidence-2', 'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6'}
                 or not isinstance(payload['rows'], list) or len(payload['rows']) > 4096):
             raise ValueError('Invalid presentation diagnostic values')
         freshness = payload.get('client_freshness', 'current')
@@ -347,20 +376,27 @@ class ChangeEvidence:
             if snapshot is None:
                 raise FileExistsError('Observed status expired; request fresh status')
             rows = payload['rows']
-            timing_frame = payload['policy_version'] in {'status-clarity-4', 'status-clarity-5'} and payload['surface'] == 'menu'
+            timing_frame = payload['policy_version'] in {'status-clarity-4', 'status-clarity-5', 'status-clarity-6'} and payload['surface'] == 'menu'
+            grid_frame = payload['policy_version'] == 'status-clarity-6' and payload['surface'] == 'menu'
             selected = payload.get('selected_repo_id')
             if timing_frame and (not isinstance(selected, str) or selected not in snapshot):
-                if snapshot or selected is not None:
+                if selected is not None or (snapshot and not grid_frame):
                     raise ValueError('Invalid selected timing repo')
             if not timing_frame and 'selected_repo_id' in payload:
                 raise ValueError('Unexpected timing selection')
-            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5'}
+            modern = payload['policy_version'] in {'status-clarity-1', 'status-clarity-2', 'status-clarity-3', 'status-clarity-4', 'status-clarity-5', 'status-clarity-6'}
             row_fields = {'repo_id', 'phase', 'display_label', 'ready'}
             if modern:
                 row_fields |= {'category', 'display_headline'}
             labels = LABELS | {value[1] for value in PRESENTATION_TEXT.values()}
             for row in rows:
-                expected_fields = row_fields | ({'timing'} if timing_frame and isinstance(row, dict) and row.get('repo_id') == selected else set())
+                expected_fields = set(row_fields)
+                if grid_frame:
+                    expected_fields |= {'timing', 'card_timing'}
+                    if isinstance(row, dict) and row.get('repo_id') == selected:
+                        expected_fields.add('detail_timing')
+                elif timing_frame and isinstance(row, dict) and row.get('repo_id') == selected:
+                    expected_fields.add('timing')
                 if (not isinstance(row, dict) or set(row) != expected_fields
                         or not isinstance(row['repo_id'], str) or row['repo_id'] not in snapshot
                         or not isinstance(row['phase'], str) or row['phase'] not in PHASES
@@ -373,6 +409,8 @@ class ChangeEvidence:
                     raise ValueError('Invalid presentation text')
                 if 'timing' in row:
                     validate_timing(row['timing'])
+                if grid_frame:
+                    validate_grid_timing(row, selected)
             if len(rows) != len(snapshot) or len({r['repo_id'] for r in rows}) != len(snapshot):
                 raise ValueError('Presentation must describe the observed repo list')
             client, observation = payload['client_id'], payload['observation_id']
@@ -383,7 +421,7 @@ class ChangeEvidence:
             displays = self.displays.setdefault(observation, {})
             for row in rows:
                 key = row['repo_id']
-                signature = (observation, freshness, payload['policy_version'], row['phase'], row['display_label'], row['ready'], row.get('category'), row.get('display_headline'), json.dumps(row.get('timing'), sort_keys=True))
+                signature = (observation, freshness, payload['policy_version'], row['phase'], row['display_label'], row['ready'], row.get('category'), row.get('display_headline'), json.dumps({field: row.get(field) for field in ('timing', 'card_timing', 'detail_timing')}, sort_keys=True))
                 current[key] = signature
                 repo_ref = snapshot[key]['repo_ref']
                 if previous.get(key) != signature:
@@ -406,16 +444,29 @@ class ChangeEvidence:
                                   reason=reason)
                 if 'timing' in row and previous.get(key) != signature:
                     expected_timing = timing_receipt(snapshot[key], freshness)
-                    timing_good = row['timing'] == expected_timing
-                    safe_fields = {field: row['timing'][field] for field in
-                                   ('schedule_state', 'timing_reason', 'location_state', 'remaining_minutes', 'inclusion_state')}
-                    self.log.emit('ui_timing', repo_ref=repo_ref, observation_id=observation,
-                                  client_id=client, surface=payload['surface'], native=payload['native'],
-                                  policy_version=payload['policy_version'], client_freshness=freshness,
-                                  result='complete' if timing_good else 'failed', **safe_fields)
-                    if not timing_good:
-                        self.log.emit('timing_disagreement', severity='warning', repo_ref=repo_ref,
-                                      observation_id=observation, result='failed', **safe_fields)
+                    receipts = {'card' if grid_frame else 'detail': row['timing']}
+                    if grid_frame and key == selected:
+                        receipts['detail'] = row['detail_timing']['receipt']
+                    for timing_surface, receipt in receipts.items():
+                        timing_good = receipt == expected_timing
+                        if grid_frame and timing_surface == 'card':
+                            compact = compact_timing_receipt(expected_timing)
+                            timing_good = timing_good and row['card_timing'] == {
+                                **compact, 'text_matches': True}
+                        elif grid_frame:
+                            timing_good = timing_good and row['detail_timing']['text_matches']
+                        safe_fields = {field: receipt[field] for field in
+                                       ('schedule_state', 'timing_reason', 'location_state',
+                                        'remaining_minutes', 'inclusion_state')}
+                        self.log.emit('ui_timing', repo_ref=repo_ref, observation_id=observation,
+                                      client_id=client, surface=payload['surface'], native=payload['native'],
+                                      timing_surface=timing_surface, policy_version=payload['policy_version'],
+                                      client_freshness=freshness,
+                                      result='complete' if timing_good else 'failed', **safe_fields)
+                        if not timing_good:
+                            self.log.emit('timing_disagreement', severity='warning', repo_ref=repo_ref,
+                                          observation_id=observation, timing_surface=timing_surface,
+                                          result='failed', **safe_fields)
                 peers = displays.setdefault(key, {})
                 view = (payload['surface'], payload['native'], freshness, payload['policy_version'])
                 rendered = (row['phase'], row['display_label'], row['ready'], row.get('category'), row.get('display_headline'))
