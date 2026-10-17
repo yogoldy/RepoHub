@@ -273,9 +273,9 @@
   function icon(phase){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[phase]||paths.unknown)+'</svg>';}
   function legend() {
     const groups = [
-      {category: 'backed_up', icon: 'ready', title: 'Backed up', labels: 'Backed up · Only Finder view settings changed',
-        explanation: 'Backed up means fresh checks match your files to the verified archive, and macOS confirms that exact archive uploaded.',
-        note: 'Only Finder view settings changed uses the information icon instead of a green check when the uploaded archive matches project files and Git. Only ordinary .DS_Store view settings differ; no new backup is needed in this exception. It is not full byte-for-byte equality.'},
+      {category: 'backed_up', icon: 'ready', title: 'Backed up',
+        explanation: 'RepoHub checked your project files and Git data against the saved backup. macOS confirmed that backup uploaded to iCloud.',
+        note: 'Changes to Finder’s folder view settings don’t require a new backup.'},
       {category: 'backup_pending', icon: 'changed', title: 'A backup is waiting to run',
         labels: 'First backup pending · Edits confirmed · Backup pending · Changes need verification · Only Git data changed · Only Git and file metadata changed · Only file metadata changed',
         explanation: 'First backup pending means no archive exists yet. Edits confirmed means a hash comparison found project or Git changes against the saved archive. Backup pending means a backup is needed without that confirmed-edit evidence.',
@@ -299,8 +299,10 @@
     ];
     return groups.map(group => `<section class="status-guide-item" data-category="${group.category}">
       <div class="guide-heading"><span class="guide-symbol" aria-hidden="true">${icon(group.icon)}</span>
-        <h4>${group.title}</h4></div><p class="guide-labels">${group.labels}</p>
-      <p>${group.explanation}</p><p class="guide-note">${group.note}</p></section>`).join('');
+        <h4>${group.title}</h4></div>
+      ${group.labels ? `<p class="guide-labels">${group.labels}</p>` : ''}
+      ${group.explanation ? `<p>${group.explanation}</p>` : ''}
+      ${group.note ? `<p class="guide-note">${group.note}</p>` : ''}</section>`).join('');
   }
   const policy={view,present,timing,describeSchedule,categoryIcon,icon,legend,finderOnly,version:'status-clarity-5'};if(typeof module==='object'&&module.exports)module.exports=policy;else root.RepoStatus=policy;
 })(typeof globalThis==='object'?globalThis:this);
