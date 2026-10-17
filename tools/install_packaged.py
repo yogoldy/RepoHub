@@ -17,6 +17,8 @@ import uuid
 
 SERVICE = 'com.leogoldberg.repohub.service'
 FRONTEND = 'com.leogoldberg.repohub.app'
+LSREGISTER = ('/System/Library/Frameworks/CoreServices.framework/Frameworks/'
+              'LaunchServices.framework/Support/lsregister')
 PROTECTED = ('config.json', 'data/workspace-registry.json', 'data/settings.json',
              'data/repo-settings.json', 'data/views.json')
 
@@ -72,6 +74,19 @@ def pid_path(pid):
     return Path(os.fsdecode(buffer.value)).resolve() if size > 0 else None
 
 
+def interpreter_process_path(interpreter):
+    probe = (
+        "import ctypes,os; b=ctypes.create_string_buffer(4096); "
+        "n=ctypes.CDLL('/usr/lib/libproc.dylib').proc_pidpath(os.getpid(),b,len(b)); "
+        "assert n>0; print(os.fsdecode(b.value))"
+    )
+    result = command([str(interpreter), '-I', '-c', probe])
+    path = Path(result.stdout.strip())
+    if not path.is_absolute() or not path.is_file():
+        raise ValueError('configured_interpreter_identity_unavailable')
+    return path.resolve()
+
+
 def service_pid():
     result = command(['launchctl', 'list'])
     for line in result.stdout.splitlines():
@@ -115,6 +130,23 @@ def stop_legacy(pid):
     command(['launchctl', 'bootout', f'gui/{os.getuid()}/{FRONTEND}'])
 
 
+def register_bundle(app):
+    # Replacing the bundle changes its registration identity. On the Pro,
+    # bootstrapping the unchanged login plist before this refresh returned EIO.
+    command([LSREGISTER, '-f', str(app)])
+
+
+def bootstrap_frontend(app, agents, journal):
+    register_bundle(app)
+    result = command(['launchctl', 'bootstrap', f'gui/{os.getuid()}',
+                      str(agents / (FRONTEND + '.plist'))], check=False)
+    if result.returncode:
+        error = journal / 'bootstrap-private-error.txt'
+        error.write_text(result.stderr)
+        error.chmod(0o600)
+        raise RuntimeError('frontend_bootstrap_failed:' + str(result.returncode))
+
+
 def restore(record_path):
     record = read_json(record_path)
     state, app, agents = (Path(record[key]) for key in ('state', 'app', 'agents'))
@@ -149,6 +181,7 @@ def restore(record_path):
         if app.exists():
             app.rename(failed)
         previous.rename(app)
+        register_bundle(app)
     for label in (SERVICE, FRONTEND):
         source = record_path.parent / (label + '.plist')
         target = agents / source.name
@@ -178,7 +211,8 @@ def install(candidate, revision):
     except ModuleNotFoundError:
         from package_app import verify
     home = Path.home()
-    state, app, agents, python = require_legacy(home)
+    state, app, agents, interpreter = require_legacy(home)
+    python = interpreter_process_path(interpreter)
     manifest = verify(candidate / 'Contents/Resources')
     info = plistlib.loads((candidate / 'Contents/Info.plist').read_bytes())
     if (manifest['source_revision'] != revision or manifest['bundle_id'] != 'com.leogoldberg.repohub'
@@ -219,7 +253,7 @@ def install(candidate, revision):
         app.rename(journal / 'previous.app')
         staged.rename(app)
         (agents / (SERVICE + '.plist')).rename(journal / 'retired-service.plist')
-        command(['launchctl', 'bootstrap', f'gui/{os.getuid()}', str(agents / (FRONTEND + '.plist'))])
+        bootstrap_frontend(app, agents, journal)
         for _ in range(90):
             try:
                 current = observation()

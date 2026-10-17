@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from tools.install_packaged import (
-    FRONTEND, SERVICE, freeze_idle_legacy, protected_hashes, require_legacy, restore,
+    FRONTEND, SERVICE, LSREGISTER, bootstrap_frontend, freeze_idle_legacy, interpreter_process_path, protected_hashes, require_legacy, restore,
 )
 
 
@@ -68,3 +68,35 @@ class PackagedInstallTests(unittest.TestCase):
                 command.assert_not_called()
             self.assertEqual(json.loads(record.read_text())['phase'], 'restored')
             self.assertTrue(app.exists())
+
+    def test_configured_interpreter_probe_resolves_framework_launcher_without_weakening_pid_check(self):
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'Python.app-executable'
+            actual.write_bytes(b'synthetic')
+            configured = Path('/synthetic/bin/python3')
+            from subprocess import CompletedProcess
+            with patch('tools.install_packaged.command', return_value=CompletedProcess([], 0, str(actual) + '\n', '')) as command:
+                self.assertEqual(interpreter_process_path(configured), actual.resolve())
+                self.assertEqual(command.call_args.args[0][:3], [str(configured), '-I', '-c'])
+            with patch('tools.install_packaged.command', return_value=CompletedProcess([], 0, 'relative-path', '')):
+                with self.assertRaises(ValueError):
+                    interpreter_process_path(configured)
+
+    def test_replacement_registration_precedes_bootstrap_and_private_errors_are_retained(self):
+        from subprocess import CompletedProcess
+        import os
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, agents = root / 'Repo Hub.app', root / 'agents'
+            with patch('tools.install_packaged.command', return_value=CompletedProcess([], 0, '', '')) as command:
+                bootstrap_frontend(app, agents, root)
+                self.assertEqual(command.call_args_list[0].args[0], [LSREGISTER, '-f', str(app)])
+                self.assertEqual(command.call_args_list[1].args[0],
+                                 ['launchctl', 'bootstrap', f'gui/{os.getuid()}', str(agents / (FRONTEND + '.plist'))])
+            results = [CompletedProcess([], 0, '', ''), CompletedProcess([], 5, '', 'synthetic-private-error')]
+            with patch('tools.install_packaged.command', side_effect=results):
+                with self.assertRaisesRegex(RuntimeError, 'frontend_bootstrap_failed:5'):
+                    bootstrap_frontend(app, agents, root)
+            error = root / 'bootstrap-private-error.txt'
+            self.assertEqual(error.read_text(), 'synthetic-private-error')
+            self.assertEqual(error.stat().st_mode & 0o777, 0o600)
