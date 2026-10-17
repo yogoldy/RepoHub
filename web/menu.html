@@ -11,7 +11,10 @@
   <div class="rail-heading">
     <span id="position">Your repos</span>
     <div>
-      <button id="all-repos" class="quiet-action" type="button" hidden>‹ All repos</button>
+      <button id="all-repos" class="back-button quiet-action" type="button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m8-8-8 8 8 8"/></svg>
+        <span>All repos</span>
+      </button>
       <button id="previous" class="arrow" aria-label="Previous repos">‹</button>
       <button id="next" class="arrow" aria-label="Next repos">›</button>
     </div>
@@ -29,7 +32,10 @@
 </main>
 <dialog id="info-dialog" aria-labelledby="info-title">
   <div class="settings-toolbar">
-    <button id="info-back" type="button" hidden>‹ About</button>
+    <button id="info-back" class="back-button icon-button" type="button" title="Back to About" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m8-8-8 8 8 8"/></svg>
+      <span class="sr-only">Back to About</span>
+    </button>
     <h2 id="info-title" tabindex="-1">About your backups</h2>
     <button id="info-close" type="button" class="icon-button" aria-label="Close backup information"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
   </div>
@@ -72,7 +78,10 @@
 </dialog>
 <dialog id="settings-dialog" aria-labelledby="settings-title">
   <div class="settings-toolbar">
-    <button type="button" id="settings-back" hidden>‹ Settings</button>
+    <button type="button" id="settings-back" class="back-button icon-button" title="Back to Settings" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m8-8-8 8 8 8"/></svg>
+      <span id="settings-back-label" class="sr-only">Back to Settings</span>
+    </button>
     <h2 id="settings-title" tabindex="-1">Settings</h2>
     <button type="button" id="settings-close" class="icon-button" aria-label="Close settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
   </div>

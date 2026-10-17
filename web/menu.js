@@ -356,7 +356,9 @@ function showSettingsPage(page) {
     ? 'Schedule · ' + (menuState?.repos?.find(row => row.id === settingsRepo)?.name || 'Repository')
     : titles[page];
   $('#settings-back').hidden = page === 'home';
-  $('#settings-back').textContent = settingsRepo ? '‹ Backups' : '‹ Settings';
+  const backLabel = settingsRepo ? 'Back to backups' : 'Back to Settings';
+  $('#settings-back-label').textContent = backLabel;
+  $('#settings-back').title = backLabel;
   $('#schedule-actions').hidden = page !== 'schedule';
   $('#settings-content').scrollTop = 0;
   $('#settings-title').focus();
