@@ -1,348 +1,184 @@
-# Repo Hub product thesis
-
-Repo Hub should make it easy to answer: **Are my chosen repos safely backed up, and what needs my attention?** The menu bar is the everyday view. Setup, settings and reporting should be simple enough that users rarely need the full dashboard.
-
-This document is the product roadmap and completion checklist. Unchecked items are proposals, not shipped functionality. Implement one atomic item per commit; tick it off only after its acceptance checks run, and record the commit and verification evidence here. Keep the stable main branch separate from work awaiting review.
-
-## Main integration and pending validation
-
-Leo authorized [a one-time PR #6 integration exception](docs/MAIN_INTEGRATION_EXCEPTION_2026-10-16.md) on 2026-10-16 so main can contain the current development code before native acceptance is complete. Required protected automated checks still apply. The linked validation backlog stays open; no product acceptance item is completed by merging, and neither Mac deployment is authorized. Future releases retain the existing acceptance policy.
-
-## Agreed next development roadmap
-
-Leo approved [the interaction-testing and readability roadmap](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md) for documentation on 2026-10-13. It defines nine ordered stages: readability standards, a verified baseline, an interaction checklist, Playwright MCP and saved tests, Show me dogfooding, Golden Gate coverage, review with Leo's AI teacher and readability cleanup, Markdown/agent-configuration audit, then final Air/Pro release acceptance. **Implementation still requires Leo's explicit go-ahead.** Tailwind and TestSprite remain deferred. The existing two-Mac reliability protocol and protected release requirements still apply; no roadmap stage is marked complete by documenting it.
-
-## Timing and location branch checkpoint — October 16, 2026
-
-Evidence-backed Git/metadata descriptions, read-only scheduling/location
-projection, selected-menu diagnostic receipts and larger timing lines are
-implemented on `codex/status-clarity`. [Acceptance and Leo's pending event/display
-review](docs/BACKUP_TIMING_ACCEPTANCE_2026-10-16.md) record the clean 220-test
-macOS gate and controlled browser results. This is not a deployed release;
-installed native acceptance, protected promotion and Leo's personal review stay
-open. Current backup decisions and daily configuration are preserved.
-
-## Signed updates — prerequisites
-
-Branch: `codex/signed-updates`, created from checked status/timing commit
-`249eb8f`. [Coordinated packaging and Sparkle acceptance](docs/SIGNED_UPDATE_ACCEPTANCE_2026-10-16.md) now record isolated native upgrade and rollback tests; neither daily Mac was deployed.
-
-- [x] Apple Developer Program membership purchased — Leo reported purchase on 2026-10-16. This records the purchase, not independently verified activation.
-- [ ] Confirm the membership is active and create or identify a usable Developer ID Application signing identity.
-- [x] Build the native app, pinned Python/helper and web interface as one verified test bundle; integrate Sparkle and validate real signed isolated upgrades and rollback on final application source `985814d`.
-- [ ] Establish Developer ID signing/notarization and verify permission continuity after activation.
-- [ ] Set production signing-key custody and an HTTPS feed, then validate the first coordinated migration from existing launchd registrations with rollback before any daily deployment.
-
-## Current foundation
-
-- [x] Monitor immediate folders inside a configured repo home, including folders without Git.
-- [x] Archive all contained files, including ignored files, uncommitted work and ordinary in-folder Git history.
-- [x] Verify source and archive hashes; preserve the previous backup until its replacement is verified and macOS confirms its iCloud upload.
-- [x] Show repo status, observed upload progress and expandable details in horizontal menu-bar cards.
-- [x] Support default schedules, menu-bar per-repo overrides, battery/adapter policies, manual backup and problem notifications.
-- [x] Explain status icons and provide Finder shortcuts with a visual demonstration.
-- [x] Distinguish Finder metadata, Git data and repo-file changes; avoid timestamp-only replacement backups after hashes match.
-- [x] Ignore ordinary `.DS_Store`-only changes as backup triggers; isolate replacement archives to changed/new/damaged repos and avoid unchanged iCloud-index rewrites.
-
-Stable main is `08af74f`. The Pro runs the accepted source-picker build `5e24009`; the Air retains its earlier build. Source configuration/pickers are implemented and core native workflows are accepted, but main promotion is pending. The five reliability goals are implemented on `codex/workspace-setup` and remain under acceptance: automated checks and a real disk-image fault/recovery test passed, while corrected native multi-selection and actual permission cases remain open after computer-use connection failures. See [the reliability checkpoint](docs/PRO_RELIABILITY_ACCEPTANCE.md). Green status still requires matching hashes plus fresh macOS upload confirmation; independent Air restore evidence covers only the documented pilot cases.
-
-## Tier 0 — Publish the direction
-
-- [x] Add this thesis to the existing latest work branch as a documentation commit.
-- [x] Publish RepoHub as a public GitHub repository, keeping stable main and the current work branch available.
-
-Published on 2026-10-09 at [yogoldy/RepoHub](https://github.com/yogoldy/RepoHub). GitHub visibility is Public and Issues are enabled. The default branch is main, now including this thesis and the latest tested application release. The existing `codex/backup-change-detection` branch is retained for its history. No diagnostics or backup archives were uploaded.
-
-Publish app source and product documentation. Local diagnostics, personal backup archives, saved workspace JSON and credentials belong outside Git. Public source publication is separate from choosing a license or shipping a general-purpose installer.
-
-## Tier 1 — Continuous diagnostics
-
-**Goal:** When a repo appears to change unexpectedly or a backup stalls, the app can explain what happened over time.
-
-The helper records diagnostics continuously from login, while the Mac is awake and the helper is running. Closing the menu-bar panel does not stop logging. Sleep and shutdown are gaps, not periods the app can observe; record startup, wake/resume and interruptions explicitly. “24/7” means an always-running local helper where macOS permits it, not activity while the computer is off.
-
-- [x] **1A — Bounded log storage.** Add a structured JSONL writer under the app's local Application Support diagnostics directory, outside monitored repos and the saved workspace-data folder. Start with seven days or 100 MiB total retention, whichever limit is reached first; rotate individual files at 10 MiB. Restrict local file permissions. Handle full disks or logging errors without stopping backups. Test rotation, recovery and retention using synthetic data.
-- [x] **1B — Change-detection evidence.** Log scan IDs, UTC timestamps, durations, scan/hash freshness, source-signature transitions, timestamp-only matches and counts of Finder/Git/repo-file differences. Record why a repo needs backup instead of treating its latest timestamp as proof of an edit. Verify that Finder browsing, timestamp changes and real file changes produce distinguishable events.
-- [x] **1C — Backup and cloud evidence.** Log schedule decisions and power-source pauses, archive creation and verification stages, retries, failures, upload observations, stale checks, pruning decisions and recovery. Tie related events to a backup/run ID and the exact archive identity. Record state transitions and a periodic heartbeat; avoid dumping every unchanged five-second poll. Test error/recovery flows without damaging personal backups.
-- [x] **1D — Agent-focused diagnostic export.** Provide a bounded structured event bundle and interpretation schema for agents, with consistent report-local aliases and a separate private alias key. Unknown text and nested payloads are excluded from the shareable copy. Test identifying paths, URL credentials, unusual filenames, bounds and permissions; local originals stay local. A human-readable debugging narrative is not required per Leo’s clarified goal. Export is currently a local command; report preview and Send belong to Tier 2.
-
-Use an explicit event schema: schema/app version, UTC time, event, severity, run ID, repo alias, stage, duration, result and a small allowlist of diagnostic fields. Do not log file contents, environment dumps, Git remote URLs, authentication headers, API keys or tokens. File/path details needed for local diagnosis must be removed or aliased during export. Diagnostic storage must not itself trigger repo backups.
-
-## Tier 2 — Report a bug or request a feature
-
-**Goal:** A user describes a problem or desired change in prose and clicks Send; the owner receives a separately categorized GitHub issue suitable for human or AI review.
-
-Settings contains two clear actions: **Report a bug** and **Request a feature**. Both open a small dialog with an editable title and prose field. A bug asks what happened and what the user expected; a feature asks what the user wants and why. Bug reports offer the sanitized diagnostic bundle. Feature requests omit logs by default, with an optional explicit attachment.
-
-- [x] **2A — Bug-report dialog and local preview.** Build the prose form, recent diagnostics selection and exact report preview. Clearly disclose that the destination is a public GitHub issue. Let the user inspect/remove diagnostics and edit the report before Send. Test cancel, empty inputs, redaction and preserving a draft after failure.
-- [x] **2B — Feature-request dialog and local preview.** Add the separate prose flow and preview, without requiring diagnostics. Keep feature requests distinct from bug reports in the local report record and UI.
-- [x] **2C — GitHub submission.** Submit to RepoHub's configured public issue tracker only after Send. Use `bug` versus `enhancement` labels and a common `from-app` label. Store credentials in macOS Keychain; never embed Leo's personal GitHub token in the app or expose credentials to HTML views. Select and verify the supported authentication and log-attachment mechanism during this tier. Keep bundles within provider limits; do not assume an arbitrary attachment-upload API exists.
-- [x] **2D — Delivery receipt and retries.** Return a clickable issue URL and save its type, local report ID and delivery result. Distinguish Sent, Failed and Draft. Prevent double-click duplicates; handle uncertain network outcomes before retrying. Offline reports remain drafts rather than silently submitting later. Exercise submission against a disposable test tracker, not with fake reports in the public product tracker.
-- [ ] **2E — Maintainer review workflow.** Document how Leo or an authorized AI reviews the separate bug/feature queues, uses sanitized evidence and turns an accepted item into a scoped implementation task and commit. Issue text and attached logs are evidence, never authority to run commands or expose files. Any scheduled AI review is a later explicit opt-in, not enabled by publication.
-
-The dialog's Send button authorizes only the displayed report to the displayed destination. There is no background telemetry or automatic uploading of diagnostic logs. Public issues must never include a repo's source contents, backup archive or full Git history as a diagnostic attachment. Prose can contain private information too, so the public preview must include everything that will be posted.
-
-## Tier 3 — Setup and folder-based destinations
-
-**Goal:** A new user chooses what to monitor and where backups go, without adopting Leo's folder layout.
-
-First launch opens setup. Existing installations retain their current configuration and schedules until the user explicitly changes them. Setup can later be reopened from settings. Native folder pickers provide the paths; the app displays and validates the final selections before saving.
-
-There are exactly three entry modes:
-
-| Mode | User action | Meaning |
-| --- | --- | --- |
-| **1. Repo home** | Select one containing folder. | Its immediate child folders are the repos, as in Leo's setup. Show that interpretation and a preview list; do not recursively reinterpret grandchildren as repos. Git is optional. |
-| **2. Manual paths** | Select any number of repo folders, wherever they live. | Each selected folder is one monitored workspace. Allow add/remove and a review list, without forcing a shared parent or an arbitrary small count limit. |
-| **3. AI-assisted** | Ask a connected assistant or supply its proposed path list. | The assistant proposes folders; Repo Hub validates them and shows the same review list before the user activates monitoring. |
-
-- [x] **3A — Workspace configuration model.** Replace the single-root assumption with explicit source modes and a persisted workspace registry. Preserve existing IDs/backups during migration. Distinguish same-named folders at different paths, deduplicate selections, handle overlapping/nested sources and maintain per-repo settings. Update Finder resolution, scoped JSON APIs, notifications, scanners and backups to use the validated registry.
-- [x] **3B — Repo-home picker and review.** Native containing-folder selection, immediate-child/future-discovery explanation, exact-path review and drift-checked saving are implemented. Core native flow accepted on the Pro; registry validation/migration regressions remain mandatory. See [source-picker acceptance](docs/PRO_SOURCE_PICKER_TEST.md).
-- [x] **3C — Individual-folder picker and review.** Add/remove across native picker sessions, exact paths, same-name identities and explicit removal review are implemented. Core native flow and restart accepted on the Pro; automated guards/preservation pass.
-- [ ] **3B/3C environmental acceptance.** Exercise simultaneous multiple selection in one native panel, separate volumes, live permission denial and unavailable drives; do not substitute same-volume fixtures for that evidence.
-- [ ] **3D — Output-folder setup.** Add a destination picker and validation. Reject a backup output inside any monitored source, including alias/symlink paths that would cause recursion. Check access and available space; an unavailable drive pauses with a clear error rather than silently writing elsewhere. Changing output must preserve old backups and disclose how a verified copy reaches the new destination.
-- [ ] **3E — Destination-aware status.** Distinguish a verified local copy, a copy in a provider-managed folder and an explicitly confirmed remote upload. A filesystem destination cannot prove Google Drive/Dropbox/OneDrive upload. For non-iCloud folders, show the evidence actually available rather than inventing confirmation or waiting forever for an iCloud signal. Keep the existing iCloud acknowledgement adapter where applicable.
-
-### Setup implementation passes
-
-1. **Workspace foundation (3A):** migrate the current repo home into a validated registry while preserving workspace IDs, existing backups and per-repo schedules.
-2. **Source selection (3B/3C):** offer repo-home immediate children or manual folder selection, with native pickers and a review list before activation.
-3. **Destination selection and evidence (3D/3E):** select and validate an output folder; preserve old backups and accurately disclose local verification versus observed provider upload.
-4. **Guided onboarding (3F):** explain the purpose and flow through a short visual walkthrough after the configuration is usable.
-
-- [ ] **3F — Guided visual onboarding.** Introduce the app as scheduled backup storage for selected workspaces. Use arrows, recognizable folder/archive/cloud icons, brief captions and optional highlight/scale/shake demonstrations to connect instructions with actual controls. Explain source selection, destination selection, schedules, manual backup, hash verification and cloud-upload status. Show the flow “selected folder → complete archive → verified destination copy → observed upload confirmation where supported.” Offer Skip, Back, Next and replay from menu-bar settings; honor reduced motion, support keyboard navigation and never start a backup or change settings just by advancing the walkthrough. Label illustrative states as demonstrations rather than live backup evidence. Cover first launch and existing users without forcing either through onboarding repeatedly.
-
-- [ ] **3G — Readable, customizable backup-folder names.** Default to “{workspace name} Backup” (for example, “HealthFit Backup”), with a naming choice such as workspace name alone, name plus Backup, or a custom per-workspace label. Preview the actual destination folder name before saving. Keep stable workspace IDs, source identity and content/archive verification hashes in metadata, independently of the human-facing name; do not weaken hash verification. Detect duplicate names using the destination filesystem's case/normalization rules, and offer descriptive disambiguation or an editable label rather than exposing an opaque ID suffix by default. Reject empty/reserved names, path separators and traversal; keep the resolved folder inside the selected destination. Persist labels across restarts and source-folder renames. Migrate existing suffixed folders without losing archives, indexes, schedules or pending upload/retention evidence; never overwrite another workspace's folder. Renaming changes presentation/location only, not backup identity or its verification requirements. Test collision handling, safe migration, interrupted renames and retained archive lookup before shipping.
-
-### Rolling backup storage
-
-The product intent is one current complete app-managed backup per workspace after safe replacement, rather than an accumulating collection of dated versions. This is scheduled backup storage; after-edit behavior remains optional. Use “destination folder” in generic setup text and name iCloud only when describing its specific upload evidence.
-
-Today each workspace has a destination subfolder containing dated `.tar.gz` archives. The app already applies latest-only cleanup: a new archive must pass verification and, for iCloud, obtain explicit macOS upload confirmation before older app-managed copies are removed. Two or more archives can temporarily remain while replacement is unconfirmed; failure must preserve the previous backup. Legacy and unmanaged files are left alone. A future simpler presentation or stable “current backup” pointer must preserve these replacement safeguards; never overwrite the only good copy in place.
-
-If the selected folder contains an ordinary self-contained `.git` directory, each complete archive includes its stored Git history alongside current ignored and uncommitted files. Git preserves committed history; discarded older archives do not preserve past uncommitted edits. Git is optional for monitoring and is not currently a retention-policy switch. External Git directories, linked worktrees, submodules and active databases still require the separate restore coverage already listed under Tier 5C. Any future different retention for folders without Git is a separate explicit product decision, not introduced by setup.
-
-Leo's current `install.py` performs a personal migration of an earlier iCloud Desktop backup layout. General setup must replace that assumption before this is presented as an installer for other users.
-
-## Tier 4 — AI-assisted source setup
-
-**Goal:** Repo locations can be scattered. A user can ask an assistant to supply the paths, then approve one understandable monitoring list.
-
-- [ ] **4A — Import contract.** Define a small versioned proposal format containing candidate paths and optional display names. First support a user-pasted/imported proposal so the workflow does not depend on a vendor account. Return per-path validation results and apply only reviewed selections. Do not accept shell commands, arbitrary filesystem access or changes to backup retention in a path proposal.
-- [ ] **4B — Assistant connections.** Add adapters for the user's chosen Codex/OpenAI, Claude Work or Claude Code workflows where their supported integration surfaces allow it. Verify authentication, API availability and local-path access during implementation; do not assume a cloud assistant can see the Mac's filesystem or that each named product provides the same API. Store any credentials in Keychain, with scoped access and a disconnect action.
-- [ ] **4C — Guided setup.** Let the user describe what to monitor, inspect proposed folders, resolve invalid/ambiguous paths and approve the final list. Sharing repo identifiers or local paths with an external AI requires a disclosed selection; repository contents are not needed for path selection. Untrusted assistant output cannot activate monitoring on its own.
-
-AI is the third setup entry mode, not a requirement for normal backups. It produces the same workspace registry used by repo-home and manual selection.
-
-## Tier 5 — Cloud APIs and independent restores (later)
-
-Folder-based destinations come first. **Do not implement cloud account linking in the current pass.**
-
-- [ ] **5A — Provider interface.** Separate copy/upload, remote object identity, observed progress, completion acknowledgement, download and cancellation. Preserve the previous verified backup until the replacement meets that destination's confirmation policy.
-- [ ] **5B — Account connectors.** Add Google Drive, OneDrive, Dropbox and iCloud options only after validating each provider's actual supported APIs and authentication model. Use scoped credentials, clear account/destination selection and revocable connections. Do not promise that iCloud exposes the same direct API controls as other providers.
-- [ ] **5C — Independent restore audit.** From a separately authenticated machine/environment, download actual remote backups, verify archive hashes, extract into an isolated destination and compare a full manifest. Confirm ignored/uncommitted files and run Git integrity/history checks. Explicitly handle repos whose `.git` points outside the selected folder, submodules and active databases; ordinary contained `.git` coverage does not prove these cases. Keep this separate from local hash verification and macOS upload acknowledgement.
-
-## Completion and commit discipline
-
-1. Finish the five-goal [reliability acceptance](docs/PRO_RELIABILITY_ACCEPTANCE.md) on `codex/workspace-setup` before adding functionality. Resume corrected native selection, freshness recovery and actual isolated permission checks. Main remains `08af74f`, Pro remains `5e24009`, and Air deployment is deferred. Destination selection/evidence follows acceptance.
-2. Implement it on the authorized work branch, with proportionate checks against synthetic data and a live UI check when behavior changes.
-3. Commit the implementation separately from the next item. Add its SHA and evidence to this checklist; a plan or screenshot alone does not mark a backend feature complete.
-4. Preserve stable main until the completed tier is reviewed for merging. Do not enable cloud/AI accounts, telemetry or scheduled maintainer agents as a side effect.
-
-The product should stay visually small: repo cards and useful status first; a gear for defaults/setup/reporting; per-repo timing in the menu bar. Diagnostics and integrations should improve confidence without turning the normal view into a developer console.
-
-## Implementation evidence
-
-**Tier 1A — `6826b7e` (2026-10-09):** structured local logs, owner-only permissions, 10 MiB rotation, seven-day/100 MiB retention, startup events, throttled heartbeats and observed runtime gaps. Sixty-five Python checks pass, including nine storage/failure/privacy/concurrency regressions. Native macOS 13 compilation passes after adding the Python module to installer packaging. Scan/display evidence and local dogfooding follow in the separate Tier 1B commit; no diagnostic upload is enabled.
-
-
-**Tier 1B — `ec5cabe` (2026-10-09):** scan IDs, durations, signature transitions, hash receipts, classified Finder/Git/repo-file differences and source/archive references are logged. Menu and full-app renderers report their actual displayed label, phase and readiness against a shared backend observation ID. Its identity includes publication errors and saved archive hashes, so changing readiness inputs cannot silently reuse a previous observation. A local report reader correlates same-observation receipts; absent receipts are not counted as agreement. Seventy-three Python tests, 34 JavaScript status checks and diagnostic delivery checks pass.
-
-Installed dogfooding recorded seven Finder-only repo alerts with zero project-file differences, and 34 of 34 native-menu/full-app comparisons agreed. The readable case and detailed evidence remain in local Application Support, outside Git; this capture cannot explain behavior before logging began. Backup/status policy was not changed in this diagnostic pass. Tier 1C stage instrumentation, Tier 1D shareable export and the reporting dialogs remain separate unfinished items.
-
-
-**Finder-trigger and repo-scope follow-up (2026-10-09):** the diagnostic case motivated a narrow `.DS_Store` trigger exception. Full hash differences remain disclosed with an information icon; they are not relabeled as full matches. Three repeated Finder-only writes create no archives and do not rewrite the iCloud index. Synthetic whole-schedule and targeted-backup checks prove that only the selected meaningfully changed repo gets a replacement; ignored files, Git history, AppleDouble data, corruption repair and existing upload-gated retention remain covered. Eighty-three Python tests, 45 JavaScript status checks, diagnostic delivery checks and native macOS 13 compilation pass. Native/browser installation observations are recorded in VERIFICATION.md. This follow-up is one implementation commit on the existing work branch; main stays separate.
-
-
-**Tier 1C — Backup lifecycle and icon decisions (2026-10-09):** schedule decisions disclose the effective frequency/edit delay and power source, quiet-period and retry waits. Selected decisions share a run ID with archive creation, hash verification, transfer and publication stages. Reuse, repair, per-repo errors, run completion and restart interruptions are recorded. New archive indexes persist the creating run ID, so macOS upload observations, stale receipts, upload-gated retention and individual prune operations can refer to the exact archive and run across restarts. Unchanged scheduling/upload/retention observations are throttled to a per-minute heartbeat. Existing archives without a run ID retain their archive reference; prior unlogged events are not reconstructed.
-
-Menu/app presentation receipts now link to those run/archive identities. Backend evidence includes freshness, change classification, copy state and verification/upload archive identities. A diagnostic-only comparison explains the rendered icon and flags disagreement with backend inputs separately from disagreement between views; neither a UI receipt nor an icon is upload proof. This does not change status or scheduling policy. The local summary includes the latest 200 lifecycle events and bounded input disagreements. Shareable export/reporting dialogs and independent cloud restores remain separate work.
-
-
-**5C pilot preparation — Controlled receive-and-restore audit:** `restore_audit.py` and [the cloud handoff](docs/CLOUD_RESTORE_HANDOFF.md) prepare a private offline test. The receiving cloud agent does not need iCloud access. Expected file/Git facts are independently captured from the matching live source, not derived from the test archive. Verification checks supplied identities, safe extraction, every manifest entry, Git integrity/history and input immutability, with stage logs and explicit unsupported cases. This prepares the experiment; Tier 5C stays unchecked until actual private iCloud-downloaded inputs are independently restored. Direct authenticated cloud retrieval and application execution remain outside this pilot.
-
-**5C Air staging pilot — Real two-Mac evidence:** See [the controlled Air experiment](docs/AIR_STAGING_TEST.md). A full-history public fixture passed 34 live staging assertions, real after-edit scheduling, upload observations, and an independent restore of the iCloud-received copy on the main Mac. The experiment exposed and corrected symlink-mode preservation in the restore checker. Tier 5C remains unchecked for its broader coverage, including unusual Git layouts and failure cases. Next diagnostic acceptance gap: actual rendered progress percentages, visibility and selected-repo detail must be correlated with backend observations; current receipts cover icons/labels only.
-
-**Verification availability — Source and synthetic coverage:** `c035666` separates verification I/O failures from checksum/archive corruption, preserves the current archive when verification is unavailable, and records a bounded `verification_deferred` lifecycle event. [The policy](docs/VERIFICATION_AVAILABILITY.md) documents the conservative retry behavior and synthetic regression coverage. Concrete private repository experiments and diagnostic reports remain local and outside Git.
-
-**Tier 1D — Agent export (2026-10-09):** [Export contract and usage](docs/DIAGNOSTIC_EXPORT.md) describe the machine-readable bundle, report-local alias relationships, separate private key and incomplete-evidence rules. Privacy/bounds regressions and the full 107-test Python suite pass on both Macs. A small controlled Air fixture exercises real backups, file changes, verification, upload acknowledgement and export correlation. Settings/reporting UI and external submission remain Tier 2; no diagnostics are published.
-
-**Tiers 2A/2B — Local report previews (2026-10-09):** [Preview behavior and boundaries](docs/REPORT_PREVIEW.md) describe separate bug/feature forms, the proposed public payload, optional bounded diagnostic files, private local drafts and failed-request prose preservation. The full 113-test Python suite passes on both Macs, browser interactions exercise both flows, JavaScript checks pass and native compilation passes. Sending is disabled pending Tier 2C; the stable installed app and main remain unchanged.
-
-**Diagnostic payload hardening (2026-10-09):** Export schema v2 replaces broad vocabulary matching with explicit per-field types and enums, rejects unknown events and arbitrary text, removes wall-clock dates/exact sizes, caps counts, rounds progress and creates fresh alias namespaces per report. Adversarial privacy tests and 118 total Python tests pass on both Macs. User prose stays separate, with a confidentiality reminder. Send remains disabled; concrete dogfooding logs and alias keys stay local.
-
-**Release deployment — `f9996ab` (2026-10-09):** Promoted to GitHub main and deployed to both Macs. All 21 packaged Python/web files were checked against the release manifest, and each loaded helper’s build identity was checked against its installed source. Live checks verified the served report interface, authenticated report preview API, export schema v2, private-key exclusion and diagnostic recording. Configuration and scheduling files were preserved. Previous runtimes and local deployment receipts are retained for rollback. The first Air service re-registration attempt rolled back; restarting its existing registered launch job succeeded. Native source was unchanged. No forced backup/restore rerun or external report submission was performed. Next: Tier 2C GitHub authentication and submission, then Tier 2D delivery/retry handling.
-
-## Cross-cutting quality — Golden rules
-
-- [x] Document known failure modes, their diagnostic trails, required responses, narrow fixes and remaining exposure in [the quality register](docs/quality/FAILURE_MODES.md). Concrete private incident records remain local.
-- [x] Add an executable domain release gate linking each rule to tests that must actually execute and pass; validate runtime/HTML packaging, JavaScript behavior/syntax and native builds/checks. Receipts identify source revision/fingerprint, dirty state and pending manual evidence.
-- [x] Wire the synthetic macOS gate into GitHub push/PR checks and agent release instructions. Main requires pull requests and an up-to-date passing GitHub Actions `automated-contract` check, including for administrators.
-
-[Gate usage and limits](docs/quality/RELEASE_GATE.md) distinguish an automated pass from live deployment/provider/hardware acceptance. Application behavior and the installed release are unchanged by this quality-tooling work.
-
-**Tiers 2C/2D — Source implementation:** [Delivery contract](docs/REPORT_DELIVERY.md) adds native Keychain setup, exact bounded public issue bodies, explicit account/preview confirmation, private durable receipts, process-safe double-click serialization, conservative uncertain-delivery reconciliation and stored draft reopening. The application tracker is fixed. Synthetic regression tests and a private disposable tracker exercise API delivery; installed releases remain unchanged pending branch review and deployment. `report_delivery` diagnostics contain only aliased report identity and enumerated state/reason codes. A fixed-label owner workflow handles non-maintainer reports after promotion. GitHub token onboarding and real Keychain prompts on both installed Macs remain live acceptance items.
-
-**2C/2D implementation evidence — `799dcd3` (2026-10-09):** the clean macOS golden-rule gate passed 138 Python tests and all JavaScript/Swift checks. Private disposable-tracker acceptance confirmed exact bug/feature payloads, labels and one issue per report after repeated Send. An explicitly simulated browser harness exercised ambiguous-response recovery, stored receipt reopening and feature diagnostics off. A follow-up regression covers failed durable-intent directory flushing before POST. Installed runtime/Keychain onboarding remains pending; no personal diagnostic payload or developer credential was published or migrated.
-
-**Menu-first reporting:** The primary menu-bar settings now provide both report entry points, with shared preview/delivery behavior, native connection setup inside the preview, and constrained external issue links. GR14 explicitly covers entry-point reachability and controller behavior on both shipped surfaces; native WebKit acceptance remains separate from the mocked DOM/API checks. This closes the prior gap where backend and syntax checks passed while the menu lacked reporting controls.
-
-**Reporting live acceptance and stopping point — 2026-10-09:** Reporting was merged through [PR #2](https://github.com/yogoldy/RepoHub/pull/2) at `8cbeac6`; its clean macOS gate passed 144 Python tests and the JavaScript/native checks. The user completed native secure token entry on the MacBook Pro. Backend account verification succeeded, and a durable `sent` receipt plus GitHub lookup confirmed [issue #3](https://github.com/yogoldy/RepoHub/issues/3). A preceding access-denied receipt and token-settings inspection exposed the distinction between sign-in and issue-write authorization; [the failure register](docs/quality/FAILURE_MODES.md) records evidence, limits and regression coverage. Tokens, private drafts, alias keys and raw diagnostic receipts stay outside Git.
-
-The follow-up clarifies account-versus-posting permission and explains access-denied retries without changing credential handling or submission policy. It is source work only until separately deployed. The Pro still runs the accepted reporting build `4e8c16e`; Air stays on its prior stable release at Leo's request. Tier 2E (maintainer review workflow), Tier 3 (setup), broader Tier 5C restore coverage and public submission onboarding remain open. No AI/cloud-service integration or scheduled review was enabled.
-
-**Setup roadmap clarification — 2026-10-10:** Setup now has four implementation passes, culminating in optional visual onboarding (3F). The rolling-storage intent and existing verified/upload-gated archive replacement are documented above; this roadmap update changes no app behavior. Main and the MacBook Pro were verified on `08af74f`; the Pro received the permission-feedback deployment after its clean 145-test macOS gate. Air reporting deployment remains deferred. Work continues on `codex/workspace-setup`, starting with 3A; onboarding, new destination selection and AI-assisted import are not shipped.
-
-
-**Tier 3A — `4363423` (2026-10-10):** [The workspace configuration contract](docs/WORKSPACE_CONFIGURATION.md) documents the persisted registry, repo-home/manual modes, preserved legacy identities, independent same-name folders, non-destructive removal, missing-source errors, source-selection locks and guarded revision API. Scanner/scheduler/JSON/backup integrations use the validated registry; the native Finder bridge accepts exact approved ID/path pairs. Copy progress, per-repo failures, displayed state, diagnostic projections and problem episodes use IDs rather than names, preventing cross-attribution for same-named folders. Sixteen targeted regressions pass, and GR15 makes them mandatory in the Golden Gate. A real isolated helper process passed 16 API/archive/restart/removal/diagnostic assertions; its provider observations were deliberately unavailable and are not cloud-upload evidence. Private receipts stay outside Git. Folder pickers, destination selection/evidence, onboarding and readable names remain 3B–3G. Main and installed apps are unchanged by this pass; native manual-path Finder clicks and separate-volume acceptance remain pending.
-
-**Tier 3A native staging — 2026-10-10:** [Pro fresh-state acceptance](docs/PRO_WORKSPACE_STAGING_TEST.md) tested `83c52bd` with computer use: same-name manual sources, native backup/settings/Finder, missing-source preservation, recovery and restart. Complete archives included Git/ignored files and passed manifest/hash checks. Diagnostics exposed an old WebKit renderer contaminating the shared-port test; fully stopping both daily jobs yielded a clean repeat with one UI client and zero status disagreements. Protected production file hashes were preserved and both daily jobs restored. Pro/main stay `08af74f`; Air unchanged. Folder-picker/review (3B/3C), destination selection/provider evidence (3D/3E), onboarding and readable names remain pending. Separate-volume and actual provider acceptance remain open.
-
-**Tier 3B/3C implementation checkpoint — 2026-10-10:** Source selection is reachable through the menu-bar gear, with a native directory picker, home/manual modes, exact-path lists, removal and explicit review/save. Server review binds the registry revision and candidate folder inventory, preventing unreviewed discovery changes from being saved. Golden Gate GR16 covers review drift, preservation and guarded/private review diagnostics; native picker bridge and JavaScript draft regressions are mandatory. Live native acceptance/deployment evidence follows separately. Destination selection, onboarding, readable names, separate-volume and provider testing remain open; Air unchanged.
-
-**Tier 3B/3C Pro acceptance — 2026-10-10:** [Native source-picker record](docs/PRO_SOURCE_PICKER_TEST.md) documents the screen/picker/review/save tests, accessibility failure and fix, stale-review rejection, full ignored/Git archive verification, diagnostics and rollback-protected Pro deployment. Application build `5e24009` passed the clean 165-test macOS Golden Gate and is installed on the Pro. Current 13 sources and schedules are preserved; Air unchanged and main unmerged. Core source-selection UI is complete; external-volume/permission and simultaneous panel multi-selection remain explicit coverage gaps. Next implementation is 3D/3E, then onboarding/readable names.
-
-**Reliability implementation checkpoint — 2026-10-10:** Goals 1, 3, 4 and 5 have separate implementation commits (`03d8ded`, `3d18f05`, `48fb7b1`, `e86a7f0`), with goal 2's native alias counterexample/fix at `a5eb444`. Follow-ups improve volume-probe performance, fixture hygiene, bounded freshness delivery, notification request/restart handling and mid-publication denial coverage. The clean implementation gate at `53ef1d5` passed 180 tests and native/JavaScript checks. Real disk-image loss/substitution/remount passed at `7d21621`. [The checkpoint](docs/PRO_RELIABILITY_ACCEPTANCE.md) records successful and failed attempts, private diagnostic evidence and remaining native acceptance. None of the incomplete OS permission cases is marked complete; no reliability deployment or main promotion occurred.
-
-
-**Two-Mac reliability checkpoint (2026-10-10):** Air-first b97fdf2 native staging
-through Jump Desktop validated picker foreground order, alias deduplication,
-cancel/save/restart persistence, preserved removed archives and visible stale
-cache/recovery against diagnostics. Notification probes exposed temporary-app
-registration rejection; an owned Applications copy allowed real grant/revocation
-and restart, with a synthetic backup continuing after denial. The daily Air jobs
-and all protected hashes were restored. These partial results do not close
-reliability: first-request refusal, actual helper privacy in an isolated account,
-remaining fault/volume cases and the identical Pro run stay open. No main promotion
-or daily deployment occurred. See the [case-by-case checkpoint](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
-
-
-**Isolated permission-test preparation (2026-10-10):** An Air standard test account
-now exists, and its narrowly authorized Remote Login permission is enabled.
-Test-account key installation and native connection remain pending user login.
-The existing Jump connection's daily Auto Logon was preserved; a temporary
-browser session is being prepared. This resolves account creation, not actual
-privacy acceptance. Both-host reliability acceptance, promotion and deployment
-remain open; see the [two-Mac record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
-
-
-**Isolated test connection checkpoint (2026-10-10):** Native control of the Air's
-standard test desktop is established through the separate Jump browser session;
-its approved public-key installer ran in that account. SSH remains blocked by an
-additional server username allowlist, with a narrowly scoped administrator update
-prepared for the user to apply. Daily services and saved Jump credentials are
-unchanged. This closes desktop connection preparation, not actual OS permission
-acceptance or the reliability release. See the [current acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
-
-
-**Air isolated-account reliability preflight (2026-10-10):** Standard-account SSH
-and native Jump menu control now work. Guarded staging exposed and fixed same-user
-shutdown timing and cross-user TCP handoff delays; fail-closed checks rejected
-permission-mode drift in a transfer. Candidate 36d76c0 passed 201 clean macOS tests
-and GitHub checks. A real owned-controller SIGKILL proved independent test cleanup
-and daily restoration with both protected baselines preserved. Native helper
-readiness agreed with observed source/destination states, and two native repo
-frames had no diagnostic disagreements. The full actual-privacy/fault matrix and
-same-candidate Pro repeat remain open; main and daily apps are unchanged. See the
-[two-Mac evidence record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
-
-
-**Air isolated-account native checkpoint (2026-10-10):** The unchanged 36d76c0
-application payload passed native simultaneous alias selection, exact reviewed
-save, distinct same-named IDs and restart persistence, with previous archives
-preserved after monitoring removal. Real notification grant/revocation/restart
-agreed with the menu, and a new edit backed up after revocation. Diagnostic
-checkpoint: 700 events, no recorded presentation/input disagreements. The helper
-rejected a synthetic Desktop source despite SSH caller access; actual folder
-refusal/restoration and initial explicit notification refusal remain unproved.
-The Test session was not the physical console, so local test-account unlock is
-the next controlled permission investigation. Both cleanup receipts preserved
-protected state and restored daily services. Full matrix/Pro repeat/release remain
-open; no broad permissions or daily deployment occurred.
-
-
-### Personal update delivery — October 17, 2026
-
-Leo clarified that real-Mac testing follows easy update delivery for this personal
-app. The signed-update branch now prepares GitHub release hosting and automatic
-exact-main publication after Golden Gate acceptance, with current plus three
-historical packages and retained Git source tags. Update-key custody is configured
-with a local recovery copy; Leo confirmed saving it in his password manager on October 17. Publication
-remains disabled until Apple credentials and initial signed distribution are ready;
-no daily Mac has been updated. See [release delivery](docs/RELEASE_DELIVERY.md) for
-implementation, native evidence limits and the first-install migration dependency.
-
-
-### Personal delivery is live — October 17, 2026
-
-Leo approved Sparkle-authenticated personal releases before Apple signing. Protected
-main acceptance automatically published 0.0.1, and the Pro’s guarded first install
-completed with all 13 repos and unchanged protected configuration/data hashes. Two
-launchd failures restored safely; registering the replacement with Launch Services
-before loading the login agent resolved the observed handoff. Background discovery
-is enabled with user-controlled installation. Air and Apple permission-continuity
-validation remain outside this completed bootstrap. See the release-delivery record
-for exact evidence and the subsequent real-upgrade acceptance boundary.
-
-### Local Settings pages candidate — October 17, 2026
-
-Leo approved staged local commits for explicit saving and a less crowded Settings
-interface, with no push, main merge or installed-app update in this batch.
-`codex/settings-pages` adds a Settings home with separate schedule, folders,
-notifications, updates, help and access pages. Access is last. A shared header keeps
-the page title, Back and Close outside the scrolling content.
-
-Schedule edits stay in a draft until Save changes succeeds. Back, Close and Escape
-ask before discarding edits; failed saves retain the draft. Native access-readiness
-entry respects the same guard. Folder setup keeps review, exact source identities,
-revision checks and existing backups; its shared controller also preserves the full
-status page's existing behavior. Access checks, notification permission requests,
-updates and report previews remain explicit actions rather than schedule saves.
-
-The repo detail now presents Where and When separately. iCloud still requires the
-existing upload-confirmation evidence; When is the archive's creation time in
-month/day/two-digit-year and local 12-hour time. Unknown evidence remains unknown.
-Backup selection, scheduling decisions, verification and typed timing receipts are
-unchanged.
-
-Focused controller regressions and isolated browser checks exercised edit-versus-save,
-discard, failed/conflicting and duplicate saves, folder navigation, reload persistence,
-and an overflowing list of 61 disposable access results. The fixed header remained
-visible while the list scrolled. Full local acceptance is recorded in the clean
-Golden Gate receipt outside Git. Installed WebKit/native folder picking and real
-permission actions remain future checks; this candidate does not change the running
-0.0.2 app or authorize publication.
-
-The same local candidate now gives About your backups a home page and separate
-status-guide and Things to know pages. Back, title and Close remain outside the
-scrolling content. Existing guide wording and the selected-folder demonstration
-are preserved; this is not the later tutorial expansion. The repo summary retains
-Report this status, with Technical details below it and above the global backup
-controls. Where, When and the next-check line use consistent vertical spacing.
-Controller regressions cover navigation, demonstration reset and repo-scoped
-technical disclosures. No publication or installed-app update is included.
-
-The local Backed up display now treats the existing ordinary .DS_Store-only
-exception as success when project files and Git match a verified, uploaded backup.
-The card and headline use the normal Backed up presentation; Technical details
-retain the difference. The summary counts repos backed up to iCloud. Raw backup
-evidence, eligibility and retention remain unchanged. Diagnostic display policy 5
-records the exception explicitly and continues interpreting older policy versions.
-After the rule passed its clean Golden Gate, the six guide sections were revised
-in separate local commits: Backed up, waiting to run, work in progress, upload
-confirmation, unavailable status and failure. Short definitions explain each
-remaining card label; repeated label lines and long combined paragraphs are removed.
-The guide still distinguishes scanning, creating and uploading; unknown upload
-evidence does not prove success or failure; scheduled waiting does not cause stale
-status; reports are reviewed before Send. This batch does not authorize a push or
-installed-app update.
+# RepoHub product roadmap
+
+RepoHub should make it easy to answer: **Are my chosen repos safely backed up,
+and what needs my attention?** The menu bar is the everyday view.
+
+## Scope and status — October 17, 2026
+
+This is the current reference for Leo's unfinished product requests. It supersedes
+the previous tiered roadmap at source
+`38d354d5ade1cc5664c43a15cb680bc31b0d0019`; Git retains that version and its
+implementation history. Leo approved the revised scope below on October 17.
+
+- **Requested:** agreed product direction, with implementation still pending.
+- **Implemented:** code exists; this does not imply every installed-Mac condition
+  has been verified.
+- **Awaiting verification:** the remaining work is evidence or acceptance rather
+  than a new feature.
+- **Superseded:** removed from the active roadmap by Leo's revised direction.
+
+This documentation change does not start feature implementation, set a new
+implementation order, authorize external submissions, or authorize a Git push.
+Complete approved work in scoped commits with proportionate tests and evidence.
+
+## Existing foundation
+
+The following are implemented and must not be rediscovered as unfinished features:
+
+| Capability | Evidence and remaining boundary |
+| --- | --- |
+| Repo-home and individually chosen folders, stable workspace identities, native pickers and explicit review/save | [Workspace configuration](docs/WORKSPACE_CONFIGURATION.md). Environmental acceptance remains separate. |
+| Complete archives, source/archive hash verification, schedules and conservative replacement of previous backups | [Verification](VERIFICATION.md) and [Golden Gate](docs/quality/RELEASE_GATE.md). Existing backup-preservation requirements continue. |
+| Continuous local diagnostics, constrained export, separate bug/feature forms, reviewed GitHub submission and durable delivery receipts | [Reporting contract](docs/REPORT_DELIVERY.md). Easier non-owner setup and maintainer review remain requested below. |
+| Coordinated app/helper/interface packaging, Sparkle, secure update-key custody, HTTPS feed and automatic publication after protected main checks | [Personal release delivery](docs/RELEASE_DELIVERY.md). Apple signing and permission continuity remain separate. |
+| Settings/About pages, explicit Save changes, selection-only repo details and menu-bar number preferences using existing card statuses | [Info view](docs/INFO_VIEW.md), [status policy](docs/STATUS_CLARITY.md) and the [menu-bar appearance reference](README.md#menu-bar-repo-cards). New UI work must retain shared state rules and diagnostic disagreement checks. |
+
+## Requested features
+
+### R1 — Choose the backup destination
+
+**Status: Requested.** Retains the former output-folder setup item (3D).
+
+- Let the user select and review a destination through a native folder picker.
+- Validate access, available space and source/destination separation, including
+  aliases and symlinks. Prevent recursive backups.
+- An unavailable or disconnected destination must pause with a clear explanation.
+  Do not silently redirect a backup elsewhere.
+- Changing destinations must preserve existing archives and disclose how a
+  verified replacement reaches the new location. Saving a path is not proof of a
+  successful copy.
+
+### R2 — Validate Finder-accessible sync folders
+
+**Status: Requested.** Retains destination-aware status (3E), with the revised
+folder-based provider scope.
+
+- Support selecting ordinary Finder paths, including iCloud Drive, Google Drive,
+  OneDrive and other locally accessible sync folders. No direct provider-account
+  connection is planned.
+- Validate actual backup creation, archive hashes, isolated extraction/restore and
+  failure/recovery at the selected path. Exercise unavailable drives, denied
+  access and provider-managed files where applicable.
+- Clearly distinguish a verified local destination copy from confirmed remote
+  upload. A provider's name or folder location alone cannot establish upload.
+  Preserve the existing iCloud evidence adapter where applicable; when remote
+  confirmation is unavailable, say so rather than inventing success or waiting
+  forever for an iCloud-only signal.
+- Preserve previous good backups when confirmation is missing. Any non-iCloud
+  replacement/retention policy must be explicit and tested before cleanup.
+
+These are destination tests, not a new cloud API, remote-verification service or
+separate expanded independent-restore product. Existing restore tools and pilot
+records remain evidence with their original limits.
+
+### R3 — Replayable visual onboarding
+
+**Status: Requested.** Retains guided onboarding (3F).
+
+Explain sources, destination, schedules, manual backup, verification and upload
+status through a short visual walkthrough tied to actual controls. Offer Skip,
+Back, Next and replay from Settings, keyboard support and reduced motion.
+Demonstrations must be recognizable as demonstrations and must not change settings
+or start backups. Preserve existing users' configuration and avoid forcing the
+tutorial on every launch.
+
+### R4 — Readable, customizable backup-folder names
+
+**Status: Requested.** Retains readable names (3G).
+
+Default to a name such as “HealthFit Backup”; allow the workspace name alone or a
+custom per-workspace label and preview the actual name before saving. Keep stable
+workspace identity and verification hashes separate from display names. Validate
+names and collisions using destination filesystem rules. Renames and migration of
+existing suffixed folders must preserve archives, indexes, schedules and pending
+upload evidence, including after interruption; never overwrite another workspace.
+
+### R5 — Recursive Git-based repo discovery
+
+**Status: Requested.** Replaces AI-assisted source setup (former Tier 4).
+
+- Let the user choose a starting folder and scan its descendant folders for Git
+  repository markers, instead of treating only immediate children as workspaces.
+- Use Git as the discovery heuristic. Recognize and validate relevant `.git`
+  directory/file forms; arbitrary source files or a Git-looking filename alone
+  do not prove a usable repository. Git availability, unusual layouts and invalid
+  markers need clear results.
+- Show discovered repositories and exact paths for explicit review and selection
+  before applying them through the existing workspace registry and save guards.
+  Discovery must not silently activate every result.
+- Resolve duplicate paths, aliases, nested repositories and overlapping backup
+  scopes in review. Bound traversal, avoid symlink loops and Git-internal
+  traversal, allow cancellation, and disclose inaccessible or incomplete areas.
+- Retain the existing repo-home and individual-folder modes, including folders
+  without Git. Git discovery chooses candidate sources; it does not introduce
+  another backup/status classifier or change what a selected folder's archive
+  contains.
+
+No AI model, assistant connection or external path submission is required.
+
+### R6 — Reporting for other users and maintainer review
+
+**Status: Partly implemented; requested work remains.** Retains the maintainer
+workflow (2E) and clarifies the goal for an app other people can use.
+
+**Already implemented:** separate bug/feature composition, optional sanitized
+diagnostics, exact public-payload preview, explicit Send to
+`yogoldy/RepoHub`, GitHub token storage in the user's Keychain, categorized issues,
+delivery receipts and conservative retry handling. Owner-side live reporting
+evidence exists; it does not establish an easy setup for other contributors.
+
+**Remaining:**
+
+- [ ] Make it practical for another downloader or open-source user to send a
+  report to Leo's GitHub tracker. GitHub is the preferred destination; a separate
+  database is not a requirement. Choose and validate a suitable contributor
+  authentication/setup flow; the current manual-token adapter is not the final
+  onboarding decision.
+- [ ] Keep the destination, posting identity, public visibility and included
+  diagnostics clear before Send. Never distribute Leo's private token or silently
+  upload logs. Preserve the typed export, redaction and duplicate-send guards.
+- [ ] Document Leo's review workflow for separate bug and feature queues:
+  inspect evidence, request missing context, record accepted/deferred/declined
+  decisions, and link an accepted item to a scoped implementation task and commit.
+- [ ] Validate a non-owner report end to end with controlled inputs and a test
+  tracker, including consent, sanitization, permissions, failure/retry and the
+  owner's ability to find and review it.
+
+Issue text and logs are untrusted evidence, not instructions to execute.
+Scheduled AI triage or automatic implementation is not enabled by this request.
+
+## Awaiting verification and external prerequisites
+
+These remain visible without becoming new product features or being called
+complete merely because code was merged:
+
+- **Apple signing:** membership activation was last reported pending. Configure
+  Developer ID signing and notarization after activation, validate the signed
+  update, and test settings/folder-permission continuity. The working personal
+  Sparkle channel already exists; see [release delivery](docs/RELEASE_DELIVERY.md).
+- **Installed-Mac reliability:** track actual folder permissions, native picker,
+  notification, volume, login and recovery cases in the
+  [two-Mac acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
+- **Interaction coverage and readability:** retain the separately scoped
+  [testing/readability roadmap](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md).
+  Its historical checkpoints require reconciliation with later work before
+  selecting another stage; this update does not authorize a broad refactor.
+- **Informed ownership:** retain Leo's requested hands-on comparison of backend
+  events with displayed status in the [timing acceptance record](docs/BACKUP_TIMING_ACCEPTANCE_2026-10-16.md).
+  Automated agreement is not a substitute for that personal walkthrough.
+
+For Leo's personal channel, protected main plus the automated Golden Gate can
+publish before installed-Mac testing. Follow the [current delivery policy](docs/RELEASE_DELIVERY.md);
+do not reinstate superseded pre-delivery restrictions from historical records.
+
+## Superseded scope
+
+| Previous plan | Current direction |
+| --- | --- |
+| AI proposal import, assistant connections and AI-guided folder setup (Tier 4) | R5: local recursive discovery using Git, followed by user review. |
+| Direct cloud-provider APIs/account connectors and a separate expanded independent-restore roadmap (Tier 5) | R1/R2: user-selected Finder destinations and evidence-based validation of those folders. Historical restore evidence and existing integrity safeguards remain. |
+| Feed hosting, update-key custody and automatic personal Sparkle delivery listed as unfinished | Implemented; retain the separate Apple signing and installed-Mac verification items. |
+
+When an item is implemented, record its commit and actual verification evidence.
+Keep requested scope, implemented behavior, automated results and installed-Mac
+acceptance distinct.
