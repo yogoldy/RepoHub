@@ -27,7 +27,7 @@ app owns its helper. Air deployment is outside this change.
 
 ## Automatic path
 
-`Golden rules` completes for a main push → `Publish signed update` checks the same source → packages/signs → Apple notarization accepts → staple ticket → Sparkle archive signature verifies → upload draft → download and compare every asset → recheck current main → publish as latest → confirm latest → retain four managed release packages.
+`Golden rules` completes for a main push → `Publish signed update` checks the same source → packages the coordinated app → Sparkle archive signature verifies → upload draft → download and compare every asset → recheck current main → publish as latest → confirm latest → retain four managed release packages. In `developer_id` mode, Developer ID signing, accepted Apple notarization and ticket stapling must also pass before archive preparation. The approved `personal_adhoc` mode uses local ad-hoc code signatures and does not claim those Apple checks.
 
 The release job is enabled through `REPOHUB_RELEASE_ENABLED=true` with `REPOHUB_RELEASE_MODE=personal_adhoc`, following the clean exact-main gate and actual package/signature validation. A fork, pull-request run, failure, stale main commit or missing `automated-contract` success is rejected. It checks out the triggering full SHA, not a moving branch, does not consume artifacts or caches from untrusted runs, and reruns the clean macOS gate before exposing signing secrets to the packaging step. The publishing job has contents-write/actions-read access; other jobs keep read-only access. Jobs serialize, and a newer main commit supersedes a still-packaging older candidate.
 
@@ -51,7 +51,7 @@ Configured with Leo's approval on October 17:
 
 - Repository secret `REPOHUB_SPARKLE_PRIVATE_KEY`: the Ed25519 private seed, never source-controlled or printed.
 - Repository variable `REPOHUB_UPDATE_PUBLIC_KEY`: matching public verification key.
-- `REPOHUB_RELEASE_ENABLED=false`: publishing stays disabled.
+- Publishing was initially configured disabled. It is now enabled with `REPOHUB_RELEASE_ENABLED=true` and `REPOHUB_RELEASE_MODE=personal_adhoc`; the first actual publication succeeded.
 - Leo confirmed on October 17 that he saved the recovery key in his password manager. This is user-confirmed custody; the password-manager contents were not inspected. The owner-only local recovery file remains outside Git. Do not reproduce the seed in issues, logs, docs or chat.
 
 After Apple membership activation, configure the following repository secrets without sharing credentials in chat:
@@ -67,13 +67,13 @@ After Apple membership activation, configure the following repository secrets wi
 
 Use a disposable runner keychain; restore its prior search list and remove the temporary keychain/secret files in cleanup. Never enable shell tracing or print subprocess signing arguments. An interrupted hosted runner is disposable; no signing material is uploaded as an artifact. Apple's response must explicitly be Accepted; stapler validation and Gatekeeper assessment still gate archive preparation. Developer ID signing includes hardened runtime and trusted timestamps.
 
-Recovery custody is confirmed. For developer_id mode, configure Apple credentials and finish a first signed-package/notarization test. The approved personal mode can enable publishing without those credentials after its gate/package tests and guarded first-install review. Then set `REPOHUB_RELEASE_ENABLED=true`. The workflow becomes automatic once present on main; it does not run directly from this feature branch. A failed release job can be rerun, retaining the exact main-source checks. New main changes naturally trigger a new Golden Gate and publication attempt.
+Recovery custody is confirmed. For developer_id mode, configure Apple credentials and finish a first signed-package/notarization test before switching the release mode. Personal publishing is already enabled on main and does not require those Apple credentials. The workflow does not publish directly from feature branches. A failed release job can be rerun, retaining the exact main-source checks. New main changes naturally trigger a new Golden Gate and publication attempt.
 
 ## Current verification limits
 
 A real unpublished GitHub draft probe confirmed exact-source targeting, uploaded/downloaded fixture-byte equality and complete probe cleanup. It exposed and corrected premature tag resolution: new draft tags do not exist until publication. Developer ID app publication still awaits Apple signing; the authorized personal channel does not.
 
-Policy, publication-order/failure and secret-cleanup regressions run in the Golden Gate, along with pinned actionlint workflow validation. Simulated GitHub/signing cases prove the control flow, not Apple service acceptance or a live public release. The feed URL becomes live on the first successful Sparkle-authenticated publication; receipts identify personal ad-hoc versus Apple-signed distribution. The Pro completed its guarded transition to published 0.0.1; the Air remains unchanged. Native permission continuity and the outstanding reliability matrix remain recorded separately. Apple activation is still user-reported pending.
+Policy, publication-order/failure and secret-cleanup regressions run in the Golden Gate, along with pinned actionlint workflow validation. Simulated GitHub/signing cases prove the control flow; the first live personal publication additionally verified the actual GitHub delivery path. Apple service acceptance remains untested. The feed is live with 0.0.1; receipts identify personal ad-hoc versus Apple-signed distribution. The Pro completed its guarded transition to published 0.0.1; the Air remains unchanged. Native permission continuity and the outstanding reliability matrix remain recorded separately. Apple activation is still user-reported pending.
 
 Sources: [GitHub workflow-run security and semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run), [Sparkle update signing](https://sparkle-project.org/documentation/), [Apple notarization](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow).
 
