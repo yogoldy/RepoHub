@@ -19,6 +19,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from tools.package_app import WEB_ASSETS
+
 REGISTER = ROOT / 'docs/quality/golden-rules.json'
 
 
@@ -78,9 +80,14 @@ def packaging_contract(root):
                     and any(isinstance(t,ast.Name) and t.id=='routes' for t in n.targets)]
     routes = ast.literal_eval(route_groups[0].value)
     for route, name in routes.items():
+        if name not in WEB_ASSETS:
+            raise ValueError('Unpackaged web asset: ' + route)
         if not (root/'web'/name).is_file():
             raise ValueError('Missing served web asset: ' + route)
-    for html in (root/'web').glob('*.html'):
+    for name in WEB_ASSETS:
+        if not (root / 'web' / name).is_file():
+            raise ValueError('Missing packaged web asset: ' + name)
+    for html in (root / 'web' / name for name in WEB_ASSETS if name.endswith('.html')):
         for asset in re.findall(r'(?:src|href)=["\'](/[^"\']+)["\']',html.read_text()):
             if asset not in routes:
                 raise ValueError('Unserved HTML dependency: ' + asset)

@@ -454,9 +454,12 @@
         "application_update",
         "update_checkpoint"
       ],
-      "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, verify its resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
-      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Test apps cannot use the daily identity or port.",
+      "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, copy web resources from an explicit allowlist covering served routes, verify resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
+      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Unlisted web files never ship; missing or linked required web assets fail packaging. Test apps cannot use the daily identity or port.",
       "test_ids": [
+        "test_app_package.AppPackageTests.test_bundle_web_allowlist_excludes_unlisted_files_and_directories",
+        "test_app_package.AppPackageTests.test_bundle_web_allowlist_rejects_missing_or_linked_required_assets",
+        "test_release_gate.ReleaseGateTests.test_served_web_asset_must_be_declared_in_bundle_allowlist",
         "test_app_package.AppPackageTests.test_integrity_rejects_missing_changed_and_extra_components",
         "test_app_package.AppPackageTests.test_links_cannot_escape_resources_and_link_changes_are_detected",
         "test_app_package.AppPackageTests.test_production_requires_https_and_test_requires_disposable_identity",

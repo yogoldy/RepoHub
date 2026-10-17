@@ -17,9 +17,21 @@ implementation history. Leo approved the revised scope below on October 17.
   than a new feature.
 - **Superseded:** removed from the active roadmap by Leo's revised direction.
 
-This documentation change does not start feature implementation, set a new
+Roadmap entries do not by themselves start feature implementation, set an
 implementation order, authorize external submissions, or authorize a Git push.
 Complete approved work in scoped commits with proportionate tests and evidence.
+
+## Current local update batch
+
+Leo authorized the package-resource change below as the first implementation in
+this batch. The remaining requested features still need their own implementation
+scope; this batch stays local until promotion is authorized.
+
+- [x] **Explicit packaged web assets:** the bundle builder copies a declared list
+  rather than the whole `web` directory. Extra local files are excluded; missing
+  or linked required files fail packaging. The existing 17 served assets remain.
+  GR20 requires resource-selection and omitted-route counterexamples; the macOS
+  gate also builds the complete app. See [the packaging boundary](docs/quality/FAILURE_MODES.md#gr20--coordinated-app-replacement).
 
 ## Existing foundation
 
