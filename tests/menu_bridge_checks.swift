@@ -11,7 +11,7 @@ import Foundation
                     "https://user@github.com/yogoldy/RepoHub/issues/12", "https://github.com:443/yogoldy/RepoHub/issues/12"] {
             precondition(!MenuBridge.isReportIssueURL(URL(string:bad)!)); count += 1
         }
-        for action in ["requestNotifications", "notificationSettings", "privacySettings", "loginSettings", "openBackups", "toggleNotifications", "connectGitHub", "quit"] {
+        for action in ["requestNotifications", "notificationSettings", "privacySettings", "loginSettings", "openBackups", "toggleNotifications", "connectGitHub", "checkForUpdates", "quit"] {
             precondition(MenuBridge.action(body: ["action":action], frameURL: url, isMainFrame: true)?.rawValue == action)
             count += 1
         }
@@ -40,6 +40,12 @@ import Foundation
             precondition(MenuBridge.action(body:valid,frameURL:url,isMainFrame:false) == nil); count += 1
             precondition(MenuBridge.action(body:valid,frameURL:URL(string:"http://127.0.0.1:8767/views/test/index.html"),isMainFrame:true) == nil); count += 1
         }
+        let updateBody: [String: Any] = ["action": "checkForUpdates"]
+        let testURL = URL(string: "http://127.0.0.1:8780/menu.html")!
+        precondition(MenuBridge.action(body: updateBody, frameURL: testURL, isMainFrame: true) == nil)
+        precondition(MenuBridge.action(body: updateBody, frameURL: testURL, isMainFrame: true, expectedPort: 8780) == .checkForUpdates)
+        precondition(MenuBridge.action(body: ["action": "checkForUpdates", "url": "https://outside.example"], frameURL: url, isMainFrame: true) == nil)
+        count += 3
         let repoBody: [String: Any] = ["action":"openRepo", "repo_id":"Example-1234567890"]
         precondition(MenuBridge.action(body: repoBody, frameURL: url, isMainFrame: true) == .openRepo)
         count += 1
