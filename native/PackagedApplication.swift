@@ -131,6 +131,32 @@ final class PackagedApplication {
         process.standardError = logHandle
         try process.run()
         helper = process
+        let processes = ["app_pid": Int(ProcessInfo.processInfo.processIdentifier),
+                         "helper_pid": Int(process.processIdentifier)]
+        if let data = try? JSONSerialization.data(withJSONObject: processes) {
+            try? data.write(to: stateDirectory.appendingPathComponent("application-processes.json"), options: .atomic)
+        }
+    }
+
+    func prepareRecovery(targetBuild: String) throws -> Process {
+        let directory = stateDirectory.appendingPathComponent("app-rollbacks/" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        let rollback = directory.appendingPathComponent(bundle.bundleURL.lastPathComponent)
+        try FileManager.default.copyItem(at: bundle.bundleURL, to: rollback)
+        let record: [String: Any] = ["app": bundle.bundleURL.path, "rollback": rollback.path,
+            "state": stateDirectory.path, "bundle_id": release.bundle_id,
+            "target_build": targetBuild, "port": address.port!]
+        let recordURL = directory.appendingPathComponent("recovery.json")
+        try JSONSerialization.data(withJSONObject: record).write(to: recordURL, options: .atomic)
+        let guardProcess = Process()
+        guardProcess.executableURL = rollback.appendingPathComponent("Contents/Resources/python/bin/python3")
+        guardProcess.arguments = ["-E", "-s", "-B",
+            rollback.appendingPathComponent("Contents/Resources/runtime/update_recovery.py").path,
+            "--record", recordURL.path]
+        guardProcess.standardOutput = FileHandle.nullDevice
+        guardProcess.standardError = FileHandle.nullDevice
+        return guardProcess
     }
 
     func stopHelper() {

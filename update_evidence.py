@@ -4,7 +4,7 @@ import re
 PHASES = frozenset({'checking', 'waiting', 'downloading', 'installing', 'relaunching', 'ready', 'failed'})
 REASONS = frozenset({'user_requested', 'backup_busy', 'helper_shutdown', 'helper_stopped',
                      'verified_update', 'update_available', 'sparkle_aborted',
-                     'component_mismatch', 'matching_helper'})
+                     'component_mismatch', 'matching_helper', 'recovery_unavailable'})
 
 
 def update_evidence(value, release):

@@ -87,10 +87,22 @@ extension AppUpdates: SPUUpdaterDelegate {
         // SIGTERM in bundled mode waits for the backup lock. It never kills a
         // backup that started after the last status request.
         DispatchQueue.global().async {
-            self.application.stopHelper()
-            DispatchQueue.main.async {
-                self.record("installing", reason: "helper_stopped")
-                installHandler()
+            do {
+                let recovery = try self.application.prepareRecovery(targetBuild: item.versionString)
+                self.application.stopHelper()
+                try recovery.run()
+                DispatchQueue.main.async {
+                    self.record("installing", reason: "helper_stopped")
+                    installHandler()
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.record("failed", reason: "recovery_unavailable")
+                    let alert = NSAlert()
+                    alert.messageText = "The update is paused because a rollback copy could not be prepared."
+                    alert.informativeText = "Your installed app and backups have not been replaced. Quit and reopen RepoHub before retrying."
+                    alert.runModal()
+                }
             }
         }
         return true
