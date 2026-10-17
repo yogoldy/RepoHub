@@ -75,18 +75,24 @@ final class PackagedApplication {
               release.build == bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
               release.version == bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
               !release.files.isEmpty else { throw Failure.packageInvalid }
-        let root = resources.resolvingSymlinksInPath().path + "/"
+        guard let resolvedRoot = realpath(resources.path, nil) else { throw Failure.packageInvalid }
+        let root = String(cString: resolvedRoot) + "/"
+        free(resolvedRoot)
         var observed = Set<String>()
         guard let enumerator = FileManager.default.enumerator(
             at: resources, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]) else {
             throw Failure.packageInvalid
         }
         for case let path as URL in enumerator {
-            let relative = String(path.path.dropFirst(resources.path.count + 1))
+            guard path.path.hasPrefix(root) else { throw Failure.packageInvalid }
+            let relative = String(path.path.dropFirst(root.count))
             let values = try path.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             if values.isSymbolicLink == true {
                 enumerator.skipDescendants()
-                guard path.resolvingSymlinksInPath().path.hasPrefix(root),
+                guard let resolvedTarget = realpath(path.path, nil) else { throw Failure.packageInvalid }
+                let target = String(cString: resolvedTarget)
+                free(resolvedTarget)
+                guard target.hasPrefix(root),
                       let expected = release.files[relative], expected.sha256 == nil,
                       expected.link == (try FileManager.default.destinationOfSymbolicLink(atPath: path.path)) else {
                     throw Failure.packageInvalid
