@@ -40,8 +40,10 @@ class UpdateShutdownTests(unittest.TestCase):
             config_path.write_text(json.dumps(config))
             (repo / 'file').write_text('confirmed replacement contents')
             script = '''
-import json,sys,time
+import json,sys,time,faulthandler
 from pathlib import Path
+faulthandler.enable()
+faulthandler.dump_traceback_later(8, repeat=True)
 import repohub
 root=Path(sys.argv[1])
 original_load=repohub.load_json
@@ -49,6 +51,10 @@ release={'source_revision':'a'*40,'build':'100','bundle_id':'com.leogoldberg.rep
 def load(path,default):
     return release if Path(path).name=='release.json' else original_load(path,default)
 repohub.load_json=load
+# This case controls one manual publication, not background scheduler timing
+# or provider availability on the runner.
+repohub.Hub.automatic_tick=lambda self: None
+repohub.Hub.refresh_cloud=lambda self: None
 original_snapshot=repohub.snapshot
 def snapshot(*args,**kwargs):
     (root/'busy').touch()
@@ -65,8 +71,9 @@ repohub.main()
             process = subprocess.Popen([sys.executable, '-B', '-c', script, str(root)],
                                        cwd=ROOT, stdout=log, stderr=log)
             origin = 'http://127.0.0.1:' + str(config['port'])
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
             def get(path):
-                with urllib.request.urlopen(origin + path, timeout=1) as response:
+                with opener.open(origin + path, timeout=1) as response:
                     return json.load(response)
             try:
                 deadline = time.monotonic() + 10
@@ -76,11 +83,13 @@ repohub.main()
                         break
                     except OSError:
                         if time.monotonic() > deadline:
-                            self.fail('Synthetic helper did not start')
+                            log.flush()
+                            self.fail('Synthetic helper did not start; child evidence:\n' +
+                                      (root / 'child.log').read_text()[-4000:])
                         time.sleep(.05)
                 request = urllib.request.Request(origin + '/api/backup', data=b'{}', headers={
                     'Content-Type': 'application/json', 'Origin': origin, 'X-RepoHub-Token': token})
-                with urllib.request.urlopen(request, timeout=2):
+                with opener.open(request, timeout=2):
                     pass
                 deadline = time.monotonic() + 5
                 while not (root / 'busy').exists():
@@ -102,5 +111,11 @@ repohub.main()
                 (root / 'finish').touch()
                 if process.poll() is None:
                     process.terminate()
-                    process.wait(timeout=20)
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        # Failure cleanup owns only this disposable child. Product
+                        # shutdown still never force-kills an active backup.
+                        process.kill()
+                        process.wait(timeout=5)
                 log.close()
