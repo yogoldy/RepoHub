@@ -277,9 +277,16 @@
         explanation: 'RepoHub checked your project files and Git data against the saved backup. macOS confirmed that backup uploaded to iCloud.',
         note: 'Changes to Finder’s folder view settings don’t require a new backup.'},
       {category: 'backup_pending', icon: 'changed', title: 'A backup is waiting to run',
-        labels: 'First backup pending · Edits confirmed · Backup pending · Changes need verification · Only Git data changed · Only Git and file metadata changed · Only file metadata changed',
-        explanation: 'First backup pending means no archive exists yet. Edits confirmed means a hash comparison found project or Git changes against the saved archive. Backup pending means a backup is needed without that confirmed-edit evidence.',
-        note: 'The Only labels require a complete comparison showing no project-file changes. Git data includes version-control history and still needs a backup. Other file metadata remains eligible for backup; the expanded explanation distinguishes it from the ignored Finder exception. Review the separate Schedule row or use Back up now. Waiting for a scheduled attempt is normal and does not mean status checks failed.'},
+        definitions: [
+          ['First backup pending', 'RepoHub hasn’t created a backup for this repo yet.'],
+          ['Edits confirmed', 'RepoHub found project-file or Git changes since the saved backup.'],
+          ['Backup pending', 'RepoHub needs to create or update this repo’s backup.'],
+          ['Changes need verification', 'RepoHub needs a complete comparison before it can identify the changes.'],
+          ['Only Git data changed', 'Git history or other Git data changed; your project files match.'],
+          ['Only file metadata changed', 'File information changed; your project files and Git match.'],
+          ['Only Git and file metadata changed', 'Git data and file information changed; your project files match.'],
+        ],
+        note: 'Check the schedule or choose Back up now. Waiting for a scheduled backup is normal.'},
       {category: 'working', icon: 'copying', title: 'RepoHub or macOS is working',
         labels: 'Scanning · Checking again · Creating backup · Uploading',
         explanation: 'Scanning compares files with the archive. Checking again means files changed during that scan; RepoHub retries on the next scan. Creating backup packages and verifies the archive. Uploading means macOS reports transfer activity for that archive.',
@@ -301,6 +308,8 @@
       <div class="guide-heading"><span class="guide-symbol" aria-hidden="true">${icon(group.icon)}</span>
         <h4>${group.title}</h4></div>
       ${group.labels ? `<p class="guide-labels">${group.labels}</p>` : ''}
+      ${group.definitions ? `<dl class="guide-definitions">${group.definitions.map(
+        ([label, meaning]) => `<dt>${label}</dt><dd>${meaning}</dd>`).join('')}</dl>` : ''}
       ${group.explanation ? `<p>${group.explanation}</p>` : ''}
       ${group.note ? `<p class="guide-note">${group.note}</p>` : ''}</section>`).join('');
   }

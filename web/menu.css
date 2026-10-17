@@ -403,3 +403,19 @@ footer button:hover {
   color: var(--text);
   transition: color 150ms ease;
 }
+
+/* Put each status label beside its own short explanation. */
+.guide-definitions {
+  margin: 12px 0 0;
+}
+.guide-definitions dt {
+  color: var(--gold);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.guide-definitions dd {
+  margin: 3px 0 12px;
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}

@@ -78,7 +78,11 @@ console.log('Schedule wording uses effective policy without inventing next-run t
 
 const {present,legend}=require('../web/repo-status.js');
 const guide=legend();
-const examples=[good,finderIgnored,changed({repo_files:1}),{...good,needs_backup:true,last_backup:null},
+const examples=[good,finderIgnored,changed({repo_files:1}),
+ changed({repo_files:1,git_data:0,finder_metadata:0}),
+ changed({repo_files:0,git_data:1,finder_metadata:0}),
+ changed({repo_files:0,git_data:0,finder_metadata:1}),
+ changed({repo_files:0,git_data:1,finder_metadata:1}),{...good,needs_backup:true,last_backup:null},
  {...good,needs_backup:true},{...good,verification:{state:'checking'}},changing,
  {...good,cloud:{state:'uploading',archive:'/current'}},
  {...good,cloud:{state:'pending',archive:'/current'}},
