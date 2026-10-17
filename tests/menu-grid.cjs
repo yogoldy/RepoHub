@@ -21,7 +21,6 @@ class Element {
     this.attributes = {};
     this.childNodes = [];
     this.events = {};
-    this.style = {values: {}, setProperty(key, value) { this.values[key] = value; }};
     this.dataset = new Proxy({}, {
       get: (_, key) => this.attributes['data-' + key.replace(/[A-Z]/g, c => '-' + c.toLowerCase())],
       set: (_, key, value) => { this.setAttribute('data-' + key.replace(/[A-Z]/g,
@@ -167,17 +166,14 @@ cards()[4].click();
 assert.equal(last()[3], 'id-4');
 assert.equal(get('cards').children.length, 7);
 assert.equal(get('technical-details').dataset.repoId, 'id-4');
-assert.equal(get('cards').style.values['--selected-column'], String(4 % columns + 1));
 assert.equal(cards()[0].getAttribute('aria-expanded'), 'false');
 columns = 2;
 vm.runInContext('updatePosition()', context);
 assert.equal(get('cards').children.length, 7);
 assert.equal(get('technical-details').dataset.repoId, 'id-4');
-assert.equal(get('cards').style.values['--selected-column'], String(4 % columns + 1));
 cards()[2].click();
 assert.equal(get('cards').children.length, 7);
 assert.equal(get('technical-details').dataset.repoId, 'id-2');
-assert.equal(get('cards').style.values['--selected-column'], String(2 % columns + 1));
 assert.equal(root.querySelectorAll('#technical-details').length, 1);
 cards()[2].click();
 render();

@@ -565,7 +565,7 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 }
 .card-grid[data-focused="true"] .card-slot:not([hidden]) {
   grid-row: 1;
-  grid-column: var(--selected-column);
+  grid-column: 1;
 }
 #all-repos {
   padding: 4px 8px;

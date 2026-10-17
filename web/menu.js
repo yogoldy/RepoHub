@@ -159,10 +159,6 @@ function gridColumns() {
 function arrangeRepoGrid(slots) {
   const grid = $('#cards');
   const desired = [...slots];
-  const selectedIndex = menuState.repos.findIndex(repo => repo.id === selectedId);
-  if (selectedIndex >= 0) {
-    grid.style.setProperty('--selected-column', String(selectedIndex % gridColumns() + 1));
-  }
   if (!slots.length) {
     const empty = document.createElement('p');
     empty.className = 'empty';
