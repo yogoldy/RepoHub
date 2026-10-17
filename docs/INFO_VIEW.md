@@ -34,3 +34,13 @@ two-Mac acceptance matrix.
 - Installed native-menu behavior and release Golden Gate are not acceptance
   evidence for this change yet. Neither Mac was deployed and no protected PR
   promotion occurred. The preview blocks writes and native actions.
+
+
+## Status-clarity update — October 16, 2026
+
+The information view now explains each current compact label within six visual
+categories. It distinguishes strict green success from the informational Finder
+exception, hash-confirmed edits from pending work, observed upload from cloud
+acknowledgement, and schedule waiting from unavailable checks. All presentation
+labels are covered by the shared guide regression. The existing Things to know
+content remains; a first-launch/repeatable tutorial is still future work.

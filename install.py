@@ -93,7 +93,7 @@ def main():
 
     runtime = STATE / "runtime"
     runtime.mkdir(exist_ok=True)
-    for name in ("helper_launch.py", "repohub.py", "access_checks.py", "workspace_registry.py", "backup_changes.py", "backup_lifecycle.py", "backup_policy.py", "status_health.py", "diagnostics.py", "change_evidence.py", "diagnostics_report.py", "diagnostic_export.py", "report_preview.py", "report_delivery.py"):
+    for name in ("helper_launch.py", "update_evidence.py", "update_recovery.py", "repohub.py", "access_checks.py", "workspace_registry.py", "backup_changes.py", "backup_lifecycle.py", "backup_policy.py", "status_health.py", "diagnostics.py", "change_evidence.py", "diagnostics_report.py", "diagnostic_export.py", "report_preview.py", "report_delivery.py"):
         shutil.copy2(SOURCE / name, runtime / name)
     shutil.copytree(SOURCE / "web", runtime / "web", dirs_exist_ok=True)
     config = {"repos_root": str(HOME_DIR / "Desktop/repos"),
@@ -113,7 +113,7 @@ def main():
     run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/CloudStatus.swift"), "-o", str(cloud_binary),
         "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0")
     shutil.copy2(cloud_binary, runtime / "cloud-status")
-    run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), str(SOURCE / "native/HelperLaunch.swift"), str(SOURCE / "native/BackupReadiness.swift"), str(SOURCE / "native/ProblemAlerts.swift"), str(SOURCE / "native/MenuBridge.swift"), str(SOURCE / "native/GitHubConnection.swift"), "-o", str(app_binary),
+    run("/usr/bin/xcrun", "swiftc", str(SOURCE / "native/RepoHub.swift"), str(SOURCE / "native/HelperLaunch.swift"), str(SOURCE / "native/BackupReadiness.swift"), str(SOURCE / "native/ProblemAlerts.swift"), str(SOURCE / "native/MenuBridge.swift"), str(SOURCE / "native/GitHubConnection.swift"), str(SOURCE / "native/PackagedApplication.swift"), str(SOURCE / "native/AppUpdates.swift"), "-o", str(app_binary),
         "-module-cache-path", "/private/tmp/repohub-swift-cache", "-target", platform.machine() + "-apple-macos13.0",
         "-framework", "AppKit", "-framework", "WebKit", "-framework", "UserNotifications")
     (APP / "Contents/MacOS").mkdir(parents=True, exist_ok=True)

@@ -59,3 +59,217 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
     grid-template-columns: 1fr;
   }
 }
+
+
+/* The selected repo explains its state before presenting technical evidence. */
+.card-status {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.repo-card {
+  height: 124px;
+}
+.detail-context {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.detail .status-headline {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0 0 9px;
+  overflow-wrap: anywhere;
+}
+.status-explanation {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+}
+.last-backup {
+  font-size: 10px;
+  margin: 14px 0;
+  line-height: 1.5;
+}
+.last-backup span {
+  color: var(--muted);
+  margin-right: 5px;
+}
+#repo-schedule {
+  justify-content: space-between;
+  text-align: left;
+}
+.schedule-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.schedule-copy strong {
+  font-weight: 500;
+  line-height: 1.4;
+}
+.schedule-copy small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+#technical-details {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#technical-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+#technical-details summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+#technical-details .facts {
+  color: var(--text);
+  gap: 14px;
+}
+.progress-line {
+  flex-wrap: wrap;
+  line-height: 1.5;
+}
+.progress-line progress {
+  min-width: 80px;
+}
+
+
+.report-status {
+  margin-top: 12px;
+  padding: 5px 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.report-status:hover {
+  background: transparent;
+  color: var(--text);
+}
+
+
+#info-dialog .status-legend {
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+#info-dialog > .settings-heading {
+  flex: none;
+  background: var(--bg);
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.status-guide-item {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 15px;
+}
+.guide-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.guide-heading h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.status-guide-item p {
+  font-size: 11px;
+  line-height: 1.65;
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
+.status-guide-item .guide-labels {
+  color: var(--gold);
+  font-size: 10px;
+}
+.status-guide-item .guide-note {
+  color: var(--muted);
+}
+.status-legend .status-guide-item .guide-symbol svg {
+  color: var(--gold);
+}
+.status-guide-item[data-category="backed_up"] .guide-symbol svg {
+  color: var(--green);
+}
+.status-guide-item[data-category="failure"] .guide-symbol svg {
+  color: var(--red);
+}
+
+
+/* Scroll only the guide body: no text can pass behind or above its title. */
+#info-dialog {
+  padding: 0;
+  overflow: hidden;
+}
+#info-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.info-content {
+  min-height: 0;
+  contain: layout paint;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+
+/* Larger reading text without changing status evidence or success icons. */
+.card-name { font-size: 13px; }
+.card-status, #summary { font-size: 12px; }
+.detail-context, .last-backup, .report-status { font-size: 12px; }
+.status-explanation { font-size: 14px; }
+#technical-details, #technical-details .facts { font-size: 12px; }
+#technical-details .fact small, .schedule-copy small { font-size: 11px; }
+#repo-schedule { font-size: 12px; }
+#info-dialog .settings-heading h2 { font-size: 20px; }
+#info-dialog h3, .guide-heading h4 { font-size: 14px; }
+.status-guide-item p, #info-dialog .things-key p { font-size: 13px; }
+.status-guide-item .guide-labels { font-size: 12px; }
+
+/* Green is a prose treatment here; pending work keeps its existing icon. */
+.status-explanation[data-category="backup_pending"],
+.technical-explanation[data-category="backup_pending"] {
+  color: var(--green);
+}
+
+/* Specific metadata labels can wrap without colliding with the repo name. */
+.repo-card {
+  height: 156px;
+}
+
+
+/* Dates describe a saved archive; the next line describes scheduler eligibility. */
+.backup-timing {
+  margin: 14px 0;
+}
+.backup-timing p {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  margin: 7px 0;
+}
+.backup-timing .backup-inclusion {
+  font-size: 13px;
+}
+
+/* Explanatory prose uses a consistent reading color; status icons carry state. */
+.status-explanation,
+.technical-explanation {
+  color: var(--green);
+}

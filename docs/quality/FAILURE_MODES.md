@@ -508,3 +508,116 @@ same-PID SIGTERM ownership. Detached watchdogs include the builder dependency.
 These checks prevent lifecycle/packaging regressions; only actual native reads
 can prove TCC permission behavior. A new candidate must repeat the full matrix
 on both Macs, including refusal/restoration/restart.
+
+
+## Status wording must not become backup evidence — October 16, 2026
+
+Presentation grouping can accidentally promote a Finder-only exception, a stale
+frame or a different archive's upload into success. Keep the existing internal
+policy intact; independently validate the new category and sentence against the
+original observation. GR06 and GR09 require cross-language mapping/counterexample
+and export-privacy regressions. Unknown evidence stays unknown. Native pixel,
+wrapping and installed-menu checks remain separate from diagnostic agreement.
+
+
+## Information guide title overlaps scrolling text — October 16, 2026
+
+A sticky heading inside a padded scrolling dialog left an exposed strip above
+it. Separating the full-width header from the guide scroll container removes
+that overlap. Keyboard focus can also scroll an overflow-hidden ancestor when
+descendant content contributes to its scroll area: layout/paint containment on
+the guide body prevents that second failure. Browser keyboard-to-bottom evidence
+kept the outer dialog at scroll zero. Native WebKit scrolling, narrow-window
+wrapping and keyboard/Escape remain release acceptance checks; this browser
+result does not close that backlog.
+
+
+## Timing evidence must agree without destroying observation identity
+
+Secondary location/due/date/countdown claims now have independent selected-repo
+receipts. Private date strings are compared against the original observation;
+only fixed codes and bounded whole minutes enter logs/exports. Unknown types,
+missing selected receipts and arbitrary dates fail closed. GR06/GR07/GR09 name
+the new regressions. Existing CI test discovery needs no YAML modification.
+
+A first implementation included each poll's observed_at in snapshot identity,
+breaking cross-view correlation even when meaningful evidence was unchanged.
+Drop that sampling field and bucket remaining time to displayed whole minutes
+for identity; retain original snapshots unchanged. Periodic due dates use the
+saved wall-clock anchor directly, avoiding floating subtraction drift.
+Native countdown readability and actual sleep/power behavior remain unproven.
+
+
+### Whole-minute countdown boundary
+
+Browser acceptance found a nominal 30-minute wait displaying 31 minutes. Tiny
+monotonic/wall-clock floating-point conversion noise rounded upward twice: once
+to seconds and again to minutes. Derive remaining seconds from the projected
+wall due time and remove sub-millisecond noise before the existing upward
+rounding. A deterministic fractional-clock counterexample protects the boundary;
+scheduler eligibility itself is unchanged.
+
+
+## GR20 — coordinated app replacement
+
+An ad-hoc native replacement lost its prior macOS permission requirement and
+rolled back, while a browser preview continued serving newer web assets against
+an older helper. A working source build did not mean that the installed app had
+updated. The new bundle builder pins Python and Sparkle, includes web/helper
+resources in one manifest, and checks that the connected helper reports the
+same release before loading the menu. Test bundles use a disposable identity,
+state and port. Native integrity and complete Sparkle package builds now run
+inside the existing macOS gate; the workflow invokes that gate already.
+
+A SIGTERM to a bundled helper waits for the actual backup lock, covering a
+backup that begins after a native idle check. The updater never sends SIGKILL.
+Actual signed-upgrade/failure recovery remains acceptance work. Production
+signing, notarization and permission continuity are not established by ad-hoc
+test signatures. No daily installation or launch registration is changed.
+
+
+### Loopback startup must not depend on hostname resolution
+
+The first updater CI run timed out starting the synthetic helper. Isolating
+scheduler/proxy inputs did not fix it. The retained child stack from the second
+run showed `HTTPServer.server_bind` blocked in `socket.getfqdn` under the runner's
+Python 3.15. Bind with TCPServer and assign the fixed loopback name/actual port;
+no resolver is needed. A deterministic regression makes getfqdn raise, confirms
+the standard server counterexample, and requires the RepoHub server to bind.
+Wildcard binding is rejected. This is an application change, so prior native
+updater acceptance is historical until repeated for the new candidate.
+
+
+## GR21 — accepted source and atomic release availability
+
+A passing feature-branch or PR gate is not an accepted main release. Publication
+requires the successful main-push workflow and job for the checked-out exact SHA;
+a new main commit during upload prevents that draft from publishing. Tests inject
+upload failure, altered downloaded assets and superseding source, and require no
+publication or package deletion. Latest-release uncertainty or a bad historical
+receipt prevents all cleanup. Cleanup retains current plus three prior managed
+packages and preserves tags and unrelated releases. The workflow is syntax-checked
+by pinned actionlint inside the macOS Golden Gate. Real Apple service/GitHub
+publication remains open until credentials and the first production release.
+
+### GitHub drafts do not yet create their Git tag
+
+The first local publishing gate passed, but a real disposable GitHub draft probe
+showed the draft's exact target was present while no tag existed. An immediate
+`commits/<tag>` verification would therefore stop every first publication. Check
+for conflicting existing tags before creating the draft; validate the draft's
+exact target SHA, and resolve the tag after publication. The regression includes
+a missing-tag normal case, foreign tag collision and moving-branch draft target.
+The actual text-fixture upload/download matched and its draft/assets were removed.
+No production update was published.
+
+### Explicit personal delivery before Apple signing
+
+Apple distribution readiness was incorrectly made a dependency of personal
+Sparkle delivery. An explicit personal_adhoc mode preserves HTTPS, bundle identity,
+archive authentication, exact-main acceptance and retention guards while omitting
+Apple submission. Conflicting app/manifest distribution flags are rejected.
+Background discovery uses Sparkle's actual SUScheduledCheckInterval key and
+one-hour minimum; the native settings check reads the built bundle through
+SPUUpdaterSettings. Silent installation remains disabled. Developer ID mode keeps
+its original certificate/notary requirements.

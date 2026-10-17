@@ -3,9 +3,10 @@
   function create(surface,{native=false,fetcher=root.fetch.bind(root),clock=Date.now,clientId}={}){
     if(!clientId){const bytes=new Uint8Array(12);root.crypto.getRandomValues(bytes);clientId=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');}
     let last='',lastAt=0,pending=false,deferred=null;
-    async function observe(status,rows,clientFreshness="current"){
+    async function observe(status,rows,clientFreshness="current",selectedRepoId=null){
       if(!status?.diagnostic_observation_id)return false;
       const body={surface,native,client_id:clientId,observation_id:status.diagnostic_observation_id,policy_version:root.RepoStatus?.version||'change-evidence-1',client_freshness:clientFreshness,rows};
+      if(surface==='menu'&&body.policy_version==='status-clarity-4')body.selected_repo_id=selectedRepoId;
       const signature=JSON.stringify(body),now=clock();
       if(clientFreshness!=='current')deferred=signature;
       if(pending)return false;

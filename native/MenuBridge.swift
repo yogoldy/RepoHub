@@ -1,7 +1,7 @@
 import Foundation
 
 enum MenuAction: String {
-    case requestNotifications, notificationSettings, privacySettings, loginSettings, openBackups, openRepo, toggleNotifications, connectGitHub, chooseRepoHome, chooseRepoFolders, quit
+    case requestNotifications, notificationSettings, privacySettings, loginSettings, openBackups, openRepo, toggleNotifications, connectGitHub, chooseRepoHome, chooseRepoFolders, checkForUpdates, quit
 }
 
 enum MenuBridge {
@@ -17,9 +17,9 @@ enum MenuBridge {
 
     // Only the exact top-level menu page gets fixed actions. Repo IDs are resolved
     // from fresh helper status; page-supplied paths/URLs/commands are never accepted.
-    static func action(body: Any, frameURL: URL?, isMainFrame: Bool) -> MenuAction? {
+    static func action(body: Any, frameURL: URL?, isMainFrame: Bool, expectedPort: Int = 8767) -> MenuAction? {
         guard isMainFrame, let url = frameURL, url.scheme == "http",
-              url.host == "127.0.0.1", url.port == 8767, url.path == "/menu.html",
+              url.host == "127.0.0.1", url.port == expectedPort, url.path == "/menu.html",
               let payload = body as? [String: Any], let raw = payload["action"] as? String,
               let action = MenuAction(rawValue: raw) else { return nil }
         if action == .openRepo {

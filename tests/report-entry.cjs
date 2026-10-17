@@ -5,7 +5,7 @@ async function surface(file){
   const html=fs.readFileSync(path.join(root,'web',file),'utf8');
   const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
   assert.equal(new Set(ids).size,ids.length,'unique IDs');
-  for(const id of ['report-bug','report-feature','report-dialog','report-form','report-send'])assert(ids.includes(id),`${file}: ${id} reachable`);
+  for(const id of ['report-bug','report-feature','report-dialog','report-form','report-send','report-context'])assert(ids.includes(id),`${file}: ${id} reachable`);
   assert(html.includes('/report.css'));
   assert(html.indexOf(file==='menu.html'?'/menu.js':'/app.js')<html.indexOf('/report-preview.js'),'host initializes before report controller');
   class Element{
@@ -30,10 +30,21 @@ async function surface(file){
   assert(!get('report-setup').hidden);get('report-setup').onclick();assert.equal(nativeCalls[0],'connectGitHub');
   await get('report-bug').onclick();
   assert(get('report-dialog').open);assert.equal(get('report-heading').textContent,'Report a glitch');assert(get('report-expected').required);assert(get('report-diagnostics').checked);
+  await context.window.RepoHubReports.openStatus({label:'Edits confirmed',headline:'RepoHub confirmed edits.',technicalDetail:'/Users/private/secret.env',name:'Private client'});
+  assert.equal(get('report-title').value,'Repo status: Edits confirmed');
+  assert.match(get('report-description').value,/RepoHub confirmed edits/);
+  assert(!get('report-description').value.includes('Private client'));
+  assert(!get('report-description').value.includes('/Users/private'));
+  assert.equal(calls.filter(x=>x.url==='/api/reports/preview'||x.url==='/api/reports/send').length,0,'opening status report never previews or sends');
   get('report-title').value='Synthetic bug';get('report-description').value='Synthetic glitch';get('report-expected').value='Expected behavior';
   await get('report-form').onsubmit({preventDefault(){}});assert(!get('report-preview').hidden);assert(!accepted);
   const bug=calls.find(x=>x.url==='/api/reports/preview').payload;assert.equal(bug.type,'bug');assert.equal(bug.expected,'Expected behavior');assert.equal(bug.include_diagnostics,true);
   get('report-back').onclick();
+  get('report-cancel').onclick();
+  await context.window.RepoHubReports.openStatus({label:'Scanning',headline:'RepoHub is scanning for changes…'});
+  assert.equal(get('report-title').value,'Synthetic bug','status entry preserves existing draft');
+  assert.equal(get('report-description').value,'Synthetic glitch');
+  assert.match(get('report-context').textContent,/scanning/);
   get('report-cancel').onclick();await get('report-feature').onclick();assert.equal(get('report-heading').textContent,'Request a feature');assert(!get('report-diagnostics').checked);assert(get('report-expected-label').hidden);
   get('report-title').value='Synthetic feature';get('report-description').value='Synthetic idea';
   get('report-cancel').onclick();await get('report-bug').onclick();assert.equal(get('report-title').value,'Synthetic bug','independent bug draft retained');

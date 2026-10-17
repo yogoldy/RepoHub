@@ -1,5 +1,7 @@
 """Small, explicit backup scheduling and macOS power-source adapter."""
 import copy
+import math
+from datetime import datetime, timezone
 import subprocess
 
 FREQUENCIES = (0, 15, 30, 60, 120, 240)
@@ -98,3 +100,55 @@ class BackupScheduler:
     def manual_completed(self, now):
         self.last_periodic = now
         self.periodic = {}
+
+
+def project_schedule(scheduler, settings, source, row, wall_now, monotonic_now,
+                     last_periodic_at, repo_periodic_at, busy=False, overrides=None):
+    """Read-only eligibility forecast using the same plan and saved cadence clocks.
+
+    Never advance clocks here. A due time is eligibility, not a start/completion
+    promise. Manual resets and failed attempts retain the existing policy.
+    """
+    observed = datetime.fromtimestamp(wall_now, timezone.utc).isoformat()
+    result = {"state": "unavailable", "reason": "power_unknown", "due_at": None,
+              "due_in_seconds": None, "observed_at": observed}
+    overrides = overrides or {}
+    policy = overrides.get(row["id"], settings).get(source)
+    if not policy:
+        return result
+    shadow = copy.copy(scheduler)
+    shadow.last_periodic = monotonic_now - max(0, wall_now - last_periodic_at)
+    shadow.periodic = {key: monotonic_now - max(0, wall_now - timestamp)
+                       for key, timestamp in repo_periodic_at.items()}
+    candidates = []
+    frequency = policy["frequency_minutes"] * 60
+    if frequency:
+        due = shadow.periodic.get(row["id"], shadow.last_periodic) + frequency
+        candidates.append((due, "periodic"))
+    if policy["after_edits"] and row.get("needs_backup") and not row.get("error"):
+        changed = shadow.changes.get(row["id"])
+        if changed:
+            quiet_due = changed[1] + policy["edit_delay_minutes"] * 60
+            retry_due = shadow.attempts.get(row["id"], float("-inf")) + 300
+            candidates.append((max(quiet_due, retry_due), "edits"))
+    if not candidates:
+        state = "manual" if not frequency and not policy["after_edits"] else "awaiting_edits"
+        if policy["after_edits"] and row.get("error"):
+            state = "blocked"
+        result.update(state=state, reason=state)
+        return result
+    due, reason = min(candidates, key=lambda candidate: candidate[0])
+    # Preserve periodic precedence when multiple triggers are already eligible.
+    selected = shadow.plan(settings, source, [row], monotonic_now,
+                           overrides)
+    if selected and selected.get("periodic_keys"):
+        due, reason = next(candidate for candidate in candidates if candidate[1] == "periodic")
+    eligible = selected is not None
+    wall_due = wall_now + due - monotonic_now
+    if reason == "periodic":
+        anchor = repo_periodic_at.get(row["id"], last_periodic_at)
+        wall_due = max(anchor, wall_now) + frequency if anchor > wall_now else anchor + frequency
+    result.update(state=("busy" if busy else "due") if eligible else "scheduled",
+                  reason=reason, due_at=datetime.fromtimestamp(wall_due, timezone.utc).isoformat(),
+                  due_in_seconds=max(0, math.ceil(round(wall_due - wall_now, 4))))
+    return result

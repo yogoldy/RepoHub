@@ -63,3 +63,27 @@ check(namedA,'error',false,{errors:[{repo:'Project',repo_id:'project-a',error:'f
 check(namedB,'ready',true,{errors:[{repo:'Project',repo_id:'project-a',error:'fixture'}]});
 check(namedA,'ready',true,{errors:[{repo:'Project',repo_id:null,error:'fixture'}]});
 console.log(count+' menu status checks passed');
+
+const {describeSchedule}=require('../web/repo-status.js');
+const policy={frequency_minutes:60,after_edits:false,edit_delay_minutes:5};
+const scheduled={backup_settings:{adapter:policy,battery:{...policy,frequency_minutes:0}},schedule_override:true};
+assert.equal(describeSchedule(scheduled,'adapter').label,'Every hour');
+assert.equal(describeSchedule(scheduled,'battery').label,'Manual only');
+assert.equal(describeSchedule(scheduled,'unknown').label,'Schedule unavailable');
+assert.equal(describeSchedule({},'adapter').label,'Schedule unavailable');
+assert.match(describeSchedule(scheduled,'adapter').detail,/Custom schedule/);
+assert.equal(describeSchedule({backup_settings:{adapter:{...policy,frequency_minutes:0,after_edits:true}}},'adapter').label,'5 minutes after edits settle');
+assert.equal(describeSchedule({backup_settings:{adapter:{...policy,frequency_minutes:'60'}}},'adapter').label,'Schedule unavailable');
+console.log('Schedule wording uses effective policy without inventing next-run times');
+
+const {present,legend}=require('../web/repo-status.js');
+const guide=legend();
+const examples=[good,finderIgnored,changed({repo_files:1}),{...good,needs_backup:true,last_backup:null},
+ {...good,needs_backup:true},{...good,verification:{state:'checking'}},changing,
+ {...good,cloud:{state:'uploading',archive:'/current'}},
+ {...good,cloud:{state:'pending',archive:'/current'}},
+ {...good,cloud:{state:'unknown'}},{...good,health:{fresh:false}},{...good,error:'fixture'}];
+for(const repo of examples){const state=present(repo);assert(guide.includes(state.label),'guide explains '+state.label);}
+assert(guide.includes(present(good,{running:true,current_repo_id:good.id}).label));
+assert.equal((guide.match(/class="status-guide-item"/g)||[]).length,6);
+console.log('Every presented label has an explanation in the six-category guide');

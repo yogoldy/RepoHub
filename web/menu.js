@@ -1,5 +1,6 @@
 let observedMenuState=null,clientFreshness='current';
 let retryingRepo=null;
+const technicalOpen = new Set();
 const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
 let menuState=null,selectedId=null,sessionToken='',loading=false,lastResponseAt=0,settingsRevision='',settingsRepo=null,defaultsRevision='',settingsDefaults=null;
 const $=s=>document.querySelector(s);
@@ -8,7 +9,7 @@ function when(value){if(!value)return 'Not yet';return new Date(value).toLocaleS
 function bytes(n){if(!Number.isFinite(n))return '—';const units=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<3){n/=1024;i++;}return new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(n)+' '+units[i];}
 async function api(path,payload){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);try{const response=await fetch(path,{signal:controller.signal,...(payload===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-RepoHub-Token':sessionToken},body:JSON.stringify(payload)})});const value=await response.json();if(!response.ok)throw new Error(value.error||'Request failed');return value;}finally{clearTimeout(timer);}}
 function nativeAction(action,repoId){const bridge=window.webkit?.messageHandlers?.repoHub;if(!bridge){$('#notice').textContent='This control is available from the Mac menu bar.';return false;}bridge.postMessage(repoId?{action,repo_id:repoId}:{action});return true;}
-function view(repo){return RepoStatus.view(repo,menuState?.backup);}
+function view(repo){return RepoStatus.present(repo,menuState?.backup);}
 $('#status-legend').innerHTML=RepoStatus.legend();
 
 const infoDialog = $('#info-dialog');
@@ -30,11 +31,14 @@ $('#show-folder').onclick=()=>{
 window.addEventListener('repoHubFinderError',e=>{$('#notice').textContent=e.detail;});
 function percentLabel(percent){return percent.toFixed(1).replace(/\.0$/,'')+'%';}
 function render(){
+  $('#quit').title = menuState.application_release
+    ? 'Quit RepoHub after any current backup finishes'
+    : 'Quit menu-bar app; the backup helper keeps running';
   const repos=menuState.repos||[];
   if(!repos.some(r=>r.id===selectedId))selectedId=repos[0]?.id||null;
   const ready=repos.filter(r=>view(r).ready).length;
-  const ignored=repos.filter(r=>view(r).phase==='background').length;
-  $('#summary').textContent=repos.length?(ignored?`${ready} fully matched · ${ignored} Finder-only · ${repos.length} repos`:`${ready} of ${repos.length} repos backed up`):'No repos found';
+  $('#summary').textContent = repos.length
+    ? `${ready} of ${repos.length} repos fully verified and uploaded` : 'No repos found';
   $('#backup').disabled=!!menuState.backup?.running;
   $('#backup').lastElementChild.textContent=menuState.backup?.running?'Backing up…':'Back up now';
   const problems=menuState.problems||[];
@@ -44,34 +48,104 @@ function render(){
     let button=existing.get(repo.id);
     if(!button){const slot=document.createElement('div');slot.className='card-slot';button=document.createElement('button');button.type='button';button.dataset.repoId=repo.id;button.addEventListener('click',()=>selectRepo(repo.id));slot.append(button);const folder=document.createElement('button');folder.type='button';folder.className='open-repo';folder.setAttribute('aria-label','Open '+repo.name+' in Finder');folder.title='Open '+repo.name+' on this Mac in Finder';folder.innerHTML='<span class="folder-shape" aria-hidden="true"></span>';folder.onclick=()=>nativeAction('openRepo',repo.id);folder.disabled=!window.webkit?.messageHandlers?.repoHub;if(folder.disabled)folder.title+=' · Available from the Mac menu bar';slot.append(folder);}
     const state=view(repo),label=state.label+(state.percent===null?'':' · '+percentLabel(state.percent));
-    button.className='repo-card '+state.phase;button.setAttribute('aria-pressed',String(repo.id===selectedId));button.setAttribute('aria-label',repo.name+' · '+label);button.setAttribute('aria-controls','detail');
-    const markup=`<span class="card-top"><span class="folder-placeholder" aria-hidden="true"></span><span class="status-mark" aria-hidden="true">${RepoStatus.icon(state.phase)}</span></span><span class="card-name">${escape(repo.name)}</span><span class="card-status">${escape(label)}</span>`;
+    button.className='repo-card '+state.phase;button.dataset.category=state.category;button.dataset.headline=state.headline;button.setAttribute('aria-description',state.headline);button.setAttribute('aria-pressed',String(repo.id===selectedId));button.setAttribute('aria-label',repo.name+' · '+label);button.setAttribute('aria-controls','detail');
+    const markup=`<span class="card-top"><span class="folder-placeholder" aria-hidden="true"></span><span class="status-mark" aria-hidden="true">${RepoStatus.categoryIcon(state)}</span></span><span class="card-name">${escape(repo.name)}</span><span class="card-status">${escape(label)}</span>`;
     if(button.innerHTML!==markup)button.innerHTML=markup;
     return button.parentElement;
   });
   const oldIds=[...existing.keys()].join('|'),newIds=repos.map(r=>r.id).join('|');
   if(oldIds!==newIds||!repos.length){const offset=rail.scrollLeft;rail.replaceChildren(...buttons);rail.scrollLeft=offset;if(!repos.length)rail.innerHTML='<p class="empty">Repos will appear here when added to your repos folder.</p>';}
   renderDetail();updatePosition();
-  void diagnosticView.observe(observedMenuState,[...rail.querySelectorAll('.repo-card')].map(button=>({repo_id:button.dataset.repoId,phase:button.className.split(' ')[1],display_label:button.querySelector('.card-status').textContent.split(' · ')[0],ready:button.classList.contains('ready')})),clientFreshness);
+  const displayedRows = [...rail.querySelectorAll('.repo-card')].map(button => {
+    const row = {repo_id: button.dataset.repoId, phase: button.className.split(' ')[1],
+      display_label: button.querySelector('.card-status').textContent.split(' · ')[0],
+      ready: button.classList.contains('ready'), category: button.dataset.category,
+      display_headline: button.dataset.headline};
+    if (row.repo_id === selectedId) row.timing = JSON.parse($('#backup-timing').dataset.receipt);
+    return row;
+  });
+  void diagnosticView.observe(observedMenuState, displayedRows, clientFreshness, selectedId);
   const notifications=menuState.notifications||{},enabled=notifications.enabled===true;
   $('#notifications').setAttribute('aria-pressed',String(enabled));
   $('#notification-caption').textContent=notifications.permission==='denied'?'macOS permission needed':enabled?'On':'Off';
   $('#checked').textContent='Live · Checked '+when(menuState.cloud_checked_at);
   for(const id of ['open-backups','notifications','quit']){$('#'+id).disabled=!window.webkit?.messageHandlers?.repoHub;if($('#'+id).disabled)$('#'+id).title='Available in the Mac menu-bar panel';}
 }
-function renderDetail(){
-  const repo=menuState.repos.find(r=>r.id===selectedId);if(!repo){$('#detail').innerHTML='<p class="empty">Select a repo to see its backup.</p>';return;}
-  const state=view(repo),cloud=repo.cloud||{},copying=state.phase==='copying',uploading=cloud.state==='uploading'||cloud.state==='pending';
-  const showProgress=repo.health?.fresh===true&&(copying||uploading),label=copying?'Building backup':state.percent===null?'Waiting for upload progress':state.percent===100?'100% · awaiting confirmation':percentLabel(state.percent);
-  const progress=showProgress?`<div class="progress-line"><progress max="100" ${!copying&&state.percent!==null?`value="${state.percent}"`:''} aria-label="${escape(repo.name)} ${copying?'backup':'upload'} progress"></progress><span>${escape(label)}</span></div>`:'';
-  const markup=`<div class="detail-top"><h2>${escape(repo.name)}</h2><span class="pill ${escape(state.phase)}">${escape(state.label)}</span></div><p class="detail-note" title="${escape(state.detail)}">${escape(state.detail)}</p>${progress}${['changing','error'].includes(repo.verification?.state)?`<button id="retry-check" class="repo-schedule" ${retryingRepo===repo.id?'disabled':''}>${retryingRepo===repo.id?'Check requested…':'Retry check now'}</button>`:''}<div class="facts"><div class="fact"><small>Last backup saved</small>${when(repo.last_backup?.completed_at)}</div><div class="fact"><small>Hashes checked</small>${when(repo.verification?.checked_at)}</div><div class="fact"><small>Backup size</small>${bytes(repo.last_backup?.archive_bytes)}</div></div><button id="repo-schedule" class="repo-schedule" aria-label="Schedule for ${escape(repo.name)}">Schedule <span>${repo.schedule_override?'Custom':'Default'}</span><span aria-hidden="true">›</span></button>`;
-  if($('#detail').innerHTML!==markup)$('#detail').innerHTML=markup;
-  $('#repo-schedule').onclick=()=>openSettings(repo.id);
-  if($('#retry-check'))$('#retry-check').onclick=async()=>{
-    retryingRepo=repo.id;renderDetail();
-    try{sessionToken=(await api('/api/session')).token;await api('/api/retry-check',{repo_id:repo.id});$('#notice').textContent='Check requested for '+repo.name+'.';}
-    catch(e){$('#notice').textContent=e.message;}
-    finally{setTimeout(()=>{retryingRepo=null;void load();},1000);}
+function renderDetail() {
+  const repo = menuState.repos.find(row => row.id === selectedId);
+  if (!repo) {
+    $('#detail').innerHTML = '<p class="empty">Select a repo to see its backup.</p>';
+    return;
+  }
+  const state = view(repo);
+  const cloud = repo.cloud || {};
+  const copying = state.phase === 'copying';
+  const uploading = state.phase === 'uploading'
+    && cloud.archive === repo.last_backup?.archive;
+  const showProgress = repo.health?.fresh === true && (copying || uploading);
+  const progressLabel = copying ? 'Creating and verifying the archive'
+    : state.percent === null ? 'macOS has not supplied a percentage'
+    : state.percent === 100 ? '100% · waiting for completion confirmation' : percentLabel(state.percent);
+  const progress = showProgress ? `<div class="progress-line"><progress max="100"
+    ${!copying && state.percent !== null ? `value="${state.percent}"` : ''}
+    aria-label="${escape(repo.name)} ${copying ? 'backup' : 'upload'} progress"></progress>
+    <span>${escape(progressLabel)}</span></div>` : '';
+  const retry = ['changing', 'error'].includes(repo.verification?.state)
+    ? `<button id="retry-check" class="repo-schedule" ${retryingRepo === repo.id ? 'disabled' : ''}>
+      ${retryingRepo === repo.id ? 'Check requested…' : 'Retry check now'}</button>` : '';
+  const schedule = RepoStatus.describeSchedule(repo, menuState.power_source);
+  const timing = RepoStatus.timing(repo, menuState.backup, clientFreshness);
+  const markup = `
+    <p class="detail-context">${escape(repo.name)}</p>
+    <h2 class="status-headline" data-category="${state.category}">${escape(state.headline)}</h2>
+    <p class="status-explanation" data-category="${state.category}">${escape(state.detail)}</p>
+    ${progress}${retry}
+    <div id="backup-timing" class="backup-timing" data-receipt="${escape(JSON.stringify(timing.receipt))}">
+      <p class="last-backup">${escape(timing.lastLine)}</p>
+      <p class="next-backup">${escape(timing.nextLine)}</p>
+      ${timing.inclusionLine ? `<p class="backup-inclusion">${escape(timing.inclusionLine)}</p>` : ''}
+    </div>
+    <button id="repo-schedule" class="repo-schedule" aria-label="Schedule for ${escape(repo.name)}">
+      <span class="schedule-copy"><strong>${escape(schedule.label)}</strong>
+        <small>${escape(schedule.detail)}</small></span><span aria-hidden="true">›</span>
+    </button>
+    <details id="technical-details" ${technicalOpen.has(repo.id) ? 'open' : ''}>
+      <summary id="technical-toggle">Technical details</summary>
+      <p class="technical-explanation" data-category="${state.category}">${escape(state.technicalDetail)}</p>
+      <div class="facts">
+        <div class="fact"><small>Hashes last checked</small>${when(repo.verification?.checked_at)}</div>
+        <div class="fact"><small>Upload last checked</small>${when(cloud.checked_at)}</div>
+        <div class="fact"><small>Archive size</small>${bytes(repo.last_backup?.archive_bytes)}</div>
+      </div>
+      ${repo.health?.fresh !== true ? `<p>${escape((repo.health?.reasons || ['Fresh evidence unavailable']).join(' · '))}</p>` : ''}
+    </details>
+    <button id="report-status" type="button" class="report-status">Report this status</button>`;
+  if ($('#detail').innerHTML !== markup) {
+    const focused = $('#detail').contains(document.activeElement) ? document.activeElement.id : null;
+    $('#detail').innerHTML = markup;
+    if (focused) document.getElementById(focused)?.focus({preventScroll: true});
+  }
+  $('#technical-details').ontoggle = () => {
+    if ($('#technical-details').open) technicalOpen.add(repo.id);
+    else technicalOpen.delete(repo.id);
+  };
+  $('#repo-schedule').onclick = () => openSettings(repo.id);
+  $('#report-status').onclick = () => {
+    if (window.RepoHubReports) void window.RepoHubReports.openStatus(state);
+    else $('#notice').textContent = 'Reporting is not available yet. Please reload this view.';
+  };
+  if ($('#retry-check')) $('#retry-check').onclick = async () => {
+    retryingRepo = repo.id;
+    renderDetail();
+    try {
+      sessionToken = (await api('/api/session')).token;
+      await api('/api/retry-check', {repo_id: repo.id});
+      $('#notice').textContent = 'Check requested for ' + repo.name + '.';
+    } catch (error) {
+      $('#notice').textContent = error.message;
+    } finally {
+      setTimeout(() => {retryingRepo = null; void load();}, 1000);
+    }
   };
 }
 function selectRepo(id){selectedId=id;render();}
@@ -99,3 +173,14 @@ window.addEventListener('resize',updatePosition);setInterval(()=>{if(lastRespons
 $('#connect-github').onclick=()=>nativeAction('connectGitHub');
 
 window.addEventListener('repoHubWorkspacesChanged',()=>void load());
+
+const updateButton = document.getElementById('check-updates');
+if (updateButton) {
+  updateButton.onclick = () => {
+    if (window.webkit?.messageHandlers?.repoHub) {
+      window.webkit.messageHandlers.repoHub.postMessage({action: 'checkForUpdates'});
+    } else {
+      $('#notice').textContent = 'Check for Updates is available in the installed app.';
+    }
+  };
+}

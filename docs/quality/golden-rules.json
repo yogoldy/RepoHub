@@ -117,14 +117,20 @@
         "upload_stale"
       ],
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
-      "required_behavior": "Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement.",
+      "required_behavior": "Green requires fresh matched hashes plus exact-archive uploaded acknowledgement; absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics.",
       "test_ids": [
         "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
         "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
         "test_backup_lifecycle.LifecycleTests.test_green_icon_with_missing_upload_is_logged_as_input_disagreement",
         "test_change_evidence.EvidenceTests.test_no_record_of_second_view_is_not_claimed_as_agreement",
         "test_change_evidence.EvidenceTests.test_both_views_are_correlated_and_disagreement_is_reported",
-        "test_change_evidence.EvidenceTests.test_client_freshness_override_preserves_backend_and_detects_false_green"
+        "test_change_evidence.EvidenceTests.test_client_freshness_override_preserves_backend_and_detects_false_green",
+        "test_status_clarity.ClarityTests.test_actual_js_mapping_preserves_policy_and_matches_evidence",
+        "test_status_clarity.ClarityTests.test_wrong_category_sentence_and_false_green_are_detected",
+        "test_status_clarity.ClarityTests.test_only_labels_require_complete_current_comparison",
+        "test_backup_timing.TimingTests.test_cloud_location_requires_same_archive_fresh_observation_and_valid_creation",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_secondary_receipts_detect_wrong_date_location_and_countdown",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_actual_javascript_timing_matches_original_receipts"
       ],
       "remaining_gap": "Freshness override and replay have typed automated coverage. Final native delayed-start/timeout/cache-expiry/recovery correlation remains open; progress percentages/pixels are separately unproven. See PRO_RELIABILITY_ACCEPTANCE.md."
     },
@@ -145,7 +151,10 @@
         "test_policy_health.SettingsHTTPTests.test_after_edit_plan_only_archives_selected_repo",
         "test_policy_health.SettingsHTTPTests.test_power_change_finishes_current_archive_and_stops_next_repo",
         "test_policy_health.SettingsHTTPTests.test_partial_automatic_run_does_not_advance_unattempted_repo_clock",
-        "test_policy_health.SettingsHTTPTests.test_repo_cadence_survives_restart_and_only_backs_up_due_repo"
+        "test_policy_health.SettingsHTTPTests.test_repo_cadence_survives_restart_and_only_backs_up_due_repo",
+        "test_backup_timing.TimingTests.test_projection_matches_actual_eligibility_and_does_not_mutate",
+        "test_backup_timing.TimingTests.test_overrides_retry_busy_and_unobserved_edits",
+        "test_backup_timing.TimingTests.test_saved_cadence_manual_reset_and_power_are_respected"
       ],
       "remaining_gap": "Physical battery transitions, full sleep/wake and logout/login cycles still require hardware smoke tests."
     },
@@ -187,7 +196,10 @@
         "test_diagnostic_export.ExportTests.test_no_wall_clock_raw_sizes_hashes_or_free_text",
         "test_diagnostic_export.ExportTests.test_adversarial_types_and_huge_numbers_do_not_escape_or_crash",
         "test_diagnostic_export.ExportTests.test_namespaces_are_fresh_and_relative_order_preserved",
-        "test_report_preview.ReportPreviewTests.test_bug_has_exact_share_files_and_private_local_draft"
+        "test_report_preview.ReportPreviewTests.test_bug_has_exact_share_files_and_private_local_draft",
+        "test_status_clarity.ClarityTests.test_new_export_fields_are_typed_and_never_copy_exception_prose",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_new_exports_are_bounded_and_exclude_private_calendar_evidence",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_malformed_or_missing_selected_timing_receipts_fail_closed"
       ],
       "remaining_gap": "Operational patterns remain bounded facts. User-written report prose is separate; a preview and confidentiality reminder cannot guarantee it contains no personal information."
     },
@@ -413,6 +425,65 @@
         "test_helper_launch.HelperLaunchTests.test_detached_guard_copies_the_launcher_dependency"
       ],
       "remaining_gap": "Actual macOS permission acceptance remains required on both hosts for the final candidate. Air controlled probes showed that physical console unlock, AssociatedBundleIdentifiers alone and direct Python did not resolve helper EPERM. A Pro-built native executable entering the same interpreter produced an actual Desktop prompt; explicit refusal blocked review without changing the registry, and native System Settings restoration recovered that same read. This is a diagnostic prototype, not final-candidate or full lifecycle acceptance. Repeat refusal/restoration/restart, notification initial refusal and the complete same-payload matrix on both Macs; never reset daily permissions."
+    },
+    {
+      "id": "GR20",
+      "title": "Updates replace one verified application version",
+      "breakpoint": "Separate native, Python and web copies can leave the installed app behind the preview or start mismatched components.",
+      "diagnostic_events": [
+        "application_update",
+        "update_checkpoint"
+      ],
+      "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, verify its resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
+      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Test apps cannot use the daily identity or port.",
+      "test_ids": [
+        "test_app_package.AppPackageTests.test_integrity_rejects_missing_changed_and_extra_components",
+        "test_app_package.AppPackageTests.test_links_cannot_escape_resources_and_link_changes_are_detected",
+        "test_app_package.AppPackageTests.test_production_requires_https_and_test_requires_disposable_identity",
+        "test_app_package.AppPackageTests.test_dependency_archive_cannot_write_outside_destination",
+        "test_update_evidence.UpdateEvidenceTests.test_only_matching_release_and_bounded_facts_are_accepted",
+        "test_update_evidence.UpdateEvidenceTests.test_update_facts_export_without_paths_or_raw_error_text",
+        "test_update_recovery.UpdateRecoveryTests.test_rollback_must_belong_to_this_identity_and_state",
+        "test_update_recovery.UpdateRecoveryTests.test_old_or_unrelated_helper_cannot_confirm_replacement",
+        "test_update_shutdown.UpdateShutdownTests.test_bundled_sigterm_waits_for_archive_publication_and_preserves_prior_copy",
+        "test_update_feed.UpdateFeedTests.test_feed_uses_actual_build_signature_and_exact_length",
+        "test_update_feed.UpdateFeedTests.test_key_file_must_be_private_regular_and_owned",
+        "test_update_shutdown.UpdateShutdownTests.test_loopback_startup_does_not_wait_for_hostname_resolution"
+      ],
+      "remaining_gap": "Final native isolated acceptance on application source 985814d passed cancellation, signed replacement, invalid signature, truncated archive, equal-version refusal, busy-backup refusal and automatic rollback after injected helper failure, with unchanged synthetic archive/configuration hashes. Clean local gate: 233 tests, 20 rules, 25 commands; GitHub automated-contract passed that exact source. Production Developer ID/notarization, permission continuity, key/feed custody, first coordinated launchd migration and persistent recovery explanation remain open. Daily Macs unchanged."
+    },
+    {
+      "id": "GR21",
+      "title": "Only accepted main source becomes an update",
+      "breakpoint": "A branch check, stale run, partial upload or broad cleanup can publish unaccepted bytes or remove unrelated releases.",
+      "diagnostic_events": [
+        "application_update"
+      ],
+      "cause_and_solution": "Require a successful exact-main push gate and matching job, monotonic versions, production receipts and scoped current-plus-three package retention. Git tags stay intact.",
+      "required_behavior": "No publication from forks or PRs; no stale-main promotion; no test archive or unrelated release deletion.",
+      "test_ids": [
+        "test_release_policy.ReleasePolicyTests.test_only_exact_successful_main_push_can_release",
+        "test_release_policy.ReleasePolicyTests.test_versions_increase_and_failed_drafts_reserve_numbers",
+        "test_release_policy.ReleasePolicyTests.test_retention_keeps_current_plus_three_without_deleting_tags_or_unrelated_releases",
+        "test_release_policy.ReleasePolicyTests.test_retention_requires_a_matching_production_receipt",
+        "test_publish_release.PublishReleaseTests.test_publish_verifies_draft_then_latest_before_scoped_cleanup",
+        "test_publish_release.PublishReleaseTests.test_upload_corruption_or_new_main_never_publishes_or_prunes",
+        "test_publish_release.PublishReleaseTests.test_unconfirmed_latest_or_foreign_historical_receipt_prevents_all_deletion",
+        "test_publish_release.PublishReleaseTests.test_missing_altered_or_test_artifacts_are_rejected",
+        "test_publish_release.PublishReleaseTests.test_gate_must_be_clean_exact_macos_and_passed",
+        "test_publish_release.PublishReleaseTests.test_signing_requires_complete_secrets_and_always_restores_keychain_search",
+        "test_publish_release.PublishReleaseTests.test_draft_without_created_tag_uses_exact_target_and_rejects_collisions",
+        "test_personal_updates.PersonalUpdateTests.test_personal_mode_is_explicit_and_does_not_relax_identity_or_https",
+        "test_personal_updates.PersonalUpdateTests.test_personal_archive_requires_matching_manifest_and_app_flags",
+        "test_personal_updates.PersonalUpdateTests.test_automatic_discovery_does_not_enable_silent_install_or_test_network_requests",
+        "test_personal_updates.PersonalUpdateTests.test_personal_release_uses_sparkle_key_without_apple_credentials_and_cleans_it",
+        "test_personal_updates.PersonalUpdateTests.test_personal_path_keeps_archive_signing_but_never_calls_notarytool",
+        "test_personal_updates.PersonalUpdateTests.test_scheduled_checks_have_typed_private_diagnostic_evidence",
+        "test_packaged_install.PackagedInstallTests.test_only_known_legacy_layout_is_accepted_and_protected_files_are_read_only",
+        "test_packaged_install.PackagedInstallTests.test_backup_race_resumes_frozen_process_without_terminating_archive_write",
+        "test_packaged_install.PackagedInstallTests.test_watchdog_before_service_handoff_never_restarts_or_replaces_daily_services"
+      ],
+      "remaining_gap": "Personal ad-hoc distribution is explicitly authorized and remains Sparkle-authenticated over HTTPS. Developer ID/notarization and permission continuity await Apple credentials. Actual main publication and the first Pro migration require live receipts; synthetic tests alone do not establish those results."
     }
   ]
 }

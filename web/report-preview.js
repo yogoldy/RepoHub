@@ -23,10 +23,27 @@
     const empty=document.createElement('option');empty.value='';empty.textContent='Choose a report…';select.append(empty);
     for(const row of result.reports){const option=document.createElement('option');option.value=row.report_id;option.textContent=row.type+' · '+row.title+' · '+row.state;select.append(option);}
   }
-  async function open(type){
+  async function open(type, statusHeadline=null){
+    if(busy)return;
     kind=type;const d=drafts[kind];el('settings-dialog').close();el('report-heading').textContent=kind==='bug'?'Report a glitch':'Request a feature';el('report-description-label').firstChild.textContent=kind==='bug'?'What happened?':'What would you like, and why?';el('report-expected-label').hidden=kind!=='bug';el('report-expected').required=kind==='bug';el('report-title').value=d.title||'';el('report-description').value=d.description||'';el('report-expected').value=d.expected||'';el('report-diagnostics').checked=d.include??(kind==='bug');el('report-window').value=d.hours||'24';el('report-window-label').hidden=!el('report-diagnostics').checked;el('report-error').textContent='';compose();el('report-dialog').showModal();el('report-title').focus();
+    el('report-context').hidden = !statusHeadline;
+    el('report-context').textContent = statusHeadline
+      ? 'Status you selected: ' + statusHeadline + ' Your existing draft, if any, is kept. No repo name, path or raw error was added automatically.' : '';
     try{sessionToken=(await api('/api/session')).token;await savedReports();}catch{el('report-error').textContent='Could not load saved reports. Your text is kept here.';}
   }
+  // Only fixed presentation wording enters the editable report. Never seed
+  // technicalDetail: it can contain local paths or provider exception prose.
+  async function openStatus(presentation) {
+    if (busy) return;
+    const draft = drafts.bug;
+    if (!draft.title && !draft.description) {
+      drafts.bug = {...draft, title: 'Repo status: ' + presentation.label,
+        description: 'RepoHub displayed: ' + presentation.headline + '\n\nWhat seemed wrong:\n'};
+    }
+    await open('bug', presentation.headline);
+  }
+  window.RepoHubReports = {openStatus};
+
   function showPreview(result,status={state:'draft'}){
     preview=result;kind=result.type;delivery=status;connection=null;
     const form=result.form||{title:result.title,description:result.body,expected:'',include_diagnostics:false,hours:24};

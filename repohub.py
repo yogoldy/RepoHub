@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import signal
 import shutil
 import stat
 import subprocess
@@ -18,11 +19,13 @@ import tarfile
 import threading
 import time
 from datetime import datetime, timezone
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer as StandardThreadingHTTPServer
+from socketserver import TCPServer
 from urllib.parse import unquote, urlparse
-from backup_policy import BackupScheduler, default_settings, validate_settings, power_source
-from status_health import annotate_health, ProblemTracker, age
+from backup_policy import BackupScheduler, default_settings, validate_settings, power_source, project_schedule
+from status_health import annotate_health, ProblemTracker, age, backup_location
 from diagnostics import DiagnosticLog, diagnostic_ref
+from update_evidence import update_evidence
 from backup_lifecycle import BackupLifecycle
 from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
@@ -616,9 +619,24 @@ class Hub:
             result["views"] = self.views
             result["notifications"] = load_json(self.state_dir / "notifications.json", {"permission": "unknown"})
             result["settings"] = self.settings
+            wall_now, monotonic_now = time.time(), time.monotonic()
             for row in result["repos"]:
                 row["schedule_override"] = row["id"] in self.repo_settings
                 row["backup_settings"] = self.repo_settings.get(row["id"], self.settings)
+                row["schedule_evidence"] = project_schedule(
+                    self.scheduler, self.settings, self.power, row, wall_now, monotonic_now,
+                    self.last_periodic_at, self.repo_periodic_at,
+                    busy=self.backup_lock.locked(), overrides=self.repo_settings)
+                row["backup_location"] = backup_location(
+                    row, wall_now, max(45, self.config.get("cloud_seconds", 5) * 6))
+            if hasattr(self, "application_release"):
+                result["application_release"] = dict(self.application_release)
+                update = update_evidence(load_json(self.state_dir / "update-status.json", {}), self.application_release)
+                result["application_update"] = update
+                if update and update != getattr(self, "last_update_evidence", None):
+                    self.diagnostics.emit("application_update", **update,
+                                          build_id=diagnostic_ref(self.application_release["source_revision"]))
+                    self.last_update_evidence = update
             result["power_source"] = self.power
             result["observed_at"] = utc_now()
             result["diagnostics"] = self.diagnostics.status()
@@ -1179,18 +1197,47 @@ class Handler(BaseHTTPRequestHandler):
             return self.send({"error": str(e)}, 400)
 
 
+class ThreadingHTTPServer(StandardThreadingHTTPServer):
+    """The local helper needs no hostname discovery or reverse DNS."""
+    def server_bind(self):
+        if self.server_address[0] != "127.0.0.1":
+            raise ValueError("Loopback address required")
+        # HTTPServer.server_bind calls socket.getfqdn, which can block on the
+        # host's resolver before listen(). Keep TCP binding and explicit facts.
+        TCPServer.server_bind(self)
+        self.server_name = "127.0.0.1"
+        self.server_port = self.server_address[1]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--backup-once", action="store_true")
+    parser.add_argument("--bundled", action="store_true")
     args = parser.parse_args()
     config = load_json(args.config, None)
     if not config:
         raise SystemExit("Missing configuration")
+    if args.bundled:
+        # The signed native entry point verifies these resources before exec.
+        # Override stale external runtime paths in memory, never in saved settings.
+        config["cloud_helper"] = str(Path(__file__).parent / "cloud-status")
     hub = Hub(config)
+    if args.bundled:
+        release = load_json(Path(__file__).parent.parent / "release.json", {})
+        hub.application_release = {key: release[key] for key in
+                                   ("source_revision", "build", "bundle_id")}
     if args.backup_once:
         hub.backup()
         return
+    if args.bundled:
+        def stop_for_update(signum, frame):
+            # A newly started backup can race the native idle check. Wait for
+            # its actual lock instead of terminating an archive publication.
+            hub.backup_lock.acquire()
+            hub.diagnostics.emit("update_checkpoint", result="complete", reason="helper_stopped")
+            raise SystemExit(0)
+        signal.signal(signal.SIGTERM, stop_for_update)
     server = ThreadingHTTPServer(("127.0.0.1", config.get("port", 8767)), Handler)
     server.hub = hub
     def scans():

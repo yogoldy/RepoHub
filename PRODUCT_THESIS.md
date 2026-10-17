@@ -12,6 +12,27 @@ Leo authorized [a one-time PR #6 integration exception](docs/MAIN_INTEGRATION_EX
 
 Leo approved [the interaction-testing and readability roadmap](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md) for documentation on 2026-10-13. It defines nine ordered stages: readability standards, a verified baseline, an interaction checklist, Playwright MCP and saved tests, Show me dogfooding, Golden Gate coverage, review with Leo's AI teacher and readability cleanup, Markdown/agent-configuration audit, then final Air/Pro release acceptance. **Implementation still requires Leo's explicit go-ahead.** Tailwind and TestSprite remain deferred. The existing two-Mac reliability protocol and protected release requirements still apply; no roadmap stage is marked complete by documenting it.
 
+## Timing and location branch checkpoint — October 16, 2026
+
+Evidence-backed Git/metadata descriptions, read-only scheduling/location
+projection, selected-menu diagnostic receipts and larger timing lines are
+implemented on `codex/status-clarity`. [Acceptance and Leo's pending event/display
+review](docs/BACKUP_TIMING_ACCEPTANCE_2026-10-16.md) record the clean 220-test
+macOS gate and controlled browser results. This is not a deployed release;
+installed native acceptance, protected promotion and Leo's personal review stay
+open. Current backup decisions and daily configuration are preserved.
+
+## Signed updates — prerequisites
+
+Branch: `codex/signed-updates`, created from checked status/timing commit
+`249eb8f`. [Coordinated packaging and Sparkle acceptance](docs/SIGNED_UPDATE_ACCEPTANCE_2026-10-16.md) now record isolated native upgrade and rollback tests; neither daily Mac was deployed.
+
+- [x] Apple Developer Program membership purchased — Leo reported purchase on 2026-10-16. This records the purchase, not independently verified activation.
+- [ ] Confirm the membership is active and create or identify a usable Developer ID Application signing identity.
+- [x] Build the native app, pinned Python/helper and web interface as one verified test bundle; integrate Sparkle and validate real signed isolated upgrades and rollback on final application source `985814d`.
+- [ ] Establish Developer ID signing/notarization and verify permission continuity after activation.
+- [ ] Set production signing-key custody and an HTTPS feed, then validate the first coordinated migration from existing launchd registrations with rollback before any daily deployment.
+
 ## Current foundation
 
 - [x] Monitor immediate folders inside a configured repo home, including folders without Git.
@@ -248,3 +269,15 @@ The Test session was not the physical console, so local test-account unlock is
 the next controlled permission investigation. Both cleanup receipts preserved
 protected state and restored daily services. Full matrix/Pro repeat/release remain
 open; no broad permissions or daily deployment occurred.
+
+
+### Personal update delivery — October 17, 2026
+
+Leo clarified that real-Mac testing follows easy update delivery for this personal
+app. The signed-update branch now prepares GitHub release hosting and automatic
+exact-main publication after Golden Gate acceptance, with current plus three
+historical packages and retained Git source tags. Update-key custody is configured
+with a local recovery copy; Leo confirmed saving it in his password manager on October 17. Publication
+remains disabled until Apple credentials and initial signed distribution are ready;
+no daily Mac has been updated. See [release delivery](docs/RELEASE_DELIVERY.md) for
+implementation, native evidence limits and the first-install migration dependency.

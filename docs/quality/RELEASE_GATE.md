@@ -1,5 +1,7 @@
 # RepoHub golden-rule release gate
 
+For Leo’s personal Sparkle channel, the [October 17 delivery policy](../RELEASE_DELIVERY.md) allows publication after an exact-main automated pass, with native checks following delivery. Keep missing native evidence open; do not block personal update availability on a circular pre-install test requirement. Other deployment boundaries below remain.
+
 This is our executable product contract. It checks backup safety, diagnostic evidence, privacy, scoped APIs, restore behavior and source/package consistency. It is not a claim of mathematical correctness or an exhaustive end-to-end test.
 
 Read [the failure-mode register](FAILURE_MODES.md) and its machine-readable [rule definitions](golden-rules.json). Each rule specifies its most susceptible boundary, diagnostic trail, required response, exact regression IDs and remaining exposure. Fixes add counterexamples to that register rather than replacing its history with a new test count.
