@@ -556,3 +556,21 @@ to seconds and again to minutes. Derive remaining seconds from the projected
 wall due time and remove sub-millisecond noise before the existing upward
 rounding. A deterministic fractional-clock counterexample protects the boundary;
 scheduler eligibility itself is unchanged.
+
+
+## GR20 — coordinated app replacement
+
+An ad-hoc native replacement lost its prior macOS permission requirement and
+rolled back, while a browser preview continued serving newer web assets against
+an older helper. A working source build did not mean that the installed app had
+updated. The new bundle builder pins Python and Sparkle, includes web/helper
+resources in one manifest, and checks that the connected helper reports the
+same release before loading the menu. Test bundles use a disposable identity,
+state and port. Native integrity and complete Sparkle package builds now run
+inside the existing macOS gate; the workflow invokes that gate already.
+
+A SIGTERM to a bundled helper waits for the actual backup lock, covering a
+backup that begins after a native idle check. The updater never sends SIGKILL.
+Actual signed-upgrade/failure recovery remains acceptance work. Production
+signing, notarization and permission continuity are not established by ad-hoc
+test signatures. No daily installation or launch registration is changed.

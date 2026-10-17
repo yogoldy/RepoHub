@@ -425,6 +425,26 @@
         "test_helper_launch.HelperLaunchTests.test_detached_guard_copies_the_launcher_dependency"
       ],
       "remaining_gap": "Actual macOS permission acceptance remains required on both hosts for the final candidate. Air controlled probes showed that physical console unlock, AssociatedBundleIdentifiers alone and direct Python did not resolve helper EPERM. A Pro-built native executable entering the same interpreter produced an actual Desktop prompt; explicit refusal blocked review without changing the registry, and native System Settings restoration recovered that same read. This is a diagnostic prototype, not final-candidate or full lifecycle acceptance. Repeat refusal/restoration/restart, notification initial refusal and the complete same-payload matrix on both Macs; never reset daily permissions."
+    },
+    {
+      "id": "GR20",
+      "title": "Updates replace one verified application version",
+      "breakpoint": "Separate native, Python and web copies can leave the installed app behind the preview or start mismatched components.",
+      "diagnostic_events": [
+        "application_update",
+        "update_checkpoint"
+      ],
+      "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, verify its resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
+      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Test apps cannot use the daily identity or port.",
+      "test_ids": [
+        "test_app_package.AppPackageTests.test_integrity_rejects_missing_changed_and_extra_components",
+        "test_app_package.AppPackageTests.test_links_cannot_escape_resources_and_link_changes_are_detected",
+        "test_app_package.AppPackageTests.test_production_requires_https_and_test_requires_disposable_identity",
+        "test_app_package.AppPackageTests.test_dependency_archive_cannot_write_outside_destination",
+        "test_update_evidence.UpdateEvidenceTests.test_only_matching_release_and_bounded_facts_are_accepted",
+        "test_update_evidence.UpdateEvidenceTests.test_update_facts_export_without_paths_or_raw_error_text"
+      ],
+      "remaining_gap": "The gate compiles the real pinned Sparkle framework into a complete signed test bundle and checks native integrity rejection. Actual native signed upgrade, invalid-download refusal, backup coordination and failed-start rollback require recorded isolated acceptance. Developer ID/notarization and permission continuity remain pending activation; neither daily Mac is deployed."
     }
   ]
 }

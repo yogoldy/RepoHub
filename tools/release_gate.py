@@ -183,6 +183,14 @@ def main():
             command('bridge-checks',[str(evidence/'bridge')])
             command('helper-launch-build',swift+[str(ROOT/'native/HelperLaunch.swift'),str(ROOT/'tests/helper_launch_checks.swift'),'-o',str(evidence/'helper-launch')])
             command('helper-launch-checks',[str(evidence/'helper-launch')])
+            command('packaged-integrity-build',swift+[str(ROOT/'native/PackagedApplication.swift'),str(ROOT/'tests/packaged_application_checks.swift'),'-o',str(evidence/'packaged-integrity')])
+            command('packaged-integrity-checks',[str(evidence/'packaged-integrity')])
+            command('coordinated-sparkle-package',[
+                sys.executable,str(ROOT/'tools/package_app.py'),'--output',str(evidence/'RepoHub Gate.app'),
+                '--cache',str(evidence/'update-dependencies'),'--version','0.2.0','--build','100',
+                '--bundle-id','com.leogoldberg.repohub.test.gate',
+                '--feed','http://127.0.0.1:8781/appcast.xml',
+                '--public-key','eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=','--test'])
         report['source_unchanged'] = source_fingerprint(ROOT)==source
         good = good and report['source_unchanged']
         report['result'] = ('passed' if args.profile=='macos' else 'partial') if good else 'failed'
