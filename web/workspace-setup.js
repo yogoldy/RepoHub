@@ -1,10 +1,17 @@
 /* Source drafts stay local until a reviewed, revision-checked save succeeds. */
 (function(root){
-  function draft(value){
-    const configuration=value.configuration;
-    return {mode:configuration.source.mode,home:configuration.source.home||'',
-      paths:configuration.workspaces.filter(row=>row.active).map(row=>row.path),revision:value.revision,
-      pending:null,review:null};
+  function draft(value) {
+    const configuration = value.configuration;
+    const state = {
+      mode: configuration.source.mode,
+      home: configuration.source.home || '',
+      paths: configuration.workspaces.filter(row => row.active).map(row => row.path),
+      revision: value.revision,
+      pending: null,
+      review: null,
+    };
+    state.original = JSON.stringify(source(state));
+    return state;
   }
   function source(state){return state.mode==='home'?{mode:'home',home:state.home}:{mode:'manual',paths:[...state.paths]};}
   function picked(state,detail){
@@ -17,7 +24,8 @@
     else state.paths=[...new Set([...state.paths,...detail.paths])];
     state.review=null;return true;
   }
-  const model={draft,source,picked};
+  function dirty(state) { return JSON.stringify(source(state)) !== state.original; }
+  const model={draft,source,picked,dirty};
   if(typeof module==='object'&&module.exports){module.exports=model;return;}
   const $=id=>document.getElementById(id),dialog=$('settings-dialog');
   if(!dialog)return;
@@ -63,14 +71,26 @@
     }
   }
   async function open(){
+    if (root.RepoHubSettings && !await root.RepoHubSettings.leaveSchedule()) return;
     try{const current=await request('/api/workspaces');state=draft(current);$('settings-form').hidden=true;$('workspace-form').hidden=false;dialog.setAttribute('aria-labelledby','workspace-title');$('workspace-error').textContent='';$('workspace-feedback').textContent='';$('workspace-reload').hidden=true;if(!dialog.open)dialog.showModal();render();}
     catch(error){const target=$('settings-error')||$('notice');if(target)target.textContent=error.message;}
   }
   function reset(){if(state)state.pending=null;$('workspace-form').hidden=true;$('settings-form').hidden=false;dialog.setAttribute('aria-labelledby','settings-title');}
-  function close(){if(busy)return;dialog.close();reset();}
+  async function close(){
+    if(busy)return;
+    const changed=!!state&&dirty(state);
+    const accepted=root.RepoHubSettings
+      ? await root.RepoHubSettings.confirmDiscard(changed)
+      : !changed||root.confirm('Discard unsaved folder changes?');
+    if(!accepted)return;
+    dialog.close();reset();state=null;
+  }
   $('workspace-open').onclick=open;$('workspace-reload').onclick=open;
   $('workspace-close').onclick=close;$('workspace-cancel').onclick=close;
-  dialog.addEventListener('cancel',event=>{if(busy)event.preventDefault();else reset();});
+  dialog.addEventListener('cancel',event=>{
+    if($('workspace-form').hidden)return;
+    event.preventDefault();void close();
+  });
   for(const mode of ['home','manual'])$('workspace-'+mode+'-mode').onclick=()=>{state.mode=mode;state.review=null;$('workspace-error').textContent='';render();};
   $('workspace-back').onclick=()=>{state.review=null;$('workspace-error').textContent='';render();};
   $('workspace-pick').onclick=()=>{
