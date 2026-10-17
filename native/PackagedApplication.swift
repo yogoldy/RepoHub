@@ -33,7 +33,8 @@ final class PackagedApplication {
 
     init(bundle: Bundle = .main) throws {
         self.bundle = bundle
-        guard let resources = bundle.resourceURL else { throw Failure.packageInvalid }
+        guard let resourceURL = bundle.resourceURL else { throw Failure.packageInvalid }
+        let resources = resourceURL.resolvingSymlinksInPath()
         self.resources = resources
         release = try Self.verify(resources: resources, bundle: bundle)
         testMode = bundle.object(forInfoDictionaryKey: "RepoHubTestMode") as? Bool == true
@@ -65,7 +66,10 @@ final class PackagedApplication {
         address = URL(string: "http://127.0.0.1:\(port)/")!
     }
 
-    static func verify(resources: URL, bundle: Bundle) throws -> Release {
+    static func verify(resources resourceURL: URL, bundle: Bundle) throws -> Release {
+        // FileManager enumerators canonicalize /var and /tmp aliases on macOS.
+        // Use the same spelling before computing relative resource names.
+        let resources = resourceURL.resolvingSymlinksInPath()
         let release = try JSONDecoder().decode(Release.self, from: Data(contentsOf: resources.appendingPathComponent("release.json")))
         guard release.schema == 1, release.bundle_id == bundle.bundleIdentifier,
               release.build == bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
