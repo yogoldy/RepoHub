@@ -22,6 +22,15 @@ macOS gate and controlled browser results. This is not a deployed release;
 installed native acceptance, protected promotion and Leo's personal review stay
 open. Current backup decisions and daily configuration are preserved.
 
+## Signed updates — prerequisites
+
+Branch: `codex/signed-updates`, created from checked status/timing commit
+`249eb8f`. Sparkle implementation and new signing are not yet started.
+
+- [x] Apple Developer Program membership purchased — Leo reported purchase on 2026-10-16. This records the purchase, not independently verified activation.
+- [ ] Confirm the membership is active and create or identify a usable Developer ID Application signing identity.
+- [ ] Establish coordinated application packaging and stable app/helper signing before integrating Sparkle.
+
 ## Current foundation
 
 - [x] Monitor immediate folders inside a configured repo home, including folders without Git.
