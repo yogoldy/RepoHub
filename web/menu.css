@@ -414,3 +414,57 @@ footer button:hover {
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
+
+/* Things to know uses the same reading rhythm as the status guide. */
+.info-content > .things-key {
+  margin-top: 0;
+}
+.things-key #things-panel {
+  gap: 0;
+  padding: 0;
+}
+.things-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.things-section:first-child {
+  padding-top: 0;
+}
+.things-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.things-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.things-heading .folder-tip {
+  flex: none;
+  margin-right: 0;
+}
+#info-dialog .things-section h3 {
+  margin: 0;
+  line-height: 1.4;
+}
+.things-key #things-panel p {
+  margin-top: 8px;
+}
+.things-key #things-panel button {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+.things-key #things-panel button::before {
+  content: none;
+}
+.things-key #things-panel button:hover:not(:disabled) {
+  background: #263347;
+}
+.things-key #things-panel .show-me {
+  color: var(--gold);
+}

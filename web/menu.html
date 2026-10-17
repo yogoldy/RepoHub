@@ -28,7 +28,31 @@
       <div id="status-legend" class="status-legend"></div>
     </section>
     <section class="status-key things-key" data-info-page="things" hidden aria-label="Things to know">
-      <div id="things-panel"><p class="folder-tip-row"><span class="folder-shape folder-tip" aria-hidden="true"></span><span>The folder icon opens that repo on your Mac in Finder.</span><button id="show-folder" class="show-me" title="Highlight the folder button on the selected repo card">Show me</button></p><span id="folder-demo-status" class="sr-only" role="status"></span><p>Use Schedule on a repo card for custom timing. The main gear sets defaults.</p><p>Backups include ignored files and uncommitted work. Back up now checks every repo.</p><p><button id="connect-github" type="button">GitHub reporting connection</button> · Set up or disconnect securely in Keychain.</p></div>
+      <div id="things-panel">
+        <section class="things-section" aria-labelledby="things-folder-title">
+          <div class="things-heading">
+            <span class="folder-shape folder-tip" aria-hidden="true"></span>
+            <h3 id="things-folder-title">Open a repo in Finder</h3>
+          </div>
+          <p>Click a repo card’s folder icon to open that repo in Finder.</p>
+          <button id="show-folder" type="button" class="show-me">Show me</button>
+          <span id="folder-demo-status" class="sr-only" role="status"></span>
+        </section>
+        <section class="things-section" aria-labelledby="things-schedule-title">
+          <h3 id="things-schedule-title">Choose backup timing</h3>
+          <p>Use Schedule in a repo’s details to change its timing. Settings → Backup schedule controls the defaults.</p>
+        </section>
+        <section class="things-section" aria-labelledby="things-files-title">
+          <h3 id="things-files-title">What your backup includes</h3>
+          <p>RepoHub includes saved files that Git ignores and work you haven’t committed.</p>
+          <p>Back up now checks every monitored repo.</p>
+        </section>
+        <section class="things-section" aria-labelledby="things-reporting-title">
+          <h3 id="things-reporting-title">GitHub reporting</h3>
+          <p>Connect GitHub to send reports. Your connection is stored in macOS Keychain.</p>
+          <button id="connect-github" type="button">Manage GitHub connection</button>
+        </section>
+      </div>
     </section>
   </div>
 </dialog>
