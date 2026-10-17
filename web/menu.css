@@ -573,3 +573,18 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 #all-repos[hidden] {
   display: none;
 }
+
+/* At most three real rows are visible; only the overview scrolls internally. */
+.card-grid {
+  max-height: var(--grid-visible-height, none);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  align-content: start;
+}
+.card-grid[data-focused="true"] {
+  max-height: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}

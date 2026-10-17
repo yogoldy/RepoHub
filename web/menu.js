@@ -1,6 +1,7 @@
 let observedMenuState=null,clientFreshness='current';
 let retryingRepo=null;
 let gridScrollTop = 0;
+let overviewScrollTop = 0;
 const technicalOpen = new Set();
 const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
 let menuState=null,selectedId=null,sessionToken='',loading=false,lastResponseAt=0,settingsRevision='',settingsRepo=null,defaultsRevision='',settingsDefaults=null;
@@ -172,7 +173,24 @@ function arrangeRepoGrid(slots) {
   desired.forEach((child, index) => {
     if (grid.children[index] !== child) grid.insertBefore(child, grid.children[index] || null);
   });
+  capOverviewRows(slots);
   $('#position').textContent = `${slots.length} repo${slots.length === 1 ? '' : 's'}`;
+}
+
+function capOverviewRows(slots) {
+  if (selectedId) return;
+  const grid = $('#cards');
+  const visibleCount = gridColumns() * 3;
+  if (slots.length <= visibleCount) {
+    grid.style.removeProperty('--grid-visible-height');
+    return;
+  }
+  // Measure real wrapped rows so longer names/statuses cannot clip row three.
+  const bottom = Math.max(...slots.slice(0, visibleCount).map(
+    slot => slot.getBoundingClientRect().bottom));
+  const padding = parseFloat(getComputedStyle(grid).paddingBottom) || 0;
+  const height = Math.ceil(bottom - grid.getBoundingClientRect().top + grid.scrollTop + padding);
+  grid.style.setProperty('--grid-visible-height', height + 'px');
 }
 
 function renderDetail(presentation) {
@@ -274,9 +292,13 @@ function renderDetail(presentation) {
 }
 function selectRepo(id) {
   const closing = selectedId === id;
-  if (!selectedId) gridScrollTop = window.scrollY;
+  if (!selectedId) {
+    gridScrollTop = window.scrollY;
+    overviewScrollTop = $('#cards').scrollTop;
+  }
   selectedId = closing ? null : id;
   render();
+  if (closing) $('#cards').scrollTop = overviewScrollTop;
   window.scrollTo({top: closing ? gridScrollTop : 0, behavior: 'auto'});
 }
 $('#all-repos').onclick = () => {
