@@ -163,6 +163,41 @@ let savedSchedule = null;
 let savedScheduleKey = '';
 let savingSchedule = false;
 let discardDecision = null;
+let activeSettingsPage = 'home';
+
+function showSettingsPage(page) {
+  const titles = {home: 'Settings', schedule: 'Backup schedule', notifications: 'Notifications',
+    updates: 'App updates', help: 'Help & diagnostics', access: 'Access & permissions'};
+  if (!(page in titles)) return;
+  activeSettingsPage = page;
+  for (const name of Object.keys(titles)) {
+    const selector = name === 'home' ? '#settings-home' : '#settings-page-' + name;
+    $(selector).hidden = name !== page;
+  }
+  $('#settings-title').textContent = settingsRepo && page === 'schedule'
+    ? 'Schedule · ' + (menuState?.repos?.find(row => row.id === settingsRepo)?.name || 'Repository')
+    : titles[page];
+  $('#settings-back').hidden = page === 'home';
+  $('#settings-back').textContent = settingsRepo ? '‹ Backups' : '‹ Settings';
+  $('#schedule-actions').hidden = page !== 'schedule';
+  $('#settings-content').scrollTop = 0;
+  $('#settings-title').focus();
+  if (page === 'updates') {
+    const native = !!window.webkit?.messageHandlers?.repoHub;
+    $('#check-updates').disabled = !native;
+    $('#updates-note').textContent = native
+      ? 'Your backup folders and settings stay separate.'
+      : 'Check for Updates is available in the installed Mac app.';
+  }
+}
+
+async function settingsBack() {
+  if ($('#settings-form').hidden) return window.RepoHubWorkspaces?.close(false);
+  if (activeSettingsPage === 'schedule' && !await leaveSchedule()) return;
+  if (settingsRepo) $('#settings-dialog').close();
+  else showSettingsPage('home');
+}
+
 
 function scheduleDraft() {
   if (settingsRepo !== null && $('#repo-defaults').checked) return null;
@@ -187,6 +222,8 @@ function scheduleDirty() {
 
 function settingsDisabled() {
   const inherited = settingsRepo !== null && $('#repo-defaults').checked;
+  $('#settings-close').disabled = savingSchedule;
+  $('#settings-back').disabled = savingSchedule;
   $('#repo-defaults').disabled = savingSchedule;
   $('#battery-automatic').disabled = savingSchedule || inherited;
   for (const source of ['battery', 'adapter']) {
@@ -231,12 +268,14 @@ async function leaveSchedule() {
   if (!await confirmDiscard(scheduleDirty())) return false;
   // Discard restores the saved draft, including its inheritance choice.
   fillSettings(savedSchedule);
+  $('#settings-error').textContent = '';
   $('#repo-defaults').checked = settingsRepo !== null && savedScheduleKey === 'null';
   settingsDisabled();
   return true;
 }
 
 async function closeSettings() {
+  if ($('#settings-form').hidden) return window.RepoHubWorkspaces?.close(true);
   if (await leaveSchedule()) $('#settings-dialog').close();
 }
 
@@ -274,7 +313,7 @@ $('#settings-dialog').addEventListener('cancel', event => {
   void closeSettings();
 });
 
-async function openSettings(repoId = null) {
+async function openSettings(repoId = null, page = 'home') {
   try {
     const result = await api(repoId ? '/api/repo-settings/' + encodeURIComponent(repoId) : '/api/settings');
     settingsRepo = repoId;
@@ -295,13 +334,22 @@ async function openSettings(repoId = null) {
     $('#readiness-panel').hidden = !!repoId;
     $('#settings-power').textContent = 'Currently: ' + powerName(result.power_source);
     $('#settings-error').textContent = '';
-    $('#settings-dialog').showModal();
+    $('#settings-form').hidden = false;
+    $('#workspace-form').hidden = true;
+    if (!$('#settings-dialog').open) $('#settings-dialog').showModal();
+    showSettingsPage(repoId ? 'schedule' : page);
   } catch (error) {
     $('#notice').textContent = error.message;
   }
 }
 $('#settings').onclick = () => openSettings();
-for (const id of ['settings-close', 'settings-cancel']) $('#' + id).onclick = closeSettings;
+$('#settings-close').onclick = closeSettings;
+$('#settings-cancel').onclick = settingsBack;
+$('#settings-back').onclick = settingsBack;
+for (const page of ['schedule', 'notifications', 'updates', 'help', 'access']) {
+  $('#settings-nav-' + page).onclick = () => page === 'schedule'
+    ? openSettings(null, 'schedule') : showSettingsPage(page);
+}
 $('#settings-form').onsubmit = async event => {
   event.preventDefault();
   if (savingSchedule || !scheduleDirty()) return;
@@ -315,9 +363,12 @@ $('#settings-form').onsubmit = async event => {
     const payload = settingsRepo
       ? {settings, revision: settingsRevision, defaults_revision: defaultsRevision}
       : {settings, revision: settingsRevision};
-    await api(path, payload);
+    const saved = await api(path, payload);
+    settingsRevision = saved.revision;
+    savedSchedule = saved.settings;
     savedScheduleKey = JSON.stringify(settings);
-    $('#settings-dialog').close();
+    if (settingsRepo) $('#settings-dialog').close();
+    else { settingsDefaults = saved.settings; showSettingsPage('home'); }
     $('#notice').textContent = 'Backup schedule saved.';
     await load();
   } catch (error) {
@@ -327,7 +378,17 @@ $('#settings-form').onsubmit = async event => {
     settingsDisabled();
   }
 };
-window.RepoHubSettings = {confirmDiscard, leaveSchedule};
+window.RepoHubSettings = {
+  confirmDiscard, leaveSchedule,
+  showHome: () => showSettingsPage('home'),
+  openAccess: async () => { await openSettings(); showSettingsPage('access'); },
+  workspaceOpened: () => {
+    $('#settings-title').textContent = 'Folders to back up';
+    $('#settings-back').hidden = false;
+    $('#settings-content').scrollTop = 0;
+    $('#settings-title').focus();
+  },
+};
 window.addEventListener('resize',updatePosition);setInterval(()=>{if(lastResponseAt&&Date.now()-lastResponseAt>20000)unreachable('Status outdated: waiting for the local helper.','cache_expired');},5000);
 (async()=>{try{sessionToken=(await api('/api/session')).token;}catch(e){/* Read status still works; writes acquire a fresh token when needed. */}await load();setInterval(load,5000);})();
 

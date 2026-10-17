@@ -92,7 +92,8 @@ function change(id, value) {
   assert.equal(writes.length, count, 'One save request while busy');
   assert(get('settings-dialog').open, 'Closing cannot interrupt an in-flight save');
   resume(); await saving; hold = false;
-  assert(!get('settings-dialog').open);
+  assert(get('settings-dialog').open);
+  assert(!get('settings-home').hidden, 'Saved global schedule returns to Settings home');
   assert.equal(writes.at(-1).url, '/api/settings');
   assert.equal(writes.at(-1).payload.settings.adapter.frequency_minutes, 120);
 
@@ -114,5 +115,41 @@ function change(id, value) {
   assert(!get('settings-dialog').open);
   assert(get('repo-defaults').checked, 'Discard restores the saved inheritance choice');
   assert.equal(writes.length, 3);
+
+  await context.openSettings();
+  assert(!get('settings-home').hidden);
+  assert(get('settings-back').hidden);
+  await get('settings-nav-schedule').onclick();
+  assert(get('settings-home').hidden);
+  assert(!get('settings-page-schedule').hidden);
+  assert(!get('schedule-actions').hidden);
+  change('adapter-frequency', '30');
+  const back = get('settings-back').onclick(); await tick();
+  get('settings-keep').onclick(); await back;
+  assert(!get('settings-page-schedule').hidden);
+  const backDiscard = get('settings-back').onclick(); await tick();
+  get('settings-discard-confirm').onclick(); await backDiscard;
+  assert(!get('settings-home').hidden);
+  assert.equal(Number(get('adapter-frequency').value), 240);
+  assert.equal(writes.length, 3, 'Back/discard does not save');
+  for (const page of ['notifications', 'updates', 'help', 'access']) {
+    get('settings-nav-' + page).onclick();
+    assert(!get('settings-page-' + page).hidden);
+    assert(get('settings-home').hidden);
+    assert(get('schedule-actions').hidden);
+    await get('settings-back').onclick();
+    assert(!get('settings-home').hidden);
+  }
+  assert(get('check-updates').disabled, 'Browser has no native update bridge');
+  let closedWorkspace;
+  context.window.RepoHubWorkspaces = {close: async closeDialog => { closedWorkspace = closeDialog; }};
+  get('settings-form').hidden = true;
+  await get('settings-back').onclick(); assert.equal(closedWorkspace, false);
+  await get('settings-close').onclick(); assert.equal(closedWorkspace, true);
+  assert(html.indexOf('id="settings-close"') < html.indexOf('id="settings-content"'));
+  assert(html.indexOf('id="settings-content"') < html.indexOf('id="settings-form"'));
+  const rows = [...html.matchAll(/id="(settings-nav-[^"]+|workspace-open)" class="settings-row"/g)].map(m => m[1]);
+  assert.equal(rows.length, 6);
+  assert.equal(rows.at(-1), 'settings-nav-access');
   console.log('Actual settings controller: explicit save, discard/Escape, failed and duplicate saves, and revision-checked inheritance passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });
