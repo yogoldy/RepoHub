@@ -643,3 +643,17 @@ frontend plist succeeded: matching packaged build 1, 13 repos, preserved configu
 The regression fixes this ordering and retains future bootstrap stderr only in the
 private migration journal. This demonstrates the working ordering on this Pro; it
 does not establish launchd’s undocumented internal reason for the earlier EIO.
+
+### Settings navigation must not silently consume an unsaved draft
+
+Opening another page, native permission-readiness entry, Close and Escape are not
+save actions. Keep a canonical draft baseline, ask before discarding actual edits,
+and serialize the existing token/revision-checked save. Failed requests preserve
+editable values and do not claim confirmed persistence. Native access entry must
+honor a declined discard decision before fetching/replacing the schedule form.
+
+The folder controller is shared with the full status page: test both hosts. Review
+must not save; busy saves block duplicate submits and navigation; conflicts keep
+the selected draft and offer explicit reload. Only a successful reviewed save
+returns to Settings home. GR22 registers the actual controller regressions. Native
+picker, privacy prompts and installed WebKit behavior are separate acceptance cases.

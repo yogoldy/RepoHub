@@ -496,9 +496,10 @@
       "cause_and_solution": "Keep local drafts, guard Back/Close/Escape, serialize saves and preserve the existing session-token and revision-checked API boundary.",
       "required_behavior": "No persistence from editing or navigation. Failed saves keep the draft. Folder choices retain review and revision protections.",
       "test_ids": [
-        "test_settings_pages.SettingsPagesTests.test_explicit_save_discard_busy_and_failure_preserve_drafts_and_revision_guards"
+        "test_settings_pages.SettingsPagesTests.test_explicit_save_discard_busy_and_failure_preserve_drafts_and_revision_guards",
+        "test_settings_pages.SettingsPagesTests.test_folder_review_cancel_conflict_and_navigation_keep_saved_sources_intact"
       ],
-      "remaining_gap": "Controller regression uses isolated API responses. Browser page layout and native Settings/Escape behavior require candidate UI validation; no daily configuration is used."
+      "remaining_gap": "Actual isolated browser checks cover schedule edits/save/discard/reload, folder-mode discard and a long access list with a fixed toolbar. Shared-controller regressions cover both menu and full-page folder hosts. Native Settings layout, permission actions and folder picking are not validated by these browser cases; no installed app or daily configuration changed."
     }
   ]
 }

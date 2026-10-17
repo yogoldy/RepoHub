@@ -12,3 +12,11 @@ class SettingsPagesTests(unittest.TestCase):
             capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_folder_review_cancel_conflict_and_navigation_keep_saved_sources_intact(self):
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            ['node', str(root / 'tests/settings-folders.cjs')], cwd=root,
+            capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

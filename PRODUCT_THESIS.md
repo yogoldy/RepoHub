@@ -293,3 +293,32 @@ before loading the login agent resolved the observed handoff. Background discove
 is enabled with user-controlled installation. Air and Apple permission-continuity
 validation remain outside this completed bootstrap. See the release-delivery record
 for exact evidence and the subsequent real-upgrade acceptance boundary.
+
+### Local Settings pages candidate — October 17, 2026
+
+Leo approved staged local commits for explicit saving and a less crowded Settings
+interface, with no push, main merge or installed-app update in this batch.
+`codex/settings-pages` adds a Settings home with separate schedule, folders,
+notifications, updates, help and access pages. Access is last. A shared header keeps
+the page title, Back and Close outside the scrolling content.
+
+Schedule edits stay in a draft until Save changes succeeds. Back, Close and Escape
+ask before discarding edits; failed saves retain the draft. Native access-readiness
+entry respects the same guard. Folder setup keeps review, exact source identities,
+revision checks and existing backups; its shared controller also preserves the full
+status page's existing behavior. Access checks, notification permission requests,
+updates and report previews remain explicit actions rather than schedule saves.
+
+The repo detail now presents Where and When separately. iCloud still requires the
+existing upload-confirmation evidence; When is the archive's creation time in
+month/day/two-digit-year and local 12-hour time. Unknown evidence remains unknown.
+Backup selection, scheduling decisions, verification and typed timing receipts are
+unchanged.
+
+Focused controller regressions and isolated browser checks exercised edit-versus-save,
+discard, failed/conflicting and duplicate saves, folder navigation, reload persistence,
+and an overflowing list of 61 disposable access results. The fixed header remained
+visible while the list scrolled. Full local acceptance is recorded in the clean
+Golden Gate receipt outside Git. Installed WebKit/native folder picking and real
+permission actions remain future checks; this candidate does not change the running
+0.0.2 app or authorize publication.
