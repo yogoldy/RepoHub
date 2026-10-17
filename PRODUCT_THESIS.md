@@ -281,3 +281,15 @@ with a local recovery copy; Leo confirmed saving it in his password manager on O
 remains disabled until Apple credentials and initial signed distribution are ready;
 no daily Mac has been updated. See [release delivery](docs/RELEASE_DELIVERY.md) for
 implementation, native evidence limits and the first-install migration dependency.
+
+
+### Personal delivery is live — October 17, 2026
+
+Leo approved Sparkle-authenticated personal releases before Apple signing. Protected
+main acceptance automatically published 0.0.1, and the Pro’s guarded first install
+completed with all 13 repos and unchanged protected configuration/data hashes. Two
+launchd failures restored safely; registering the replacement with Launch Services
+before loading the login agent resolved the observed handoff. Background discovery
+is enabled with user-controlled installation. Air and Apple permission-continuity
+validation remain outside this completed bootstrap. See the release-delivery record
+for exact evidence and the subsequent real-upgrade acceptance boundary.

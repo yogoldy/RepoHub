@@ -631,3 +631,15 @@ the real process path by probing exactly the configured interpreter in isolated
 mode, then retain the same strict libproc PID-path comparison. The regression
 requires the configured interpreter and rejects malformed probe paths; no name-only
 process matching or generic Python termination is introduced.
+
+### Register a replaced bundle before loading its login agent
+
+Two real Pro migrations failed with launchctl bootstrap EIO (5) and automatically
+restored the old app/helper with matching protected hashes and 13 repos. The same
+published executable loaded its argument guard normally and both disposable
+launchd tests passed, so an executable-loading fault was not established. Refreshing
+the replacement bundle through Apple’s lsregister before bootstrapping the unchanged
+frontend plist succeeded: matching packaged build 1, 13 repos, preserved configuration.
+The regression fixes this ordering and retains future bootstrap stderr only in the
+private migration journal. This demonstrates the working ordering on this Pro; it
+does not establish launchd’s undocumented internal reason for the earlier EIO.

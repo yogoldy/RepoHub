@@ -482,9 +482,10 @@
         "test_packaged_install.PackagedInstallTests.test_only_known_legacy_layout_is_accepted_and_protected_files_are_read_only",
         "test_packaged_install.PackagedInstallTests.test_backup_race_resumes_frozen_process_without_terminating_archive_write",
         "test_packaged_install.PackagedInstallTests.test_watchdog_before_service_handoff_never_restarts_or_replaces_daily_services",
-        "test_packaged_install.PackagedInstallTests.test_configured_interpreter_probe_resolves_framework_launcher_without_weakening_pid_check"
+        "test_packaged_install.PackagedInstallTests.test_configured_interpreter_probe_resolves_framework_launcher_without_weakening_pid_check",
+        "test_packaged_install.PackagedInstallTests.test_replacement_registration_precedes_bootstrap_and_private_errors_are_retained"
       ],
-      "remaining_gap": "Personal ad-hoc distribution is explicitly authorized and remains Sparkle-authenticated over HTTPS. Developer ID/notarization and permission continuity await Apple credentials. Actual main publication and the first Pro migration require live receipts; synthetic tests alone do not establish those results."
+      "remaining_gap": "Personal release 0.0.1 was automatically published and bootstrapped on the Pro with unchanged protected hashes and 13 repos. Launch Services registration before login-agent bootstrap resolved observed EIO after two restored attempts. Complete the follow-up real Sparkle upgrade; Apple signing/permission continuity and the Air matrix remain deferred."
     }
   ]
 }
