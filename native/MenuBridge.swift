@@ -81,4 +81,17 @@ enum MenuBridge {
               values.isDirectory == true, values.isSymbolicLink != true else { return nil }
         return item
     }
+
+    static func backupDirectoryURL(status: [String: Any]) -> URL? {
+        guard let setup = status["setup"] as? [String: Any], setup["configured"] as? Bool == true,
+              let path = status["backup_root"] as? String,
+              path.hasPrefix("/"), !path.contains("\0") else { return nil }
+        let item = URL(fileURLWithPath: path)
+        // The helper owns destination selection. Never substitute the old default,
+        // accept a page-supplied path, or follow a redirected/unavailable directory.
+        guard canonicalSourcePath(item) == path,
+              let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+              values.isDirectory == true, values.isSymbolicLink != true else { return nil }
+        return item
+    }
 }

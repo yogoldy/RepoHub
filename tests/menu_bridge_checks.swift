@@ -113,6 +113,31 @@ import Foundation
         manual["workspace_sources"] = "invalid"
         precondition(MenuBridge.repositoryURL(id:"Outside-id",status:manual) == nil)
         count += 6
+        let firstDestination = outside.appendingPathComponent("Chosen Backups")
+        let secondDestination = outside.appendingPathComponent("Another Destination")
+        try! files.createDirectory(at: firstDestination, withIntermediateDirectories: true)
+        try! files.createDirectory(at: secondDestination, withIntermediateDirectories: true)
+        func backupStatus(_ path: Any, configured: Bool = true) -> [String: Any] {
+            ["backup_root": path, "setup": ["configured": configured]]
+        }
+        let firstPath = MenuBridge.canonicalSourcePath(firstDestination)
+        let secondPath = MenuBridge.canonicalSourcePath(secondDestination)
+        precondition(MenuBridge.backupDirectoryURL(status: backupStatus(firstPath)).map(MenuBridge.canonicalSourcePath) == firstPath)
+        precondition(MenuBridge.backupDirectoryURL(status: backupStatus(secondPath)).map(MenuBridge.canonicalSourcePath) == secondPath)
+        count += 2
+        let archiveFile = outside.appendingPathComponent("archive.tar.gz")
+        try! Data("not a folder".utf8).write(to: archiveFile)
+        let missing = MenuBridge.canonicalSourcePath(outside) + "/Missing Destination"
+        for value in [backupStatus(firstPath, configured: false), backupStatus("relative"),
+                      backupStatus(42), backupStatus(firstPath + "/../Chosen Backups"),
+                      backupStatus(firstPath + "\0"), backupStatus(MenuBridge.canonicalSourcePath(archiveFile)),
+                      backupStatus(missing), backupStatus(linked.appendingPathComponent("Chosen Backups").path),
+                      ["backup_root": firstPath], ["setup": ["configured": true]]] {
+            precondition(MenuBridge.backupDirectoryURL(status: value) == nil)
+            count += 1
+        }
+        precondition(!files.fileExists(atPath: missing))
+        count += 1
         print("\(count) menu bridge checks passed")
     }
 }
