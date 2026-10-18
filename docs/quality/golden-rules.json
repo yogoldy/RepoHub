@@ -580,7 +580,7 @@
       "breakpoint": "Unbounded recursion, Git-looking files or external worktree storage can yield unsafe or misleading source selections.",
       "diagnostic_events": ["git_discovery", "workspace_review", "workspace_configuration"],
       "cause_and_solution": "Scan explicitly with depth/count/time limits and cancellation. Validate Git metadata without running hooks. Skip linked and protected directories; disclose invalid/external layouts and incomplete areas. Add only user-selected results to the existing individual-folder draft.",
-      "required_behavior": "Discovery never activates repos, removes non-Git selections or changes repo-home behavior. Incomplete, cancelled or failed scans are not reported as complete empty success. Existing source-review and identity checks still govern saves.",
+      "required_behavior": "Discovery never activates repos, removes non-Git selections or changes repo-home behavior. Incomplete, cancelled or failed scans are not reported as complete empty success. Cancellation accepted before final publication remains cancelled with partial diagnostics, including during the last identity check. Existing source-review and identity checks still govern saves.",
       "test_ids": [
         "test_git_discovery.DiscoveryTests.test_recursive_candidates_do_not_modify_sources_and_show_unsupported_layouts",
         "test_git_discovery.DiscoveryTests.test_protected_paths_and_links_are_not_traversed_and_limits_disclosed",

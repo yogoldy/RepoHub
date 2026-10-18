@@ -113,3 +113,11 @@ disabled while a native picker or discovery is active. The follow-up release PR
 must record its own clean gate, Sparkle install, native reload and explicit backup
 acceptance. Real permission denial/recovery was not forced on the daily app;
 Apple signing/notarization, other providers and Air remain outside this update.
+
+The first follow-up PR check passed, while its duplicate branch run failed the
+cancellation regression. Investigation reproduced a real late-cancellation race:
+the worker could accept cancellation during its final check, then report complete.
+An event-controlled regression now fixes that timing independently of runner
+speed and requires cancelled/incomplete state plus the existing partial diagnostic.
+Both corrections stay in the same protected follow-up release; the failed run is
+not accepted as release evidence.

@@ -791,6 +791,13 @@ protected folders are excluded, and unsupported external history is disclosed.
 Ordinary folders and repo-home mode keep their existing behavior. Source paths,
 names and review fingerprints stay out of the typed setup/discovery diagnostics.
 
+The first follow-up branch run exposed a cancellation race after the last
+traversal check: an accepted request could publish complete instead of cancelled.
+The regression now pauses the worker at its final identity check with events,
+accepts cancellation, then releases completion. It fails reliably before the
+fix. Final publication checks cancellation under the same lock, retaining
+incomplete results and a partial diagnostic rather than claiming a full scan.
+
 See [first-run acceptance](../FIRST_RUN_SETUP.md) for current evidence and the
 remaining native permission, iCloud and installed-update checks. The macOS PR,
 main and publication workflows all execute the same complete Golden Gate; new
