@@ -46,9 +46,9 @@ scope; this batch stays local until promotion is authorized.
   and failed requests. This is a local presentation change, not a new backup rule.
 - [x] **First-run setup candidate:** the approved five-step welcome window,
   one iCloud destination, readable folder layouts, reviewed Git discovery and
-  recoverable configuration saves are implemented with synthetic/native-build
-  coverage. Final gate, native interaction and installed-Mac acceptance are
-  pending; see [the implementation record](docs/FIRST_RUN_SETUP.md).
+  recoverable configuration saves are integrated. The first protected release
+  passed the clean gate and installed migration; a draft-reload correction has
+  its own final delivery checks. See [the implementation record](docs/FIRST_RUN_SETUP.md).
 
 ## Existing foundation
 
@@ -124,17 +124,16 @@ without custom labels.
   repo name. Do not append an arbitrary identifier, hash, numeric suffix or
   “Backup” label. No custom naming setting is requested.
 - Keep stable workspace IDs, source bindings and verification hashes in internal
-  registry/index metadata, separate from the visible folder name. The current
-  implementation uses a slug plus a shortened identity hash as both workspace ID
-  and destination directory; changing the directory must not discard that ID or
-  weaken verification.
+  registry/index metadata, separate from the visible folder name. The original
+  layout used a slug plus a shortened identity hash as both workspace ID and
+  destination directory; migration retains that ID and its verification history.
 - Validate names using the destination filesystem's rules. If two repos would
   have the same destination name, including case/normalization collisions, show
   the conflicting source paths and require an explicit destination/layout
   resolution before proceeding. Never silently rename, merge or overwrite them;
   reviewed parent grouping uses the shortest distinguishing source ancestry.
-- Migrate existing suffixed folders without losing archives, indexes, schedules
-  or pending upload evidence. Preserve recovery after interruption and show the
+- Migrate existing suffixed folders without losing archives, indexes or schedules.
+  Recheck upload evidence at each changed path. Preserve recovery and show the
   resulting path. Existing backups change only when reviewed setup is applied.
 
 ### R5 — Recursive Git-based repo discovery

@@ -32,6 +32,8 @@ async function actualController(backupNow) {
   let discoveryReads = 0;
   const context = vm.createContext({
     console, setTimeout, Uint8Array, crypto: require('node:crypto').webcrypto,
+    // An unhosted WKWebView confirm returns false; draft reload must still work.
+    confirm: () => false,
     document: {getElementById: id => nodes[id], createElement: () => new Node(),
       createTextNode: value => ({textContent: value})},
     addEventListener: (name, handler) => { listeners[name] = handler; },
@@ -45,6 +47,7 @@ async function actualController(backupNow) {
       else if (path === '/api/discovery/start') result = {id: 'discovery', state: 'running'};
       else if (path === '/api/discovery') {
         assert.equal(nodes['cancel-discovery'].disabled, false, 'Each rescan must be cancellable');
+        assert.equal(nodes.reload.disabled, true, 'Reload waits for an active scan');
         discoveryReads += 1;
         result = discoveryReads <= 2 ? {id: 'discovery', state: 'complete', visited: 3, results: [
           {path: '/projects/Git', selectable: true}], incomplete: false} : {
@@ -66,6 +69,18 @@ async function actualController(backupNow) {
   });
   vm.runInContext(fs.readFileSync('web/setup.js', 'utf8'), context);
   for (let turn = 0; turn < 10; turn++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.filter(call => call.path === '/api/setup/apply').length, 0);
+  nodes['pick-sources'].onclick();
+  assert.equal(nodes.reload.disabled, true, 'Reload waits for the native picker');
+  const sourcePicker = calls.filter(call => call.native?.action === 'chooseRepoFolders').at(-1).native;
+  await listeners.repoHubSetupPicked({detail: {
+    request_id: sourcePicker.request_id, cancelled: false, paths: ['/projects/discard-this-draft'],
+  }});
+  assert.equal(nodes.sources.children.length, 2);
+  assert.equal(nodes.reload.disabled, false);
+  await nodes.reload.onclick();
+  for (let turn = 0; turn < 10; turn++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(nodes.sources.children.length, 1, 'Reload discards only the unsaved draft without a browser confirmation');
   assert.equal(calls.filter(call => call.path === '/api/setup/apply').length, 0);
   for (let scan = 0; scan < 2; scan++) {
     nodes['find-git'].onclick();
@@ -94,8 +109,21 @@ async function actualController(backupNow) {
   assert.deepEqual(calls.find(call => call.path === '/api/setup/apply').value.draft.source.paths,
     ['/projects/non-git', '/projects/Git']);
   assert.equal(nodes.complete.hidden, false);
+  assert.equal(nodes.reload.disabled, false, 'The completed view can reload saved setup');
   assert.equal(calls.some(call => call.native?.action === 'requestNotifications'), false);
   assert.equal(calls.some(call => call.path === '/api/backup'), false);
+  await nodes.reload.onclick();
+  for (let turn = 0; turn < 10; turn++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(nodes.complete.hidden, true, 'Reload exits the old completion view');
+  assert.equal(nodes['setup-actions'].hidden, false);
+  assert.equal(nodes['discovery-panel'].hidden, true, 'Reload removes results belonging to the discarded draft');
+  assert.equal(nodes['discovery-results'].children.length, 0);
+  assert.equal(nodes['access-status'].textContent, '');
+  assert.equal(nodes['review-paths'].children.length, 0);
+  assert.equal(nodes.next.disabled, false);
+  assert.equal(nodes.reload.disabled, false);
+  assert.equal(nodes.sources.children.length, 1);
+  assert.equal(calls.filter(call => call.path === '/api/setup/apply').length, 1, 'Reload cannot save configuration');
 }
 (async () => {
   await actualController(false); await actualController(true);

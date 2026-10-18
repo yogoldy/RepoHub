@@ -537,7 +537,7 @@
       "breakpoint": "Fresh packages required a pre-existing personal config; independent settings saves could expose only part of a setup draft.",
       "diagnostic_events": ["setup_review", "setup_applied", "setup_continued", "setup_recovery"],
       "cause_and_solution": "Bootstrap empty manual sources with backups disabled. Review helper-observed access against the exact draft/revision, then serialize and journal application. Recover before starting scans or backups; keep current operation until explicit apply.",
-      "required_behavior": "New installs remain idle until explicit reviewed save. Denied, changed, busy or stale requests cannot activate a draft. Existing configurations and optional permission choices survive. Native bootstrap and exact trusted welcome-page bridge checks run in the macOS gate.",
+      "required_behavior": "New installs remain idle until explicit reviewed save. Denied, changed, busy or stale requests cannot activate a draft. Reload discards unsaved choices and stale discovery/access/completion UI without browser confirmation or configuration writes. Existing configurations and optional permission choices survive. Native bootstrap and exact trusted welcome-page bridge checks run in the macOS gate.",
       "test_ids": [
         "test_setup_service.SetupTests.test_fresh_install_is_idle_until_explicit_apply_and_preserves_default_schedule",
         "test_setup_service.SetupTests.test_first_backup_pending_needs_no_nonexistent_upload_receipt",
