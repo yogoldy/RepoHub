@@ -785,6 +785,13 @@ reused after a path changes. Switching destinations leaves old archives in place
 and requires a new copy. A missing or replaced destination is never recreated or
 silently rebound. General provider support is outside this release.
 
+Actual Finder acceptance also found the native Repository Backups action still
+hard-coded to the legacy collection. It now resolves only the helper's fresh
+selected root, with configured/canonical/existing-directory checks and no default
+fallback. The macOS bridge regression covers changing the selected root,
+unconfigured or malformed status, redirected/file/missing targets and no path
+creation. Its trusted page action still accepts no path or URL from JavaScript.
+
 GR25 makes recursive Git discovery a bounded, cancellable candidate scan. It does
 not save selections or run backups. Git markers are validated, Git internal and
 protected folders are excluded, and unsupported external history is disclosed.

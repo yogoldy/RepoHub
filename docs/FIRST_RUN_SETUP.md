@@ -121,3 +121,28 @@ An event-controlled regression now fixes that timing independently of runner
 speed and requires cancelled/incomplete state plus the existing partial diagnostic.
 Both corrections stay in the same protected follow-up release; the failed run is
 not accepted as release evidence.
+
+Both final checks at `26f5610` passed, followed by protected merge `5488522`,
+main's gate and automatic 0.0.6 publication. Sparkle installed that version with
+the resource inventory, seven saved setup/settings files, fifteen current archive
+hashes and the index verified unchanged. Setup stayed closed on relaunch and
+reopened from Settings. A native scan of 500 disposable repos was cancelled after
+433 folders/432 candidates; results stayed unchecked and incomplete, and its
+typed diagnostic reported partial. Reload removed those results and an unsaved
+non-Git selection, restored repo-home mode and left all seven saved files intact.
+An explicit native backup then verified/reused fifteen archives without errors;
+all fourteen workspace uploads and the app-data upload were observed. A separate
+current-source/archive comparison for RepoHub matched. The earlier normal
+scheduled run created four replacements with no errors; its legitimate clock and
+index changes were captured before the 0.0.6 installation baseline.
+
+The final Finder interaction exposed another integration boundary: Repository
+Backups still opened a hard-coded legacy collection rather than the selected
+backup root. Native navigation now fetches the helper's current `backup_root`,
+requires configured setup and an existing canonical physical directory, and
+reports unavailable roots without creating or substituting a path. The native
+bridge cases cover two different selected roots, missing/unconfigured/invalid
+status, files, aliases, path hops and missing destinations. The existing macOS
+gate compiles and executes these cases as well as the complete native app; no
+workflow trigger or request guard is relaxed. Its release/install acceptance is
+recorded in the follow-up PR.

@@ -460,8 +460,20 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     @objc func openBackups() {
-        let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Repository Backups")
-        NSWorkspace.shared.open(path)
+        var request = URLRequest(url: address.appendingPathComponent("api/status"))
+        request.timeoutInterval = 8
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            let status = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            let target = status.flatMap { MenuBridge.backupDirectoryURL(status: $0) }
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard error == nil, (response as? HTTPURLResponse)?.statusCode == 200, let target = target else {
+                    self.finderNotice("The selected backup folder is unavailable. Review it in Settings and try again.")
+                    return
+                }
+                if !NSWorkspace.shared.open(target) { self.finderNotice("Finder could not open your backup folder.") }
+            }
+        }.resume()
     }
     @objc func checkForUpdates() { updates?.checkForUpdates() }
     @objc func quit() { NSApp.terminate(nil) }

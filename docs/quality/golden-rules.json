@@ -559,7 +559,7 @@
       "breakpoint": "Workspace IDs doubled as user-visible folder names; naive renames or destination changes can lose indexes, reuse an old upload receipt or overwrite another repo.",
       "diagnostic_events": ["setup_applied", "setup_recovery", "repo_backup_finished", "upload_observed"],
       "cause_and_solution": "Keep IDs in metadata, compute collision-safe readable parent groups and journal staged renames with archive verification. Bind the chosen iCloud destination to physical identity. Destination switches keep prior archives and require a new local copy.",
-      "required_behavior": "No arbitrary hash suffixes, foreign-folder overwrite, source overlap, silent destination rebinding or pruning of old-location archives. Every moved archive is verified, and upload evidence is re-observed for the new path.",
+      "required_behavior": "No arbitrary hash suffixes, foreign-folder overwrite, source overlap, silent destination rebinding or pruning of old-location archives. Every moved archive is verified, and upload evidence is re-observed for the new path. Native backup navigation uses the helper's selected existing physical root, with no hard-coded fallback or page-supplied path; macOS bridge checks cover this boundary.",
       "test_ids": [
         "test_backup_layout.LayoutTests.test_names_keep_identity_separate_and_group_duplicate_parents",
         "test_backup_layout.LayoutTests.test_journal_recovers_rename_and_partial_metadata_write_without_losing_bytes",
