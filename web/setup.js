@@ -149,6 +149,21 @@
       if (current.state !== 'running') break;
       await new Promise(resolve => setTimeout(resolve, 500));
     }
+    const warningLabels = {
+      git_unavailable: 'Git is not available. Add folders manually or install the Apple command line tools.',
+      parent_unavailable: 'The parent folder changed or is unavailable. Choose it again.',
+      traversal_limit: 'The scan reached its time or folder limit. Choose a smaller parent folder.',
+      depth_limit: 'These folders are too deeply nested. Choose a deeper starting folder.',
+      unreadable_or_invalid_git: 'This area could not be read or its Git metadata could not be checked.',
+      symlink_skipped: 'A linked folder was skipped to avoid loops.',
+    };
+    const warnings = discovery.warnings || [];
+    $('discovery-warnings').hidden = !warnings.length;
+    $('discovery-warning-list').replaceChildren(...warnings.map(row => pathRow(
+      warningLabels[row.reason] || 'This area could not be checked.', row.path)));
+    if (warnings.some(row => row.reason === 'git_unavailable')) {
+      $('discovery-status').textContent = warningLabels.git_unavailable;
+    }
     $('discovery-results').replaceChildren(...discovery.results.map(row => {
       const li = document.createElement('li'), label = document.createElement('label'), input = document.createElement('input');
       input.type = 'checkbox'; input.disabled = !row.selectable;

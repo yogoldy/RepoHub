@@ -29,6 +29,7 @@ async function actualController(backupNow) {
   nodes.steps.children = Array.from({length: 5}, () => new Node());
   const calls = [], listeners = {};
   let currentOperation;
+  let discoveryReads = 0;
   const context = vm.createContext({
     console, setTimeout, Uint8Array, crypto: require('node:crypto').webcrypto,
     document: {getElementById: id => nodes[id], createElement: () => new Node(),
@@ -44,8 +45,11 @@ async function actualController(backupNow) {
       else if (path === '/api/discovery/start') result = {id: 'discovery', state: 'running'};
       else if (path === '/api/discovery') {
         assert.equal(nodes['cancel-discovery'].disabled, false, 'Each rescan must be cancellable');
-        result = {id: 'discovery', state: 'complete', visited: 3, results: [
-          {path: '/projects/Git', selectable: true}], incomplete: false};
+        discoveryReads += 1;
+        result = discoveryReads <= 2 ? {id: 'discovery', state: 'complete', visited: 3, results: [
+          {path: '/projects/Git', selectable: true}], incomplete: false} : {
+          id: 'discovery', state: 'failed', visited: 0, results: [], incomplete: true,
+          warnings: [{reason: 'git_unavailable', path: '/projects'}]};
       } else if (path === '/api/setup/review') {
         assert.equal(options.headers['X-RepoHub-Token'], 'fresh-token');
         currentOperation = {id: 'check', state: 'complete', value: {review: 'checked',
@@ -71,6 +75,11 @@ async function actualController(backupNow) {
   }
   const selection = nodes['discovery-results'].children[0].children[0].children[0];
   selection.checked = true; selection.onchange(); nodes['add-discovered'].onclick();
+  nodes['find-git'].onclick();
+  const unavailable = calls.filter(call => call.native?.action === 'chooseDiscoveryParent').at(-1).native;
+  await listeners.repoHubSetupPicked({detail: {request_id: unavailable.request_id, cancelled: false, paths: ['/projects']}});
+  assert.match(nodes['discovery-status'].textContent, /Git is not available.*Add folders manually/);
+  assert.equal(nodes['add-discovered'].disabled, true);
   await nodes.next.onclick();
   await nodes.next.onclick();
   assert.match(nodes['access-status'].textContent, /helper can read/);

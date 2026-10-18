@@ -24,7 +24,9 @@
     <div class="button-row"><button id="pick-sources" type="button">Add folders</button><button id="find-git" type="button">Find Git repos</button></div>
     <section id="discovery-panel" hidden>
       <h3>Git discovery</h3><p id="discovery-status" role="status"></p>
+      <p>Linked folders and Git internal folders are skipped. Repos with Git history stored elsewhere are not selectable.</p>
       <ul id="discovery-results" class="path-list"></ul>
+      <details id="discovery-warnings" hidden><summary>Skipped or unavailable areas</summary><ul id="discovery-warning-list" class="path-list"></ul></details>
       <button id="add-discovered" type="button">Add selected repos</button>
       <button id="cancel-discovery" type="button">Cancel scan</button>
     </section>
