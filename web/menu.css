@@ -239,7 +239,13 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 }
 
 /* Larger reading text without changing status evidence or success icons. */
-.card-name { font-size: 13px; }
+.card-name,
+#open-backups {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.35;
+}
 .card-status, #summary { font-size: 12px; }
 .detail-context, .last-backup, .report-status { font-size: 12px; }
 .status-explanation { font-size: 14px; }
@@ -454,7 +460,11 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 
 #open-backups {
   grid-column: 1 / -1;
-  color: var(--green);
+}
+
+/* Browser preview availability must not alter the requested surface colors. */
+#open-backups:disabled {
+  opacity: 1;
 }
 
 .status-explanation[data-category="status_unavailable"],
