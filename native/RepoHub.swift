@@ -13,6 +13,9 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var notificationsEnabled: Bool { UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true }
     var polling: Timer?
     var sourcePicker: NSOpenPanel?
+    var setupWindow: NSWindow?
+    var setupWebView: WKWebView?
+    var offeredSetup = false
     var packaged: PackagedApplication?
     var updates: AppUpdates?
     var hasLoadedMenu = false
@@ -115,6 +118,11 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                     }
                 }
                 self.unavailableSince = nil
+                if !self.offeredSetup, let setup = status["setup"] as? [String: Any],
+                   setup["configured"] as? Bool != true || setup["reviewed"] as? Bool != true {
+                    self.offeredSetup = true
+                    self.openSetup()
+                }
                 let repos = status["repos"] as? [[String: Any]] ?? []
                 self.renderMenuBar(status: status, generation: generation)
                 self.notifyProblems(status["problems"] as? [[String: Any]] ?? [])
@@ -297,9 +305,11 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.webView === popoverWebView,
+        let isSetup = message.webView === setupWebView
+        guard (message.webView === popoverWebView || isSetup),
               let action = MenuBridge.action(body: message.body, frameURL: message.frameInfo.request.url,
-                                             isMainFrame: message.frameInfo.isMainFrame, expectedPort: address.port ?? 8767) else { return }
+                                             isMainFrame: message.frameInfo.isMainFrame, expectedPort: address.port ?? 8767,
+                                             expectedPage: isSetup ? "/setup.html" : "/menu.html") else { return }
         switch action {
         case .openBackups: openBackups()
         case .openRepo:
@@ -316,9 +326,17 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         case .checkForUpdates: checkForUpdates()
         case .getMenuAppearance, .saveMenuAppearance:
             if let body = message.body as? [String: Any] { menuAppearance(action: action, body: body) }
-        case .chooseRepoHome, .chooseRepoFolders:
+        case .openSetup: openSetup()
+        case .closeSetup:
+            setupWindow?.close()
+            setupWebView = nil
+            setupWindow = nil
+            pollStatus()
+            showPopover()
+        case .chooseRepoHome, .chooseRepoFolders, .chooseBackupDestination, .chooseDiscoveryParent:
             if let body = message.body as? [String: Any], let id = body["request_id"] as? String {
-                chooseSources(multiple: action == .chooseRepoFolders, requestID: id)
+                chooseSources(multiple: action == .chooseRepoFolders, requestID: id,
+                              sender: message.webView, purpose: action)
             }
         case .quit: quit()
         }
@@ -331,52 +349,91 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             decisionHandler(.cancel)
             return
         }
-        decisionHandler(url.scheme == "http" && url.host == "127.0.0.1" && url.port == address.port && url.path == "/menu.html" ? .allow : .cancel)
+        let page = webView === setupWebView ? "/setup.html" : "/menu.html"
+        decisionHandler(url.scheme == "http" && url.host == "127.0.0.1" && url.port == address.port && url.path == page ? .allow : .cancel)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             guard let self = self else { return }
-            webView.load(URLRequest(url: self.address.appendingPathComponent("menu.html")))
+            webView.load(URLRequest(url: self.address.appendingPathComponent(webView === self.setupWebView ? "setup.html" : "menu.html")))
         }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pollStatus()
-        if !UserDefaults.standard.bool(forKey: "readinessShown") {
-            webView.evaluateJavaScript("window.dispatchEvent(new Event('repoHubReadinessRequested'))") { _, error in
-                if error == nil { UserDefaults.standard.set(true, forKey: "readinessShown") }
-            }
-        }
     }
 
-    func chooseSources(multiple: Bool, requestID: String) {
+    func openSetup() {
+        if setupWindow == nil {
+            let configuration = WKWebViewConfiguration()
+            configuration.userContentController.add(self, name: "repoHub")
+            let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 740, height: 720), configuration: configuration)
+            setupWebView = view
+            view.navigationDelegate = self
+            view.underPageBackgroundColor = NSColor(calibratedRed: 0.063, green: 0.082, blue: 0.114, alpha: 1)
+            let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = "Welcome to RepoHub"
+            window.minSize = NSSize(width: 580, height: 540)
+            window.isReleasedWhenClosed = false
+            window.contentView = view
+            window.appearance = NSAppearance(named: .darkAqua)
+            window.center()
+            setupWindow = window
+            view.load(URLRequest(url: address.appendingPathComponent("setup.html")))
+        }
+        popover.performClose(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        setupWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    func chooseSources(multiple: Bool, requestID: String, sender: WKWebView? = nil,
+                       purpose: MenuAction = .chooseRepoFolders) {
         guard sourcePicker == nil else { return }
+        let target = sender ?? popoverWebView!
+        let inSetup = target === setupWebView
         let panel = NSOpenPanel()
         sourcePicker = panel
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = multiple
-        panel.canCreateDirectories = false
-        panel.title = multiple ? "Choose individual repo folders" : "Choose a repo-home folder"
-        panel.message = multiple ? "Each selected folder is one repo. You can add more in setup." : "Immediate subfolders of this folder will be monitored as repos."
+        panel.canCreateDirectories = purpose == .chooseBackupDestination
+        switch purpose {
+        case .chooseBackupDestination:
+            panel.title = "Choose a backup folder in iCloud Drive"
+            panel.message = "Your repo folders will be stored directly inside this folder."
+            panel.directoryURL = packaged?.testMode == true
+                ? packaged?.stateDirectory.deletingLastPathComponent().appendingPathComponent("cloud")
+                : FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
+        case .chooseDiscoveryParent:
+            panel.title = "Choose a parent folder to scan for Git repos"
+            panel.message = "Review discovered repos before adding them. Nothing is enabled automatically."
+        default:
+            panel.title = multiple ? "Choose individual repo folders" : "Choose a repo-home folder"
+            panel.message = multiple ? "Each selected folder is one repo. You can add more in setup." : "Immediate subfolders of this folder will be monitored as repos."
+        }
         panel.prompt = "Choose"
-        popover.behavior = .applicationDefined
+        if !inSetup { popover.behavior = .applicationDefined }
         // A popover floats above an independent NSOpenPanel. Hide it while the
         // picker is active; its WebKit draft survives and is reopened on return.
         popover.performClose(nil)
         NSApp.activate(ignoringOtherApps: true)
-        panel.begin { [weak self] response in
+        let completion: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard let self = self else { return }
             let detail: [String: Any] = ["request_id": requestID, "cancelled": response != .OK,
                                         "paths": response == .OK ? panel.urls.map { MenuBridge.canonicalSourcePath($0) } : []]
             self.sourcePicker = nil
-            self.popover.behavior = .transient
-            self.showPopover()
+            if !inSetup {
+                self.popover.behavior = .transient
+                self.showPopover()
+            }
             guard let data = try? JSONSerialization.data(withJSONObject: detail),
                   let json = String(data: data, encoding: .utf8) else { return }
-            self.popoverWebView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('repoHubSourcesPicked',{detail:" + json + "}))")
+            let event = inSetup ? "repoHubSetupPicked" : "repoHubSourcesPicked"
+            target.evaluateJavaScript("window.dispatchEvent(new CustomEvent('" + event + "',{detail:" + json + "}))")
         }
+        if inSetup, let window = setupWindow { panel.beginSheetModal(for: window, completionHandler: completion) }
+        else { panel.begin(completionHandler: completion) }
     }
 
     func finderNotice(_ message: String) {

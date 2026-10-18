@@ -15,6 +15,7 @@ EXPECTED_WEB_ASSETS = {
     'menu.css', 'menu.html', 'menu.js', 'notes.html', 'readiness.css',
     'readiness.js', 'repo-status.js', 'report-preview.js', 'report.css',
     'style.css', 'view-client.js', 'workspace-setup.css', 'workspace-setup.js',
+    'setup.html', 'setup.js', 'setup.css',
 }
 
 

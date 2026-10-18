@@ -1,0 +1,44 @@
+.setup-shell {
+  max-width: 760px;
+  margin: auto;
+  padding: 28px;
+  line-height: 1.6;
+}
+.setup-shell h2 { font-size: 22px; line-height: 1.3; }
+.setup-shell p { color: var(--muted); }
+.setup-shell #error { color: var(--red); }
+.setup-shell #feedback, .setup-shell #access-status { color: var(--gold); }
+#error:empty, #feedback:empty { display: none; }
+#steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  list-style-position: inside;
+  padding: 18px 0;
+  margin: 18px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+#steps [aria-current="step"] { color: var(--gold); font-weight: 650; }
+.setup-shell [hidden] { display: none !important; }
+.setup-shell section[data-step] { min-height: 290px; }
+.mode-buttons, .button-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.mode-buttons [aria-pressed="true"] { border-color: var(--gold); }
+.path-list { list-style: none; padding: 0; }
+.path-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.path-list small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.path-list li > div, .path-list label { min-width: 0; overflow-wrap: anywhere; }
+.selected-path { padding: 16px; border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
+.optional { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); }
+.setup-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; padding: 22px 0 14px; border-top: 1px solid var(--line); }
+.setup-shell footer { gap: 12px; font-size: 12px; }
+.setup-shell footer button { font-size: 12px; padding: 6px 0; }
+.setup-shell #browser-note { font-size: 11px; }
+.setup-shell #discovery-panel { margin-top: 22px; }

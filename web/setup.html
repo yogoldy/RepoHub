@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Welcome to RepoHub</title>
+  <link rel="stylesheet" href="/menu.css">
+  <link rel="stylesheet" href="/setup.css">
+  <script src="/setup.js" defer></script>
+</head>
+<body>
+<main class="setup-shell">
+  <header><div><p class="eyebrow">YOUR REPOS, BACKED UP</p><h1>Welcome to RepoHub</h1></div><button id="help" type="button">Help</button></header>
+  <p id="existing-note" hidden>Your current backups keep working until you apply changes here.</p>
+  <nav aria-label="Setup progress"><ol id="steps"><li>Sources</li><li>Destination</li><li>Access</li><li>Schedule</li><li>Review</li></ol></nav>
+  <p id="feedback" role="status" aria-live="polite"></p>
+  <p id="error" role="alert"></p>
+  <section id="step-sources" data-step="0">
+    <h2 tabindex="-1">What would you like to back up?</h2>
+    <p>Include Git repos or any other folders you want to protect.</p>
+    <div class="mode-buttons"><button id="mode-manual" type="button">Individual folders</button><button id="mode-home" type="button">Repo-home folder</button></div>
+    <p id="source-description"></p>
+    <ul id="sources" class="path-list"></ul>
+    <div class="button-row"><button id="pick-sources" type="button">Add folders</button><button id="find-git" type="button">Find Git repos</button></div>
+    <section id="discovery-panel" hidden>
+      <h3>Git discovery</h3><p id="discovery-status" role="status"></p>
+      <ul id="discovery-results" class="path-list"></ul>
+      <button id="add-discovered" type="button">Add selected repos</button>
+      <button id="cancel-discovery" type="button">Cancel scan</button>
+    </section>
+  </section>
+  <section id="step-destination" data-step="1" hidden>
+    <h2 tabindex="-1">Where should backups go?</h2>
+    <p>Choose one folder in iCloud Drive. RepoHub keeps your repo names inside it.</p>
+    <p id="destination" class="selected-path">No destination selected</p>
+    <button id="pick-destination" type="button">Choose backup folder…</button>
+    <p>Changing location leaves existing archives where they are. New backups go to your chosen folder.</p>
+  </section>
+  <section id="step-access" data-step="2" hidden>
+    <h2 tabindex="-1">Check folder access</h2>
+    <p>RepoHub checks that the backup helper can read your selected files and write to the destination.</p>
+    <p id="access-status" role="status">Not checked</p>
+    <button id="check-access" type="button">Check access again</button>
+    <button id="privacy" type="button">Open folder privacy settings</button>
+    <div class="optional"><h3>Optional permissions</h3><p>Backups work without notifications. Launch at login is optional too.</p>
+      <button id="notifications" type="button">Enable notifications</button><button id="login" type="button">Open login settings</button>
+    </div>
+  </section>
+  <section id="step-schedule" data-step="3" hidden>
+    <h2 tabindex="-1">Choose your backup schedule</h2>
+    <p>Per-repo overrides stay unchanged. You can adjust these defaults later in Settings.</p>
+    <div id="schedule-fields" class="power-settings"></div>
+  </section>
+  <section id="step-review" data-step="4" hidden>
+    <h2 tabindex="-1">Ready to finish?</h2>
+    <p>Review the exact paths before saving. Internal IDs stay separate from these folder names.</p>
+    <ul id="review-paths" class="path-list"></ul>
+    <p id="review-schedule"></p><p id="review-removals"></p><p id="review-old"></p>
+    <p>Access checked does not mean a backup exists. A backup is verified locally first; macOS confirms its iCloud upload separately.</p>
+  </section>
+  <section id="complete" hidden><h2>Setup saved</h2><p id="complete-copy"></p><button id="done" type="button" class="primary">Open RepoHub</button></section>
+  <div id="setup-actions" class="setup-actions"><button id="back" type="button">Back</button><button id="next" type="button" class="primary">Next</button><button id="finish-backup" type="button" hidden>Finish and back up now</button></div>
+  <footer><button id="continue-current" type="button" hidden>Continue with current settings</button><button id="reload" type="button">Reload saved settings</button><button id="quit" type="button">Quit RepoHub</button></footer>
+  <p id="browser-note" hidden>Browser preview: folder pickers and macOS permission actions are available in the installed app.</p>
+</main>
+<dialog id="help-dialog"><h2>Setting up your backups</h2><p>Choose sources, an iCloud Drive destination and a schedule. Grant access only to the folders you choose.</p><p>Access checks do not verify backup contents or cloud upload. RepoHub reports those separately after a backup.</p><p>Closing this window does not save its draft. Existing settings remain in use; a new installation stays idle until setup is finished.</p><button id="help-close" type="button">Close help</button></dialog>
+</body>
+</html>

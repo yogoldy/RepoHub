@@ -628,6 +628,11 @@ $('#connect-github').onclick=()=>nativeAction('connectGitHub');
 window.addEventListener('repoHubWorkspacesChanged',()=>void load());
 
 const updateButton = document.getElementById('check-updates');
+const setupButton = document.getElementById('open-setup');
+if (setupButton) {
+  setupButton.disabled = !window.webkit?.messageHandlers?.repoHub;
+  setupButton.onclick = () => nativeAction('openSetup');
+}
 if (updateButton) {
   updateButton.onclick = () => {
     if (window.webkit?.messageHandlers?.repoHub) {

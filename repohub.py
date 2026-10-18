@@ -31,6 +31,10 @@ from change_evidence import ChangeEvidence
 from backup_changes import finder_only_difference, edit_entries
 from access_checks import access_failure, probe_source, probe_destination
 from workspace_registry import WorkspaceRegistry, workspace_id, require_source, overlaps
+from backup_layout import BackupLayout, LayoutTransaction
+from destination_policy import require_destination
+from git_discovery import GitDiscovery
+from setup_service import SetupService
 from report_preview import preview_report
 from report_delivery import send_report, connection_status, delivery_status, case_path, read_private
 
@@ -55,6 +59,11 @@ def atomic_json(path, value):
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -340,6 +349,16 @@ def snapshot(root, destination, staging, expected=None, after_archive=None, obse
 
 class Hub:
     def __init__(self, config):
+        config = dict(config)
+        self.state_dir = Path(config['state_dir']).resolve()
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        LayoutTransaction(self.state_dir, atomic_json).recover()
+        self.setup_record = load_json(self.state_dir / 'data/setup.json', {})
+        if self.setup_record.get('destination'):
+            config['backup_root'] = self.setup_record['destination']['path']
+        self.configured = self.setup_record.get('configured', not config.get('setup_required', False))
+        self.setup_recovery_required = False
+        self.setup_cloud_root = config.get('_setup_test_cloud_root')
         self.config = config
         self.retention = config.get("retention", "all")
         if self.retention not in {"all", "latest"}:
@@ -369,7 +388,14 @@ class Hub:
         self.data_dir = self.state_dir / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.registry = WorkspaceRegistry(self.data_dir / "workspace-registry.json", self.root,
-                                          (self.backups, self.state_dir), atomic_json, config.get("sources"))
+                                          (self.backups, self.state_dir,
+                                           *(Path(path) for path in self.setup_record.get('previous_destinations', []))), atomic_json,
+                                          config.get('sources', {'mode': 'manual', 'paths': []}))
+        self.layout = BackupLayout(self.state_dir, self.backups)
+        self.setup = SetupService(self, atomic_json)
+        self.archive_digest = sha256
+        self.discovery = GitDiscovery((self.backups, self.state_dir,
+                                       *(Path(path) for path in self.setup_record.get('previous_destinations', []))))
         self.settings_path = self.data_dir / "settings.json"
         self.settings = validate_settings(load_json(self.settings_path, default_settings()))
         if not self.settings_path.exists():
@@ -437,6 +463,8 @@ class Hub:
                 self.diagnostics.emit('access_readiness', repo_ref=diagnostic_ref(key), state=outcome['state'], operation='source_read', error_code=outcome.get('error_code'),result='complete')
             try:
                 # Probe the existing destination root; never create a missing mounted path.
+                if self.setup_record.get('destination'):
+                    require_destination(self.setup_record['destination'])
                 probe_destination(self.backups if self.backups.exists() else self.backups.parent)
                 destination = {'state':'accessible','operation':'destination_write'}
             except OSError as error:destination = access_failure(error,'destination_write')
@@ -511,6 +539,10 @@ class Hub:
             raise
 
     def scan(self, deep=True, force=False, repo_id=None, _lock_held=False):
+        if self.setup_recovery_required:
+            if _lock_held:
+                self.scan_lock.release()
+            return
         if not _lock_held and not self.scan_lock.acquire(blocking=False):
             return
         scan_id, scan_started = secrets.token_hex(8), time.monotonic()
@@ -589,6 +621,9 @@ class Hub:
                     row["needs_backup"] = row["verification"].get("backup_required", True)
                 if row["verification"]["state"] == "error":
                     row["needs_backup"] = True
+                if current and not self.layout.contains(key, current['archive']):
+                    row['needs_backup'] = True
+                    row['verification'] = {'state': 'missing'}
                 row["cloud"] = self.cloud_for(key, current)
                 self.evidence.repo_checked(row, scan_id, (time.monotonic() - repo_started) * 1000, not verification_performed)
                 rows.append(row)
@@ -619,6 +654,9 @@ class Hub:
             result["views"] = self.views
             result["notifications"] = load_json(self.state_dir / "notifications.json", {"permission": "unknown"})
             result["settings"] = self.settings
+            result['setup'] = {'configured': self.configured,
+                               'reviewed': self.setup_record.get('reviewed', False),
+                               'recovery_required': self.setup_recovery_required}
             wall_now, monotonic_now = time.time(), time.monotonic()
             for row in result["repos"]:
                 row["schedule_override"] = row["id"] in self.repo_settings
@@ -691,6 +729,8 @@ class Hub:
             return self.repo_settings_status(key)
 
     def automatic_tick(self):
+        if not self.configured or self.setup_recovery_required:
+            return
         self.diagnostics.heartbeat(repo_count=len(self.status["repos"]),
                                    scan_running=self.scan_lock.locked(),
                                    backup_running=self.backup_lock.locked())
@@ -743,7 +783,7 @@ class Hub:
         with self.lock:
             copies = {key: dict(value) for key, value in self.index.items()}
         requests = [{"id": key, "path": value["archive"]} for key, value in copies.items()
-                    if Path(value["archive"]).parent == self.backups / key]
+                    if self.layout.contains(key, value['archive'])]
         helper = self.config.get("cloud_helper", str(Path(__file__).parent / "cloud-status"))
         try:
             result = subprocess.run([helper], input=json.dumps(requests), text=True,
@@ -797,7 +837,7 @@ class Hub:
         with self.lock:
             if self.index.get(key, {}).get("archive") != current["archive"]:
                 raise ValueError("Refusing cleanup using a superseded upload observation")
-        destination = self.backups / key
+        destination = self.layout.directory(key)
         retained = Path(current["archive"])
         if (destination.is_symlink() or destination.resolve().parent != self.backups
                 or retained.parent != destination or retained.is_symlink()
@@ -821,6 +861,8 @@ class Hub:
             self.lifecycle.emit("prune_finished", key=key, current=current, previous_archive_ref=diagnostic_ref(str(path)), result="removed")
 
     def backup(self, keys=None, reason="manual", expected_power=None, attempted_keys=None, run_id=None):
+        if not self.configured or self.setup_recovery_required:
+            raise ValueError('Finish setup or recover its interrupted save before starting backups')
         run_id = run_id or secrets.token_hex(12)
         started = time.monotonic()
         if expected_power is not None and power_source() != expected_power:
@@ -849,6 +891,8 @@ class Hub:
             with self.lock:
                 self.status["backup"] = {"running": True, "started_at": utc_now(), "current_repo": None, "current_repo_id": None, "reason": reason, "run_id": run_id}
                 self.persist_status()
+            if self.setup_record.get('destination'):
+                require_destination(self.setup_record['destination'])
             if not self.backups.parent.is_dir():
                 raise FileNotFoundError(2, "Backup destination unavailable")
             backup_sources = {key: root for key, root in repositories.items() if keys is None or key in keys}
@@ -874,6 +918,7 @@ class Hub:
                     stage = value
                     self.lifecycle.emit("archive_stage", key=key, run_id=run_id, stage=value)
                 try:
+                    destination = self.setup.allocate(key, root)
                     require_source(root, canonical_only=True)
                     if key != "repohub-data":self.registry.require_workspace(key, root)
                     entries = tree_entries(root)
@@ -909,7 +954,8 @@ class Hub:
                                                 previous_archive_ref=diagnostic_ref(previous["archive"]), error_type=type(error).__name__)
                             pass  # Replace a corrupt copy from the intact source; do not prune first.
                     if key != "repohub-data":self.registry.require_workspace(key, root)
-                    if verified and (verified["state"] == "matched" or verified.get("ignored_finder_only") is True):
+                    if (verified and self.layout.contains(key, previous['archive'])
+                            and (verified["state"] == "matched" or verified.get("ignored_finder_only") is True)):
                         with self.lock:
                             self.verifications[key] = verified
                             previous["content_signature"] = verified["archive_content_signature"]
@@ -924,7 +970,14 @@ class Hub:
                         self.lifecycle.emit("repo_backup_finished", key=key, run_id=run_id, result="reused",
                                             archive_ref=diagnostic_ref(previous["archive"]), duration_ms=(time.monotonic()-repo_started)*1000)
                         continue
-                    result = snapshot(root, self.backups / key, self.state_dir / "staging", expected=signature, observe=observe, source_check=(lambda: self.registry.require_workspace(key, root)) if key != "repohub-data" else None)
+                    def check_context():
+                        if key != 'repohub-data':
+                            self.registry.require_workspace(key, root)
+                        if self.setup_record.get('destination'):
+                            require_destination(self.setup_record['destination'])
+                        LayoutTransaction.safe_target(self.backups, destination)
+                    result = snapshot(root, destination, self.state_dir / "staging", expected=signature,
+                                      observe=observe, source_check=check_context)
                     current_archive = result["archive"]
                     self.lifecycle.emit("archive_verified", key=key, run_id=run_id, archive_ref=diagnostic_ref(current_archive),
                                         backup_hash_ref=diagnostic_ref(result["sha256"]), result="verified")
@@ -1037,6 +1090,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(self.hub.readiness_status())
             if path == "/api/workspaces":
                 return self.send(self.hub.workspace_status())
+            if path == '/api/setup':
+                return self.send(self.hub.setup.status())
+            if path == '/api/setup/operation':
+                return self.send(self.hub.setup.snapshot())
+            if path == '/api/discovery':
+                return self.send(self.hub.discovery.status())
             if path == "/api/settings":
                 return self.send(self.hub.settings_status())
             if path == "/api/status":
@@ -1060,6 +1119,7 @@ class Handler(BaseHTTPRequestHandler):
                       "/workspace-setup.js": "workspace-setup.js", "/workspace-setup.css": "workspace-setup.css",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
                       "/menu-appearance.js": "menu-appearance.js",
+                      "/setup.html": "setup.html", "/setup.js": "setup.js", "/setup.css": "setup.css",
                       "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:
                 return self.send({"error": "Not found"}, 404)
@@ -1109,6 +1169,21 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict):
                 raise ValueError("Request must be an object")
             path = unquote(urlparse(self.path).path)
+            if path in {'/api/setup/review', '/api/setup/apply', '/api/setup/continue',
+                        '/api/discovery/start', '/api/discovery/cancel'}:
+                try:
+                    if path == '/api/setup/continue':
+                        return self.send(self.hub.setup.continue_current(payload))
+                    if path.startswith('/api/setup/'):
+                        return self.send(self.hub.setup.start(path.rsplit('/', 1)[1], payload), 202)
+                    expected = {'parent'} if path.endswith('/start') else {'id'}
+                    if set(payload) != expected:
+                        raise ValueError('Invalid discovery request')
+                    value = (self.hub.discovery.start(payload['parent']) if path.endswith('/start')
+                             else self.hub.discovery.cancel(payload['id']))
+                    return self.send(value, 202)
+                except FileExistsError as error:
+                    return self.send({'error': str(error)}, 409)
             if path.startswith("/api/repo-settings/"):
                 try:
                     return self.send(self.hub.save_repo_settings(path.removeprefix("/api/repo-settings/"), payload))
@@ -1224,10 +1299,14 @@ def main():
     config = load_json(args.config, None)
     if not config:
         raise SystemExit("Missing configuration")
+    config.pop('_setup_test_cloud_root', None)
     if args.bundled:
         # The signed native entry point verifies these resources before exec.
         # Override stale external runtime paths in memory, never in saved settings.
         config["cloud_helper"] = str(Path(__file__).parent / "cloud-status")
+        release = load_json(Path(__file__).parent.parent / 'release.json', {})
+        if str(release.get('bundle_id', '')).startswith('com.leogoldberg.repohub.test.'):
+            config['_setup_test_cloud_root'] = str(Path(config['state_dir']).parent / 'cloud')
     hub = Hub(config)
     if args.bundled:
         release = load_json(Path(__file__).parent.parent / "release.json", {})

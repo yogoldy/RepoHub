@@ -18,8 +18,14 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    with explicit incomplete results and unsupported external Git stores. Synthetic
    tests exercise nested/invalid/external repos, protected folders, loops, limits,
    missing Git, cancellation and permission failures. Selection UI is pending.
-4. **Pending:** isolated fresh startup, welcome window, transactional setup and
-   runtime integration, preserving existing configuration until explicit apply.
+4. **Implemented, acceptance pending:** a separate five-step welcome window,
+   native pickers, idle fresh bootstrap and reviewed transactional setup. Existing
+   installs can continue unchanged. Async access/review/apply operations retain
+   draft and revision guards. The runtime uses the saved layout, rechecks physical
+   destination identity and retains old-location archives when switching roots.
+   Six service regressions, three HTTP/security regressions and the actual JS
+   controller exercise explicit saves. Native app compilation and unique-test
+   bootstrap/restart checks passed. Native picker/layout acceptance is pending.
 5. **Pending:** diagnostics, Golden Gate/CI, release and installed acceptance.
 
 Destination changes preserve old archives in place. Existing users see a prefilled

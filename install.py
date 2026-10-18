@@ -93,7 +93,7 @@ def main():
 
     runtime = STATE / "runtime"
     runtime.mkdir(exist_ok=True)
-    for name in ("helper_launch.py", "update_evidence.py", "update_recovery.py", "repohub.py", "access_checks.py", "workspace_registry.py", "backup_changes.py", "backup_lifecycle.py", "backup_policy.py", "status_health.py", "diagnostics.py", "change_evidence.py", "diagnostics_report.py", "diagnostic_export.py", "report_preview.py", "report_delivery.py"):
+    for name in ("helper_launch.py", "update_evidence.py", "update_recovery.py", "repohub.py", "access_checks.py", "workspace_registry.py", "backup_layout.py", "destination_policy.py", "git_discovery.py", "setup_service.py", "backup_changes.py", "backup_lifecycle.py", "backup_policy.py", "status_health.py", "diagnostics.py", "change_evidence.py", "diagnostics_report.py", "diagnostic_export.py", "report_preview.py", "report_delivery.py"):
         shutil.copy2(SOURCE / name, runtime / name)
     shutil.copytree(SOURCE / "web", runtime / "web", dirs_exist_ok=True)
     config = {"repos_root": str(HOME_DIR / "Desktop/repos"),

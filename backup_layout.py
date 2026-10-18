@@ -6,6 +6,7 @@ from pathlib import Path
 import secrets
 import stat
 import unicodedata
+from workspace_registry import source_identity
 
 
 def folded(value):
@@ -103,7 +104,8 @@ class LayoutTransaction:
             self.safe_target(root, target)
         for name in updates:
             relative_path(name)
-        journal = {'version': 1, 'root': str(root), 'stage': '.repohub-migration-' + secrets.token_hex(12),
+        journal = {'version': 1, 'root': str(root), 'identity': source_identity(root),
+                   'stage': '.repohub-migration-' + secrets.token_hex(12),
                    'phase': 'stage', 'moves': plan, 'updates': updates}
         self.writer(self.path, journal)
         self.recover()
@@ -129,6 +131,8 @@ class LayoutTransaction:
         if (journal.get('version') != 1 or not stage.name.startswith('.repohub-migration-')
                 or root.resolve() != root or root.is_symlink() or not root.is_dir()):
             raise ValueError('Setup recovery destination is unavailable')
+        if source_identity(root) != journal['identity']:
+            raise ValueError('Setup recovery destination identity changed')
         self.safe_target(root, stage)
         stage.mkdir(exist_ok=True, mode=0o700)
         if journal['phase'] == 'stage':
@@ -189,4 +193,6 @@ class BackupLayout:
         return target
 
     def contains(self, key, archive):
+        if self.names is not None and key not in self.names:
+            return False
         return Path(archive).parent == self.directory(key)

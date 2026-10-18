@@ -8,7 +8,8 @@ import CryptoKit
         let contents = root.appendingPathComponent("Contents")
         let resources = contents.appendingPathComponent("Resources")
         try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
-        let info = ["CFBundleIdentifier": "com.leogoldberg.repohub.test.integrity",
+        let identity = "com.leogoldberg.repohub.test.integrity." + UUID().uuidString.lowercased()
+        let info: [String: Any] = ["CFBundleIdentifier": identity, "RepoHubTestMode": true,
                     "CFBundleVersion": "100", "CFBundleShortVersionString": "0.2.0"]
         let infoData = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
         try infoData.write(to: contents.appendingPathComponent("Info.plist"))
@@ -22,6 +23,16 @@ import CryptoKit
         try JSONSerialization.data(withJSONObject: manifest).write(to: resources.appendingPathComponent("release.json"))
         let bundle = Bundle(url: root)!
         _ = try PackagedApplication.verify(resources: resources, bundle: bundle)
+        let application = try PackagedApplication(bundle: bundle)
+        defer { try? FileManager.default.removeItem(at: application.stateDirectory.deletingLastPathComponent()) }
+        let initialConfig = try Data(contentsOf: application.configURL)
+        let config = try JSONSerialization.jsonObject(with: initialConfig) as! [String: Any]
+        precondition(config["setup_required"] as? Bool == true)
+        precondition(config["port"] as? Int == 8879)
+        precondition(application.testMode)
+        _ = try PackagedApplication(bundle: bundle)
+        let retainedConfig = try Data(contentsOf: application.configURL)
+        precondition(retainedConfig == initialConfig)
         func rejected() {
             do {
                 _ = try PackagedApplication.verify(resources: resources, bundle: bundle)
