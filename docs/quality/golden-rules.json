@@ -567,7 +567,8 @@
         "test_destination_policy.DestinationTests.test_outside_alias_overlap_missing_and_disk_full_are_rejected",
         "test_destination_policy.DestinationTests.test_replaced_or_disconnected_destination_never_recreates_or_rebinds",
         "test_setup_service.SetupTests.test_existing_apply_migrates_names_but_preserves_bytes_ids_settings_and_restart",
-        "test_setup_service.SetupTests.test_destination_switch_keeps_old_archives_and_requires_new_copy"
+        "test_setup_service.SetupTests.test_destination_switch_keeps_old_archives_and_requires_new_copy",
+        "test_setup_service.SetupTests.test_nested_readable_layout_retention_keeps_siblings_until_exact_upload"
       ],
       "remaining_gap": "Real iCloud folder renames, file-provider placeholders, disk interruption and re-observed upload acknowledgement require native acceptance. Other cloud providers are outside this release."
     },

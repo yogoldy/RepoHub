@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from repohub import Hub, sha256, atomic_json
+from repohub import Hub, sha256, atomic_json, utc_now
 
 
 class SetupTests(unittest.TestCase):
@@ -132,3 +132,28 @@ class SetupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hub.backup()
         self.assertTrue(Hub(self.config).setup.status()['reviewed'])
+
+    def test_nested_readable_layout_retention_keeps_siblings_until_exact_upload(self):
+        other = self.base / 'Other/Project'; other.mkdir(parents=True)
+        (other / 'work').write_text('second repo')
+        self.hub.retention = 'latest'; self.hub.config['require_upload_before_prune'] = True
+        draft = self.draft()
+        draft['source'] = {'mode': 'manual', 'paths': [str(self.source), str(other)]}
+        review = self.hub.setup.review(draft)
+        self.hub.setup.apply({'draft': draft, 'review': review['review'], 'backup_now': False})
+        self.hub.backup()
+        self.assertEqual(self.hub.status['backup']['errors'], [])
+        before = copy.deepcopy(self.hub.index)
+        (self.source / 'work').write_text('changed contents')
+        self.hub.backup()
+        self.assertEqual(self.hub.status['backup']['errors'], [])
+        key = next(key for key, path in self.hub.repositories().items() if path == self.source)
+        current = self.hub.index[key]
+        self.assertNotEqual(current['archive'], before[key]['archive'])
+        self.assertTrue(Path(before[key]['archive']).exists(), 'Unconfirmed replacement cannot prune')
+        self.hub.cloud_states[key] = {'state': 'uploaded', 'archive': current['archive'], 'checked_at': utc_now()}
+        self.hub.retain_current(key, current)
+        self.assertFalse(Path(before[key]['archive']).exists())
+        for other_key, value in before.items():
+            if other_key != key:
+                self.assertTrue(Path(value['archive']).exists(), 'Retention cannot touch sibling workspaces')

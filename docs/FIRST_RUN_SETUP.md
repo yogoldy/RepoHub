@@ -23,7 +23,7 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    installs can continue unchanged. Async access/review/apply operations retain
    draft and revision guards. The runtime uses the saved layout, rechecks physical
    destination identity and retains old-location archives when switching roots.
-   Six service regressions, three HTTP/security regressions and the actual JS
+   Seven service regressions, four HTTP/security regressions and the actual JS
    controller exercise explicit saves. Native app compilation and unique-test
    bootstrap/restart checks passed. Native picker/layout acceptance is pending.
 5. **Implemented contract; acceptance pending:** GR23–25 register executable setup,
@@ -41,6 +41,16 @@ appearance tests passed when run with their required disposable-domain access.
 This does not replace the final clean-source macOS gate. Other focused passes
 include all 20 existing workspace tests, seven package-selection tests, the native
 app build, native fresh bootstrap/restart and the setup/API/controller tests.
+
+The clean macOS gate at `236b3b5` passed 304 tests, 25 rules and 30 commands
+with unchanged source. An isolated native pilot then selected a non-Git folder,
+discovered/reviewed two same-named nested Git repos, chose a test destination,
+checked access and finished without creating any archives. An explicit native
+backup verified all three archive manifests and checksums. It also exposed the
+old flat-directory retention guard rejecting the two grouped paths after safe
+publication. No archives were lost. A new regression now exercises latest-only
+retention in nested groups, withholding cleanup until exact upload evidence and
+protecting sibling archives. Final native repeat and a new gate are required.
 
 Destination changes preserve old archives in place. Existing users see a prefilled
 review once, with an option to continue unchanged. Fresh users choose sources,

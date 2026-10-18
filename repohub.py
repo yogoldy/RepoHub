@@ -842,7 +842,7 @@ class Hub:
                 raise ValueError("Refusing cleanup using a superseded upload observation")
         destination = self.layout.directory(key)
         retained = Path(current["archive"])
-        if (destination.is_symlink() or destination.resolve().parent != self.backups
+        if (destination.is_symlink() or destination.resolve() != destination or self.backups not in destination.parents
                 or retained.parent != destination or retained.is_symlink()
                 or not ARCHIVE_NAME.fullmatch(retained.name)):
             raise ValueError("Refusing cleanup outside the managed snapshot folder")
