@@ -37,6 +37,9 @@ class DiscoveryTests(unittest.TestCase):
         bad = self.parent / 'bad'; bad.mkdir(); (bad / '.git').write_text('not Git')
         external = self.parent / 'worktree'; external.mkdir()
         (external / '.git').write_text('gitdir: ../Client/App/.git')
+        linked = self.repo('linked-objects')
+        (linked / '.git/objects').rename(self.base / 'external-objects')
+        (linked / '.git/objects').symlink_to(self.base / 'external-objects')
         before = (first / '.git/config').read_bytes()
         scan = GitDiscovery([]); scan.start(str(self.parent)); status = self.wait(scan)
         results = {row['path']: row for row in status['results']}
@@ -44,6 +47,7 @@ class DiscoveryTests(unittest.TestCase):
         self.assertTrue(results[str(nested)]['selectable'])
         self.assertFalse(results[str(bad)]['selectable'])
         self.assertEqual(results[str(external)]['reason'], 'external_git_storage')
+        self.assertEqual(results[str(linked)]['reason'], 'external_git_storage')
         self.assertEqual(before, (first / '.git/config').read_bytes())
         self.assertNotIn(str(self.parent / 'ordinary'), results)
 

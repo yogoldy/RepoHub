@@ -31,6 +31,10 @@ def git_candidate(path, git):
     if not metadata.is_dir():
         return result
     # External worktree/common/alternate object stores are outside snapshot scope.
+    if any((metadata / name).is_symlink() for name in (
+            'objects', 'objects/pack', 'objects/info', 'refs', 'refs/heads',
+            'refs/tags', 'refs/remotes', 'HEAD', 'config', 'packed-refs')):
+        return {**result, 'reason': 'external_git_storage'}
     if (metadata / 'commondir').exists() or (metadata / 'objects/info/alternates').exists():
         return {**result, 'reason': 'external_git_storage'}
     environment = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
