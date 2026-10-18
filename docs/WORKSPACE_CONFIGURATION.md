@@ -37,7 +37,7 @@ The first startup without a registry migrates `config.json`'s existing `repos_ro
 }
 ```
 
-After creation, the saved registry takes precedence over the legacy home and initial `sources`; editing those initial settings does not silently replace an approved source list. The destination is still configured by `backup_root`; choosing/migrating it in the UI belongs to 3D/3E.
+After creation, the saved registry takes precedence over the legacy home and initial `sources`; editing those initial settings does not silently replace an approved source list. The destination is still configured by `backup_root`; choosing/migrating it in the UI belongs to R1/R2 in [the current product roadmap](../PRODUCT_THESIS.md). Recursive Git-based source discovery is requested separately as R5 and is not implemented by the existing repo-home/manual modes.
 
 ## Selection and filesystem boundaries
 

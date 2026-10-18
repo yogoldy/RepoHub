@@ -1,5 +1,6 @@
 let observedMenuState=null,clientFreshness='current';
 let retryingRepo=null;
+let requestingRescan = false;
 let detailsAnimation = null;
 const technicalOpen = new Set();
 const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
@@ -63,10 +64,20 @@ function render(){
     return [repo.id, {state, timing, compact: RepoStatus.compactTiming(timing)}];
   }));
   const ready = [...presentations.values()].filter(item => item.state.ready).length;
+  const waiting = [...presentations.values()].filter(
+    item => item.state.category === 'status_unavailable').length;
   window.RepoHubMenuAppearance?.update(menuState,
     [...presentations.values()].map(item => item.state));
-  $('#summary').textContent = repos.length
-    ? `${ready} of ${repos.length} repos backed up to iCloud` : 'No repos found';
+  let summary = 'No repos found';
+  if (repos.length) {
+    if (waiting === repos.length) {
+      summary = `Waiting for fresh status · ${repos.length} ${repos.length === 1 ? 'repo' : 'repos'}`;
+    } else {
+      summary = `${ready} of ${repos.length} repos backed up to iCloud`;
+      if (waiting) summary += ` · ${waiting} awaiting fresh checks`;
+    }
+  }
+  $('#summary').textContent = summary;
   $('#backup').disabled=!!menuState.backup?.running;
   $('#backup').lastElementChild.textContent=menuState.backup?.running?'Backing up…':'Back up now';
   const problems=menuState.problems||[];
@@ -333,8 +344,29 @@ $('#repo-expansion').addEventListener('keydown', event => {
   selectedButton?.focus({preventScroll: true});
   event.preventDefault();
 });
-function unreachable(message,reason='request_failed'){clientFreshness=reason;if(observedMenuState){menuState=RepoDiagnostics.displayState(observedMenuState,reason);render();}$('#backup').disabled=true;$('#notice').textContent=message;$('#checked').textContent='Status outdated · reconnecting';}
-async function load(){if(loading)return;loading=true;try{observedMenuState=await api('/api/status');clientFreshness='current';menuState=observedMenuState;lastResponseAt=Date.now();render();}catch(e){unreachable('Could not reach the local backup helper.',e.name==='AbortError'?'response_timeout':'request_failed');}finally{loading=false;}}
+function unreachable(message,reason='request_failed'){clientFreshness=reason;if(observedMenuState){menuState=RepoDiagnostics.displayState(observedMenuState,reason);render();}$('#backup').disabled=true;$('#notice').textContent=message;$('#checked').textContent='Waiting for fresh checks · reconnecting';}
+async function load(){if(loading)return;loading=true;try{observedMenuState=await api('/api/status');clientFreshness='current';menuState=observedMenuState;lastResponseAt=Date.now();render();}catch(e){unreachable('Waiting for the local helper. Retrying automatically.',e.name==='AbortError'?'response_timeout':'request_failed');}finally{loading=false;}}
+async function rescanNow() {
+  if (requestingRescan) return;
+  requestingRescan = true;
+  const button = $('#rescan');
+  const label = $('#rescan-label');
+  button.disabled = true;
+  label.textContent = 'Requesting scan…';
+  try {
+    sessionToken = (await api('/api/session')).token;
+    await api('/api/scan', {});
+    await load();
+    $('#notice').textContent = 'Scan requested. Status will update automatically.';
+  } catch (error) {
+    $('#notice').textContent = 'Scan could not be requested. ' + error.message;
+  } finally {
+    requestingRescan = false;
+    button.disabled = false;
+    label.textContent = 'Rescan now';
+  }
+}
+$('#rescan').onclick = rescanNow;
 $('#backup').onclick=async()=>{try{sessionToken=(await api('/api/session')).token;$('#backup').disabled=true;await api('/api/backup',{});$('#notice').textContent='Backup requested.';setTimeout(load,700);}catch(e){$('#notice').textContent=e.message;$('#backup').disabled=false;}};
 $('#open-backups').onclick=()=>nativeAction('openBackups');$('#notifications').onclick=()=>{if(nativeAction('toggleNotifications'))setTimeout(load,500);};$('#quit').onclick=()=>nativeAction('quit');window.addEventListener('repoHubNotificationsChanged',load);
 const powerName = source => source === 'battery' ? 'On battery'
@@ -588,7 +620,7 @@ window.RepoHubSettings = {
     $('#settings-title').focus();
   },
 };
-window.addEventListener('resize',updatePosition);setInterval(()=>{if(lastResponseAt&&Date.now()-lastResponseAt>20000)unreachable('Status outdated: waiting for the local helper.','cache_expired');},5000);
+window.addEventListener('resize',updatePosition);setInterval(()=>{if(lastResponseAt&&Date.now()-lastResponseAt>20000)unreachable('Waiting for the local helper. Retrying automatically.','cache_expired');},5000);
 (async()=>{try{sessionToken=(await api('/api/session')).token;}catch(e){/* Read status still works; writes acquire a fresh token when needed. */}await load();setInterval(load,5000);})();
 
 $('#connect-github').onclick=()=>nativeAction('connectGitHub');
@@ -596,6 +628,11 @@ $('#connect-github').onclick=()=>nativeAction('connectGitHub');
 window.addEventListener('repoHubWorkspacesChanged',()=>void load());
 
 const updateButton = document.getElementById('check-updates');
+const setupButton = document.getElementById('open-setup');
+if (setupButton) {
+  setupButton.disabled = !window.webkit?.messageHandlers?.repoHub;
+  setupButton.onclick = () => nativeAction('openSetup');
+}
 if (updateButton) {
   updateButton.onclick = () => {
     if (window.webkit?.messageHandlers?.repoHub) {

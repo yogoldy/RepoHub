@@ -22,6 +22,30 @@ LOCK = ROOT / 'tools/update-dependencies.json'
 NATIVE = ('RepoHub.swift', 'HelperLaunch.swift', 'BackupReadiness.swift',
           'ProblemAlerts.swift', 'MenuBridge.swift', 'GitHubConnection.swift',
           'PackagedApplication.swift', 'AppUpdates.swift', 'MenuAppearance.swift')
+# The web directory may contain ignored local files. Only declared resources ship;
+# the release gate checks that every served route is covered by this list.
+WEB_ASSETS = (
+    'app.js',
+    'diagnostics-client.js',
+    'index.html',
+    'menu-appearance.js',
+    'menu.css',
+    'menu.html',
+    'menu.js',
+    'notes.html',
+    'readiness.css',
+    'readiness.js',
+    'repo-status.js',
+    'report-preview.js',
+    'report.css',
+    'style.css',
+    'setup.html',
+    'setup.js',
+    'setup.css',
+    'view-client.js',
+    'workspace-setup.css',
+    'workspace-setup.js',
+)
 
 
 def sha256(path):
@@ -68,6 +92,19 @@ def runtime_modules():
             if 'repohub.py' in values:
                 return values
     raise ValueError('missing_runtime_modules')
+
+
+def copy_web_assets(source, destination):
+    if source.is_symlink() or not source.is_dir():
+        raise ValueError('invalid_web_asset_directory')
+    for name in WEB_ASSETS:
+        path = source / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('invalid_web_asset: ' + name)
+
+    destination.mkdir()
+    for name in WEB_ASSETS:
+        shutil.copy2(source / name, destination / name)
 
 
 def inventory(resources):
@@ -173,7 +210,7 @@ def build(output, cache, version, build_number, identifier, feed, public_key,
         (contents / 'Frameworks').mkdir()
         for name in runtime_modules():
             shutil.copy2(ROOT / name, runtime / name)
-        shutil.copytree(ROOT / 'web', runtime / 'web')
+        copy_web_assets(ROOT / 'web', runtime / 'web')
         shutil.copytree(unpacked / 'python/python', resources / 'python', symlinks=True)
         framework = contents / 'Frameworks/Sparkle.framework'
         shutil.copytree(unpacked / 'sparkle/Sparkle.framework', framework, symlinks=True)

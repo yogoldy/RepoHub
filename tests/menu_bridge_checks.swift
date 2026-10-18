@@ -3,6 +3,17 @@ import Foundation
 @main struct MenuBridgeTests {
     static func main() {
         let url = URL(string: "http://127.0.0.1:8767/menu.html")!
+        let setup = URL(string: "http://127.0.0.1:8767/setup.html")!
+        for action in ["chooseBackupDestination", "chooseDiscoveryParent", "chooseRepoFolders"] {
+            let body = ["action": action, "request_id": String(repeating: "b", count: 24)]
+            precondition(MenuBridge.action(body: body, frameURL: setup, isMainFrame: true) == nil)
+            precondition(MenuBridge.action(body: body, frameURL: setup, isMainFrame: true,
+                                          expectedPage: "/setup.html")?.rawValue == action)
+            precondition(MenuBridge.action(body: body, frameURL: setup, isMainFrame: false,
+                                          expectedPage: "/setup.html") == nil)
+        }
+        precondition(MenuBridge.action(body: ["action": "connectGitHub"], frameURL: setup,
+                                      isMainFrame: true, expectedPage: "/setup.html") == nil)
         var count = 0
         precondition(MenuBridge.isReportIssueURL(URL(string:"https://github.com/yogoldy/RepoHub/issues/12")!))
         for bad in ["http://github.com/yogoldy/RepoHub/issues/12", "https://github.com/other/RepoHub/issues/12",

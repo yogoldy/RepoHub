@@ -4,9 +4,9 @@ A simple local Mac app showing whether the latest iCloud-folder backups match th
 
 ## Product direction
 
-See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the tiered checklist: continuous diagnostics, separate bug/feature reporting to GitHub, setup through a repo home, manual folders or AI-assisted paths, and later cloud account connectors and independent restore audits. These unchecked features are planned, not shipped. Continuous diagnostics, constrained exports and explicit GitHub report delivery are implemented. Tier 3A adds [the persisted workspace registry and guarded source-selection API](docs/WORKSPACE_CONFIGURATION.md); native folder-picker setup and destination selection are the next passes.
+See [PRODUCT_THESIS.md](PRODUCT_THESIS.md) for the current unfinished requests: destination selection and Finder sync-folder validation, replayable onboarding, readable backup-folder names, recursive Git-based repo discovery, and reporting setup/review for other users. Git discovery replaces the former AI-assisted setup proposal; Finder-accessible provider folders replace direct cloud-account connectors. Continuous diagnostics, constrained exports, explicit GitHub delivery and [native source pickers with reviewed workspace selection](docs/WORKSPACE_CONFIGURATION.md) are implemented.
 
-This is currently Leo's local prototype. `install.py` performs a personal migration of an earlier backup setup; general folder-picker onboarding and a distributable installer remain roadmap work. Public source publication does not upload personal backups or diagnostics.
+Coordinated app/helper/interface packaging and the personal Sparkle update channel are implemented; see [release delivery](docs/RELEASE_DELIVERY.md). General onboarding, Apple Developer ID signing and notarization remain open. `install.py` retains the legacy personal migration path. Public source publication does not upload personal backups or diagnostics.
 
 ## Pieces
 
@@ -17,7 +17,7 @@ This is currently Leo's local prototype. `install.py` performs a personal migrat
 
 ## Backups
 
-The existing installation monitors immediate folders under `~/Desktop/repos`, including folders without Git. The workspace registry also supports individually selected folders at unrelated locations; its selection UI is not implemented yet. Backups include `.git`, uncommitted files, ignored files, dependencies, and empty folders. Symlinks are preserved as links; their outside targets are not copied. The app never changes the source repos.
+The existing repo-home mode monitors immediate folders under a chosen containing folder, including folders without Git. Native source pickers also support individually selected folders at unrelated locations, with exact-path review before saving. Recursive Git discovery is a separate requested mode, not implemented yet. Backups include `.git`, uncommitted files, ignored files, dependencies, and empty folders. Symlinks are preserved as links; their outside targets are not copied. The app never changes the source repos.
 
 Changed workspaces replace their current full `.tar.gz` archive with a newly dated copy in `iCloud Drive/Repository Backups/Snapshots/<workspace-id>/`. The helper hashes every regular source file with SHA-256, including ignored files and Git internals. New copies are checked against the decompressed archive's actual file contents, permissions, directories and link targets, and then against a second source-content pass. Destination archive bytes must also pass SHA-256 verification before the indexes are saved.
 
@@ -80,7 +80,7 @@ Back up now, Repository Backups, Backup notifications, and the settings gear use
 
 The native bridge accepts only openBackups, openRepo, toggleNotifications, connectGitHub, and quit from this popover's exact top-level http://127.0.0.1:8767/menu.html document. Other origins, ports, paths, subframes, extra fields and arbitrary path/command requests are rejected. openRepo accepts only a workspace ID and resolves its path from fresh helper status and the registry's exact approved ID/path pair, requiring an existing canonical non-symlink directory. Older single-root helper status retains its immediate-child check. HTML views never receive this bridge. Backups and settings still go through authenticated loopback POST endpoints, obtaining the current process token for each write so a helper restart does not strand the panel with an old token. Browser-only previews disable the three native controls.
 
-Menu checks: `node tests/menu-status.cjs`; compile `native/MenuBridge.swift` and `native/MenuAppearance.swift` with `tests/menu_bridge_checks.swift` and run the executable. Existing Python security/backup and Swift notification-readiness checks still apply. The menu-bar foundation started from 9f442b8; its fixed adapter and per-repo schedules remain in the current app. Broader independent cloud restore coverage remains a separate pass.
+Menu checks: `node tests/menu-status.cjs`; compile `native/MenuBridge.swift` and `native/MenuAppearance.swift` with `tests/menu_bridge_checks.swift` and run the executable. Existing Python security/backup and Swift notification-readiness checks still apply. The menu-bar foundation started from 9f442b8; its fixed adapter and per-repo schedules remain in the current app. The current roadmap requests validation of selected Finder sync folders; historical independent restore records retain their original evidence limits.
 
 Settings → **Menu bar appearance** chooses what the number counts: repos waiting
 for backup, repos with confirmed changes, or no number. The default remains waiting

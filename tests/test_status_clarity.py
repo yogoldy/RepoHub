@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from change_evidence import ChangeEvidence, presentation_text, timing_receipt
+from change_evidence import ChangeEvidence, compact_timing_receipt, presentation_text, timing_receipt
 from diagnostics import DiagnosticLog, read_events
 from diagnostic_export import export_bundle
 
@@ -48,11 +48,48 @@ console.log(JSON.stringify(next));"""
                'category': rendered['category'], 'display_label': rendered['label'],
                'display_headline': rendered['headline']}
         payload = {'surface': 'menu', 'native': False, 'client_id': 'c' * 24,
-                   'observation_id': observation, 'policy_version': 'status-clarity-5',
+                   'observation_id': observation, 'policy_version': 'status-clarity-7',
                    'client_freshness': freshness, 'selected_repo_id': repo['id'], 'rows': [row]}
         row['timing'] = timing_receipt(self.evidence.snapshots[observation][repo['id']], freshness)
+        row['card_timing'] = {**compact_timing_receipt(row['timing']), 'text_matches': True}
+        row['detail_timing'] = {'receipt': row['timing'], 'text_matches': True}
         self.evidence.presentation(payload)
         return payload
+
+    def test_waiting_copy_keeps_stale_evidence_non_green_and_recovers_without_backup(self):
+        before = copy.deepcopy(self.good)
+        stale = copy.deepcopy(self.good)
+        stale['health'] = {'fresh': False, 'reasons': ['Repo checks stopped updating']}
+        waiting = self.render(stale)
+        self.assertEqual(waiting['phase'], 'stale')
+        self.assertFalse(waiting['ready'])
+        self.assertEqual(waiting['category'], 'status_unavailable')
+        self.assertEqual(waiting['label'], 'Waiting for fresh checks')
+        self.assertEqual(waiting['headline'], 'Waiting for fresh backup status.')
+        self.assertIn('Rescan now', waiting['detail'])
+        payload = self.report(stale)
+        for version in range(1, 7):
+            old = copy.deepcopy(payload)
+            old['policy_version'] = f'status-clarity-{version}'
+            facts = self.evidence.snapshots[old['observation_id']][stale['id']]
+            old['rows'][0].update(presentation_text(facts, 'stale', old['policy_version']))
+            if version < 6:
+                old['rows'][0].pop('card_timing')
+                old['rows'][0].pop('detail_timing')
+            if version < 4:
+                old.pop('selected_repo_id')
+                old['rows'][0].pop('timing')
+            self.evidence.presentation(old)
+        self.report(self.good)
+        self.assertTrue(self.render(self.good)['ready'])
+        self.assertEqual(self.good, before)
+        self.assertFalse([event for event in read_events(self.root/'logs')
+                          if event['event'] == 'presentation_input_disagreement'])
+        payload['rows'][0].update(phase='ready', ready=True, category='backed_up',
+                                 display_label='Backed up', display_headline='Your files are backed up.')
+        self.evidence.presentation(payload)
+        self.assertTrue([event for event in read_events(self.root/'logs')
+                         if event['event'] == 'presentation_input_disagreement'])
 
     def test_actual_js_mapping_preserves_policy_and_matches_evidence(self):
         cases = [(self.good, {})]
@@ -178,6 +215,8 @@ console.log(JSON.stringify(next));"""
             previous['policy_version'] = version
             previous['rows'][0].update(phase='background', ready=False,
                                       **presentation_text(facts, 'background', version))
+            previous['rows'][0].pop('card_timing')
+            previous['rows'][0].pop('detail_timing')
             if version != 'status-clarity-4':
                 previous.pop('selected_repo_id')
                 previous['rows'][0].pop('timing')
@@ -185,6 +224,8 @@ console.log(JSON.stringify(next));"""
         self.assertFalse(any(e['event'] == 'presentation_input_disagreement'
                              for e in read_events(self.root/'logs')))
         payload['policy_version'] = 'status-clarity-4'
+        payload['rows'][0].pop('card_timing')
+        payload['rows'][0].pop('detail_timing')
         self.evidence.presentation(payload)
         self.assertTrue(any(e['event'] == 'presentation_input_disagreement'
                             for e in read_events(self.root/'logs')))
@@ -225,6 +266,8 @@ console.log(JSON.stringify(next));"""
         payload['policy_version'] = 'status-clarity-1'
         payload.pop('selected_repo_id')
         payload['rows'][0].pop('timing')
+        payload['rows'][0].pop('card_timing')
+        payload['rows'][0].pop('detail_timing')
         payload['rows'][0].update(display_label='Edits confirmed',
                                   display_headline='RepoHub confirmed edits.')
         self.evidence.presentation(payload)
@@ -259,7 +302,7 @@ console.log(JSON.stringify(next));"""
         bundle = export_bundle(self.root/'logs', self.root/'exports')
         shared = (bundle/'share/events.jsonl').read_text()
         rows = [json.loads(line) for line in shared.splitlines()]
-        actual = next(e for e in rows if e.get('policy_version') == 'status-clarity-5' and e['event'] == 'ui_presented')
+        actual = next(e for e in rows if e.get('policy_version') == 'status-clarity-7' and e['event'] == 'ui_presented')
         self.assertEqual(actual['category'], 'backed_up')
         self.assertEqual(actual['display_headline'], 'Your files are backed up.')
         for text in ['private-name', '/Users/private', '/private/current', 'private-repo', 'private-sha']:

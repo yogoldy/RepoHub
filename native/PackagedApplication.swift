@@ -43,6 +43,27 @@ final class PackagedApplication {
             ? home.appendingPathComponent("Library/Application Support/RepoHub Tests/" + release.bundle_id + "/state")
             : home.appendingPathComponent("Library/Application Support/RepoHub")
         configURL = stateDirectory.appendingPathComponent("config.json")
+        if !FileManager.default.fileExists(atPath: configURL.path) {
+            try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+            let cloud = testMode ? stateDirectory.deletingLastPathComponent().appendingPathComponent("cloud")
+                : home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
+            if testMode {
+                try FileManager.default.createDirectory(at: cloud, withIntermediateDirectories: true,
+                                                        attributes: [.posixPermissions: 0o700])
+            }
+            let initial: [String: Any] = ["state_dir": stateDirectory.path, "port": testMode ? 8879 : 8767,
+                "sources": ["mode": "manual", "paths": []] as [String: Any], "setup_required": true,
+                "backup_root": cloud.appendingPathComponent("Repository Backups").path,
+                "retention": "latest", "require_upload_before_prune": true,
+                "scan_seconds": 30, "cloud_seconds": 5, "verification_seconds": 900]
+            let descriptor = open(configURL.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+            if descriptor < 0 { throw Failure.configurationInvalid }
+            let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+            try handle.write(contentsOf: JSONSerialization.data(withJSONObject: initial, options: [.sortedKeys]))
+            try handle.synchronize()
+            try handle.close()
+        }
         let data = try Data(contentsOf: configURL)
         guard let config = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let state = config["state_dir"] as? String,
@@ -55,7 +76,7 @@ final class PackagedApplication {
             guard release.bundle_id.hasPrefix("com.leogoldberg.repohub.test.") else {
                 throw Failure.configurationInvalid
             }
-            for key in ["repos_root", "backup_root"] {
+            for key in ["backup_root"] + (config["repos_root"] == nil ? [] : ["repos_root"]) {
                 guard let path = config[key] as? String,
                       URL(fileURLWithPath: path).resolvingSymlinksInPath().path.hasPrefix(
                         stateDirectory.deletingLastPathComponent().resolvingSymlinksInPath().path + "/") else {

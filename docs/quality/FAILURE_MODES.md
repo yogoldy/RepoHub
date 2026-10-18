@@ -141,6 +141,24 @@ acceptance remain required when this local candidate is delivered.
 
 ### GR06 — Display decisions need fresh evidence
 
+Post-sleep recovery can briefly leave scan/hash evidence stale while the helper
+catches up. Treating that wait as “can’t get current backup status” sounded like
+a failed backup. Policy `status-clarity-7` uses “Waiting for fresh checks” and
+“Waiting for fresh backup status.” The underlying stale phase, false readiness,
+freshness thresholds and persistent-problem notifications are unchanged. The
+summary describes missing fresh status rather than implying every backup is lost.
+Technical details retain the observed reasons; the display does not claim sleep
+caused a particular case without evidence. Old policy wording remains valid for
+historical receipts.
+
+The menu's Rescan now uses the existing guarded `/api/scan` endpoint. Acceptance
+means a request was accepted, not that the scan or a backup completed. The actual
+controller test covers fresh tokens, duplicate requests and failed requests; an
+isolated HTTP regression verifies origin/Host/token guards, a real forced scan,
+preserved archive bytes/index and no call to backup. Actual card/detail mutations
+and stale-to-fresh recovery remain subject to the independent diagnostic oracle.
+Private sleep/diagnostic case records remain outside Git.
+
 **Susceptible boundary:** Green check uses old archive data, stale hashes, missing upload flags or an unavailable helper.
 
 **Cause / solution:** Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts.
@@ -592,6 +610,20 @@ same release before loading the menu. Test bundles use a disposable identity,
 state and port. Native integrity and complete Sparkle package builds now run
 inside the existing macOS gate; the workflow invokes that gate already.
 
+The web-resource boundary now uses an explicit list in `tools/package_app.py`.
+A controlled build using the former whole-directory copy included injected
+`.env`, Finder metadata, scratch files and a symlink target in its valid resource
+manifest. Hashing that manifest did not establish that the files belonged in a
+release. The builder now copies only declared regular web files, rejecting a
+missing required asset or a linked source file/directory. All 17 existing served
+assets remain; this does not remove the dashboard or retained notes route.
+The gate rejects a served route omitted from the package list. GR20 registers
+the actual-build resource-selection regressions and the omitted-route
+counterexample. Compilation/signing are stubbed only for the synthetic selection
+tests; the macOS gate separately compiles and builds the complete native bundle.
+Private local files are excluded, not deleted. No new runtime diagnostic event
+or status rule is required for this build-time boundary.
+
 A SIGTERM to a bundled helper waits for the actual backup lock, covering a
 backup that begins after a native idle check. The updater never sends SIGKILL.
 Actual signed-upgrade/failure recovery remains acceptance work. Production
@@ -727,3 +759,33 @@ logs and shareable exports; exact dates remain in the private comparison request
 GR06 and GR09 register the regressions. Existing Python discovery runs them in
 GitHub Actions without a YAML change. Browser layout and native WebKit acceptance
 remain separate from these DOM-observation and evidence-contract tests.
+
+## First-run setup, destinations and discovery — October 18, 2026
+
+GR23 requires a fresh package to start without a personal configuration and remain
+idle until an exact reviewed draft passes helper-owned access checks. Setup saves
+share the backup/scan/configuration locks and journal their directory moves and
+metadata writes. A prepared journal blocks operation until recovery succeeds;
+revision, identity and archive checks do not become optional during recovery.
+Native checks compile the app, exercise a unique test bootstrap and restrict the
+welcome bridge to its exact trusted web view/page/port. UI controller and HTTP
+tests distinguish review from save and explicit first-backup requests.
+
+GR24 keeps stable IDs in metadata and names backup folders after sources, grouping
+duplicate leaf names by their distinguishing parent paths. Existing paths change
+only on reviewed apply. Hashes guard migration; uploaded observations cannot be
+reused after a path changes. Switching destinations leaves old archives in place
+and requires a new copy. A missing or replaced destination is never recreated or
+silently rebound. General provider support is outside this release.
+
+GR25 makes recursive Git discovery a bounded, cancellable candidate scan. It does
+not save selections or run backups. Git markers are validated, Git internal and
+protected folders are excluded, and unsupported external history is disclosed.
+Ordinary folders and repo-home mode keep their existing behavior. Source paths,
+names and review fingerprints stay out of the typed setup/discovery diagnostics.
+
+See [first-run acceptance](../FIRST_RUN_SETUP.md) for current evidence and the
+remaining native permission, iCloud and installed-update checks. The macOS PR,
+main and publication workflows all execute the same complete Golden Gate; new
+Python/JS wrappers are discovered automatically, with registered test IDs failing
+the gate if absent, skipped or unsuccessful.

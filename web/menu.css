@@ -239,7 +239,12 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 }
 
 /* Larger reading text without changing status evidence or success icons. */
-.card-name { font-size: 13px; }
+.card-name {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.35;
+}
 .card-status, #summary { font-size: 12px; }
 .detail-context, .last-backup, .report-status { font-size: 12px; }
 .status-explanation { font-size: 14px; }
@@ -441,6 +446,57 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 .quiet-action:hover {
   background: transparent;
   color: var(--text);
+}
+
+.controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#open-backups {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  min-height: 44px;
+  margin: 3px 0;
+  padding: 11px 12px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+#open-backups:hover:not(:disabled) {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+#open-backups .action-icon {
+  color: var(--muted);
+}
+
+#open-backups .backups-chevron {
+  margin-left: auto;
+}
+
+#open-backups .backups-chevron svg {
+  width: 14px;
+  height: 14px;
+}
+
+.controls .primary {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+/* Browser preview availability must not alter the requested surface colors. */
+#open-backups:disabled {
+  opacity: 1;
+}
+
+.status-explanation[data-category="status_unavailable"],
+.technical-explanation[data-category="status_unavailable"] {
+  color: var(--muted);
 }
 
 /* Put each status label beside its own short explanation. */

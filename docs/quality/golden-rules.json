@@ -121,6 +121,9 @@
       "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
       "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics. Policy 6 checks every horizontal card receipt while details are collapsed or expanded, plus the one selected expanded timing line when present. Missing, hidden or incorrect compact text cannot be proven by an expanded-panel receipt.",
       "test_ids": [
+        "test_status_clarity.ClarityTests.test_waiting_copy_keeps_stale_evidence_non_green_and_recovers_without_backup",
+        "test_rescan.RescanTests.test_menu_rescan_controller_requests_only_scanning_and_recovers_from_rejection",
+        "test_rescan.RescanTests.test_scan_api_guards_request_and_preserves_backup_when_files_change",
         "test_menu_appearance.MenuAppearanceTests.test_counts_consume_existing_card_statuses_including_finder_and_unknown",
         "test_menu_appearance.MenuAppearanceTests.test_native_counts_have_independent_diagnostics_and_private_export",
         "test_menu_appearance.MenuAppearanceTests.test_native_readback_receipt_and_http_origin_token_guards",
@@ -454,9 +457,12 @@
         "application_update",
         "update_checkpoint"
       ],
-      "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, verify its resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
-      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Test apps cannot use the daily identity or port.",
+      "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, copy web resources from an explicit allowlist covering served routes, verify resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
+      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Unlisted web files never ship; missing or linked required web assets fail packaging. Test apps cannot use the daily identity or port.",
       "test_ids": [
+        "test_app_package.AppPackageTests.test_bundle_web_allowlist_excludes_unlisted_files_and_directories",
+        "test_app_package.AppPackageTests.test_bundle_web_allowlist_rejects_missing_or_linked_required_assets",
+        "test_release_gate.ReleaseGateTests.test_served_web_asset_must_be_declared_in_bundle_allowlist",
         "test_app_package.AppPackageTests.test_integrity_rejects_missing_changed_and_extra_components",
         "test_app_package.AppPackageTests.test_links_cannot_escape_resources_and_link_changes_are_detected",
         "test_app_package.AppPackageTests.test_production_requires_https_and_test_requires_disposable_identity",
@@ -524,6 +530,64 @@
         "test_settings_pages.SettingsPagesTests.test_folder_review_cancel_conflict_and_navigation_keep_saved_sources_intact"
       ],
       "remaining_gap": "Actual isolated browser checks cover schedule edits/save/discard/reload, folder-mode discard and a long access list with a fixed toolbar. Shared-controller regressions cover both menu and full-page folder hosts. Native Settings layout, permission actions and folder picking are not validated by these browser cases; no installed app or daily configuration changed."
+    },
+    {
+      "id": "GR23",
+      "title": "First-run setup cannot activate an unreviewed or partial configuration",
+      "breakpoint": "Fresh packages required a pre-existing personal config; independent settings saves could expose only part of a setup draft.",
+      "diagnostic_events": ["setup_review", "setup_applied", "setup_continued", "setup_recovery"],
+      "cause_and_solution": "Bootstrap empty manual sources with backups disabled. Review helper-observed access against the exact draft/revision, then serialize and journal application. Recover before starting scans or backups; keep current operation until explicit apply.",
+      "required_behavior": "New installs remain idle until explicit reviewed save. Denied, changed, busy or stale requests cannot activate a draft. Existing configurations and optional permission choices survive. Native bootstrap and exact trusted welcome-page bridge checks run in the macOS gate.",
+      "test_ids": [
+        "test_setup_service.SetupTests.test_fresh_install_is_idle_until_explicit_apply_and_preserves_default_schedule",
+        "test_setup_service.SetupTests.test_first_backup_pending_needs_no_nonexistent_upload_receipt",
+        "test_setup_service.SetupTests.test_replaced_draft_source_is_rejected_before_probing_its_new_contents",
+        "test_setup_service.SetupTests.test_stale_busy_denied_and_changed_selection_never_apply_a_partial_draft",
+        "test_setup_service.SetupTests.test_existing_continue_and_fresh_cancel_do_not_activate_changes",
+        "test_setup_service.SetupTests.test_interrupted_metadata_save_blocks_runtime_until_restart_recovers",
+        "test_setup_api.SetupAPITests.test_setup_and_discovery_require_host_origin_token_and_review_before_save",
+        "test_setup_api.SetupAPITests.test_full_http_review_apply_and_restart_preserve_non_git_source",
+        "test_setup_api.SetupAPITests.test_setup_resources_are_served_from_explicit_routes",
+        "test_setup_api.SetupAPITests.test_setup_diagnostics_export_only_typed_results_without_selected_paths",
+        "test_setup_ui.SetupUITests.test_actual_welcome_controller_requires_access_review_and_explicit_save"
+      ],
+      "remaining_gap": "Final native welcome-window layout, folder picker, real macOS permission refusal/recovery and installed update acceptance must be recorded separately. Synthetic permission failures do not prove TCC behavior."
+    },
+    {
+      "id": "GR24",
+      "title": "Readable backup paths preserve identity and verified archives",
+      "breakpoint": "Workspace IDs doubled as user-visible folder names; naive renames or destination changes can lose indexes, reuse an old upload receipt or overwrite another repo.",
+      "diagnostic_events": ["setup_applied", "setup_recovery", "repo_backup_finished", "upload_observed"],
+      "cause_and_solution": "Keep IDs in metadata, compute collision-safe readable parent groups and journal staged renames with archive verification. Bind the chosen iCloud destination to physical identity. Destination switches keep prior archives and require a new local copy.",
+      "required_behavior": "No arbitrary hash suffixes, foreign-folder overwrite, source overlap, silent destination rebinding or pruning of old-location archives. Every moved archive is verified, and upload evidence is re-observed for the new path.",
+      "test_ids": [
+        "test_backup_layout.LayoutTests.test_names_keep_identity_separate_and_group_duplicate_parents",
+        "test_backup_layout.LayoutTests.test_journal_recovers_rename_and_partial_metadata_write_without_losing_bytes",
+        "test_backup_layout.LayoutTests.test_stage_interruption_and_id_name_swap_are_recoverable",
+        "test_backup_layout.LayoutTests.test_collisions_links_and_changed_archives_fail_without_overwrite",
+        "test_destination_policy.DestinationTests.test_one_cloud_destination_and_probe_leave_contents_unchanged",
+        "test_destination_policy.DestinationTests.test_outside_alias_overlap_missing_and_disk_full_are_rejected",
+        "test_destination_policy.DestinationTests.test_replaced_or_disconnected_destination_never_recreates_or_rebinds",
+        "test_setup_service.SetupTests.test_existing_apply_migrates_names_but_preserves_bytes_ids_settings_and_restart",
+        "test_setup_service.SetupTests.test_destination_switch_keeps_old_archives_and_requires_new_copy",
+        "test_setup_service.SetupTests.test_nested_readable_layout_retention_keeps_siblings_until_exact_upload"
+      ],
+      "remaining_gap": "Real iCloud folder renames, file-provider placeholders, disk interruption and re-observed upload acknowledgement require native acceptance. Other cloud providers are outside this release."
+    },
+    {
+      "id": "GR25",
+      "title": "Recursive Git discovery returns bounded candidates without enabling them",
+      "breakpoint": "Unbounded recursion, Git-looking files or external worktree storage can yield unsafe or misleading source selections.",
+      "diagnostic_events": ["git_discovery", "workspace_review", "workspace_configuration"],
+      "cause_and_solution": "Scan explicitly with depth/count/time limits and cancellation. Validate Git metadata without running hooks. Skip linked and protected directories; disclose invalid/external layouts and incomplete areas. Add only user-selected results to the existing individual-folder draft.",
+      "required_behavior": "Discovery never activates repos, removes non-Git selections or changes repo-home behavior. Incomplete, cancelled or failed scans are not reported as complete empty success. Existing source-review and identity checks still govern saves.",
+      "test_ids": [
+        "test_git_discovery.DiscoveryTests.test_recursive_candidates_do_not_modify_sources_and_show_unsupported_layouts",
+        "test_git_discovery.DiscoveryTests.test_protected_paths_and_links_are_not_traversed_and_limits_disclosed",
+        "test_git_discovery.DiscoveryTests.test_missing_git_cancellation_and_permission_failures_are_not_empty_success",
+        "test_setup_ui.SetupUITests.test_actual_welcome_controller_requires_access_review_and_explicit_save"
+      ],
+      "remaining_gap": "Large real inventories and unusual Git layouts need observed runs. External Git storage is explicitly unsupported by discovery; no background auto-add is implemented."
     }
   ]
 }
