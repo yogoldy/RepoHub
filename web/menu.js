@@ -350,8 +350,9 @@ async function rescanNow() {
   if (requestingRescan) return;
   requestingRescan = true;
   const button = $('#rescan');
+  const label = $('#rescan-label');
   button.disabled = true;
-  button.textContent = 'Requesting scan…';
+  label.textContent = 'Requesting scan…';
   try {
     sessionToken = (await api('/api/session')).token;
     await api('/api/scan', {});
@@ -362,7 +363,7 @@ async function rescanNow() {
   } finally {
     requestingRescan = false;
     button.disabled = false;
-    button.textContent = 'Rescan now';
+    label.textContent = 'Rescan now';
   }
 }
 $('#rescan').onclick = rescanNow;

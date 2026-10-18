@@ -443,11 +443,20 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   color: var(--text);
 }
 
-.status-refresh {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 8px;
+.controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#open-backups {
+  grid-column: 1 / -1;
+  background: #355d85;
+  border-color: #4d77a1;
+  color: #eef6ff;
+}
+
+#open-backups:hover:not(:disabled) {
+  background: #416f9c;
+  border-color: #638db6;
 }
 
 .status-explanation[data-category="status_unavailable"],

@@ -38,6 +38,12 @@ scope; this batch stays local until promotion is authorized.
   guarded scan API without creating a backup. Diagnostic policy 7 retains older
   wording for historical receipts; GR06 covers the waiting/recovery and request
   boundaries. Installed-Mac delivery remains part of the next update.
+- [x] **Prominent scan and backup controls:** Back up now and Rescan now share
+  equal-width gold buttons with distinct circular-arrow/scan icons. Repository
+  Backups uses its own blue treatment and spans the next row, followed by
+  notifications; the footer keeps only the last-check time and Quit. Scan
+  requests preserve the icon through pending and
+  failed requests. This is a local presentation change, not a new backup rule.
 
 ## Existing foundation
 

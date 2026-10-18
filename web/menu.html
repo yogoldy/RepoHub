@@ -27,8 +27,25 @@
   <section id="detail" class="detail" aria-label="Selected repository details" hidden></section>
   <section id="technical-panel" aria-label="Selected repository technical details" hidden></section>
 </div>
-<div class="controls"><button id="backup" class="action primary"><span class="action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 1 0 0 8m0-13v5h-5"/></svg></span><span>Back up now</span></button><button id="open-backups" class="action"><span class="action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5h6l2 2h10v13H3Z"/></svg></span><span>Repository Backups</span></button><button id="notifications" class="action notification-action" aria-pressed="false"><span class="switch-track"><span></span></span><span>Backup notifications</span><small id="notification-caption">Checking…</small></button></div>
-<footer><div class="status-refresh"><span id="checked">Live status · every 5 seconds</span><button id="rescan" class="quiet-action" type="button" title="Check files and backup status without creating a backup">Rescan now</button></div><button id="quit" class="quiet-action">Quit</button></footer>
+<div class="controls">
+  <button id="backup" class="action primary" type="button">
+    <span class="action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 1 0 0 8m0-13v5h-5"/></svg></span>
+    <span>Back up now</span>
+  </button>
+  <button id="rescan" class="action primary" type="button" title="Check files and backup status without creating a backup">
+    <span class="action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></span>
+    <span id="rescan-label">Rescan now</span>
+  </button>
+  <button id="open-backups" class="action" type="button">
+    <span class="action-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5h6l2 2h10v13H3Z"/></svg></span>
+    <span>Repository Backups</span>
+  </button>
+  <button id="notifications" class="action notification-action" aria-pressed="false">
+    <span class="switch-track"><span></span></span>
+    <span>Backup notifications</span><small id="notification-caption">Checking…</small>
+  </button>
+</div>
+<footer><span id="checked">Live status · every 5 seconds</span><button id="quit" class="quiet-action">Quit</button></footer>
 </main>
 <dialog id="info-dialog" aria-labelledby="info-title">
   <div class="settings-toolbar">
