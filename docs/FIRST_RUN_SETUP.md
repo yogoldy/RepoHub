@@ -14,7 +14,10 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    helper-owned write probe, free-space and source/state separation checks. Three
    controlled regressions cover aliases, overlap, disk full and replacement or
    disappearance without path recreation. Runtime/picker integration is pending.
-3. **Pending:** recursive, cancellable Git discovery and reviewed selection.
+3. **Implemented component:** bounded, cancellable recursive Git candidates,
+   with explicit incomplete results and unsupported external Git stores. Synthetic
+   tests exercise nested/invalid/external repos, protected folders, loops, limits,
+   missing Git, cancellation and permission failures. Selection UI is pending.
 4. **Pending:** isolated fresh startup, welcome window, transactional setup and
    runtime integration, preserving existing configuration until explicit apply.
 5. **Pending:** diagnostics, Golden Gate/CI, release and installed acceptance.
