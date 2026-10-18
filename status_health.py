@@ -10,6 +10,11 @@ def age(value, now):
         return float("inf")
 
 
+def upload_expected(row):
+    """A first backup has no archive whose upload could be checked or stalled."""
+    return bool(row.get('last_backup') or row.get('cloud', {}).get('archive'))
+
+
 def annotate_health(status, config, now):
     scan_limit = max(120, config.get("scan_seconds", 30) * 4)
     cloud_limit = max(45, config.get("cloud_seconds", 5) * 6)
@@ -21,7 +26,7 @@ def annotate_health(status, config, now):
         reasons = []
         if scan_old:
             reasons.append("Repo checks stopped updating")
-        if age(cloud.get("checked_at"), now) > cloud_limit:
+        if upload_expected(row) and age(cloud.get("checked_at"), now) > cloud_limit:
             reasons.append("Upload status needs a fresh check")
         if (verification.get("state") == "matched" or verification.get("ignored_finder_only") is True) and age(verification.get("checked_at"), now) > hash_limit:
             reasons.append("Hash verification is outdated")
@@ -49,7 +54,7 @@ class ProblemTracker:
             cloud = row.get("cloud", {})
             if cloud.get("state") == "error":
                 observed[key + ":upload"] = (name, "iCloud reports an upload problem", 120, cloud.get("archive"))
-            elif cloud.get("state") in {"uploading", "pending", "unknown"}:
+            elif upload_expected(row) and cloud.get("state") in {"uploading", "pending", "unknown"}:
                 # A changing percentage is evidence of progress, even with 4355.
                 observed[key + ":upload"] = (name, "Upload has not shown progress for 30 minutes", 1800,
                                                (cloud.get("archive"), cloud.get("percent")))

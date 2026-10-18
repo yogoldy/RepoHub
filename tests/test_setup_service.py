@@ -1,11 +1,13 @@
 import copy
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from repohub import Hub, sha256, atomic_json, utc_now
+from status_health import ProblemTracker
 
 
 class SetupTests(unittest.TestCase):
@@ -157,3 +159,22 @@ class SetupTests(unittest.TestCase):
         for other_key, value in before.items():
             if other_key != key:
                 self.assertTrue(Path(value['archive']).exists(), 'Retention cannot touch sibling workspaces')
+
+    def test_first_backup_pending_needs_no_nonexistent_upload_receipt(self):
+        self.apply()
+        status = self.hub.public_status()
+        row = status['repos'][0]
+        self.assertIsNone(row['last_backup'])
+        self.assertTrue(row['health']['fresh'])
+        script = "const p=require('./web/repo-status.js'); const r=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(JSON.stringify(p.present(r)));"
+        process = subprocess.run(['node', '-e', script], input=json.dumps(row), text=True,
+                                 capture_output=True, check=True, cwd=Path(__file__).resolve().parents[1])
+        display = json.loads(process.stdout)
+        self.assertEqual(display['label'], 'First backup pending')
+        self.assertFalse(display['ready'])
+        problems = ProblemTracker()
+        self.assertEqual(problems.update(status, 1000), [])
+        self.assertEqual(problems.update(status, 3000), [], 'No nonexistent upload can stall')
+        self.hub.backup()
+        self.assertFalse(self.hub.public_status()['repos'][0]['health']['fresh'],
+                         'An existing archive still requires a fresh cloud observation')

@@ -23,7 +23,7 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    installs can continue unchanged. Async access/review/apply operations retain
    draft and revision guards. The runtime uses the saved layout, rechecks physical
    destination identity and retains old-location archives when switching roots.
-   Seven service regressions, four HTTP/security regressions and the actual JS
+   Eight service regressions, four HTTP/security regressions and the actual JS
    controller exercise explicit saves. Native app compilation and unique-test
    bootstrap/restart checks passed. Native picker/layout acceptance is pending.
 5. **Implemented contract; acceptance pending:** GR23–25 register executable setup,
@@ -64,6 +64,12 @@ The actual welcome controller also tests two consecutive discovery runs: Cancel
 must become available on every scan, old result controls are cleared while
 scanning, and newly selected Git candidates retain the existing non-Git source.
 A draft destination is included in the scan exclusions before it is saved.
+
+The first-backup counterexample also covers the shared health/status boundary:
+before an archive exists, a fresh source scan shows First backup pending and
+cannot generate a stalled-upload episode. Once an archive exists, upload
+freshness remains required. The test renders the actual JS policy from real
+helper output and never permits a green backed-up state without upload evidence.
 
 Destination changes preserve old archives in place. Existing users see a prefilled
 review once, with an option to continue unchanged. Fresh users choose sources,
