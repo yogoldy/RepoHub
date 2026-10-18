@@ -10,7 +10,10 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    folders. Four controlled regressions cover interrupted staging/publication,
    partial configuration writes, swaps, foreign targets and symlink rejection.
    This component is not yet connected to the daily runtime.
-2. **Pending:** one iCloud destination, identity/access/space checks.
+2. **Implemented component:** one iCloud destination with physical identity,
+   helper-owned write probe, free-space and source/state separation checks. Three
+   controlled regressions cover aliases, overlap, disk full and replacement or
+   disappearance without path recreation. Runtime/picker integration is pending.
 3. **Pending:** recursive, cancellable Git discovery and reviewed selection.
 4. **Pending:** isolated fresh startup, welcome window, transactional setup and
    runtime integration, preserving existing configuration until explicit apply.
