@@ -106,16 +106,27 @@ Demonstrations must be recognizable as demonstrations and must not change settin
 or start backups. Preserve existing users' configuration and avoid forcing the
 tutorial on every launch.
 
-### R4 — Readable, customizable backup-folder names
+### R4 — Preserve repo names in backup folders
 
-**Status: Requested.** Retains readable names (3G).
+**Status: Requested.** Revised by Leo on October 18: one naming behavior,
+without custom labels.
 
-Default to a name such as “HealthFit Backup”; allow the workspace name alone or a
-custom per-workspace label and preview the actual name before saving. Keep stable
-workspace identity and verification hashes separate from display names. Validate
-names and collisions using destination filesystem rules. Renames and migration of
-existing suffixed folders must preserve archives, indexes, schedules and pending
-upload evidence, including after interruption; never overwrite another workspace.
+- Name each workspace's backup folder after its source folder, preserving the
+  repo name. Do not append an arbitrary identifier, hash, numeric suffix or
+  “Backup” label. No custom naming setting is requested.
+- Keep stable workspace IDs, source bindings and verification hashes in internal
+  registry/index metadata, separate from the visible folder name. The current
+  implementation uses a slug plus a shortened identity hash as both workspace ID
+  and destination directory; changing the directory must not discard that ID or
+  weaken verification.
+- Validate names using the destination filesystem's rules. If two repos would
+  have the same destination name, including case/normalization collisions, show
+  the conflicting source paths and require an explicit destination/layout
+  resolution before proceeding. Never silently rename, merge or overwrite them;
+  the exact conflict-resolution interface remains to be designed.
+- Migrate existing suffixed folders without losing archives, indexes, schedules
+  or pending upload evidence. Preserve recovery after interruption and show the
+  resulting path. This roadmap change does not rename existing backups now.
 
 ### R5 — Recursive Git-based repo discovery
 
@@ -200,6 +211,7 @@ do not reinstate superseded pre-delivery restrictions from historical records.
 | Previous plan | Current direction |
 | --- | --- |
 | AI proposal import, assistant connections and AI-guided folder setup (Tier 4) | R5: local recursive discovery using Git, followed by user review. |
+| Custom backup-folder labels and an optional “Backup” suffix | R4: preserve the source folder name as the only naming behavior; keep IDs and hashes in metadata. |
 | Direct cloud-provider APIs/account connectors and a separate expanded independent-restore roadmap (Tier 5) | R1/R2: user-selected Finder destinations and evidence-based validation of those folders. Historical restore evidence and existing integrity safeguards remain. |
 | Feed hosting, update-key custody and automatic personal Sparkle delivery listed as unfinished | Implemented; retain the separate Apple signing and installed-Mac verification items. |
 
