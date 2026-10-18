@@ -447,16 +447,14 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.repo-card,
 #open-backups {
-  grid-column: 1 / -1;
-  background: #355d85;
-  border-color: #4d77a1;
-  color: #eef6ff;
+  background: linear-gradient(140deg, #202a38, #17202c);
 }
 
-#open-backups:hover:not(:disabled) {
-  background: #416f9c;
-  border-color: #638db6;
+#open-backups {
+  grid-column: 1 / -1;
+  color: var(--green);
 }
 
 .status-explanation[data-category="status_unavailable"],
