@@ -40,11 +40,10 @@ scope; this batch stays local until promotion is authorized.
   boundaries. Installed-Mac delivery remains part of the next update.
 - [x] **Prominent scan and backup controls:** Back up now and Rescan now share
   equal-width gold buttons with distinct circular-arrow/scan icons. Repository
-  Backups shares the repo-card background and action-button typography with white text,
-  spanning the next row,
-  followed by notifications; the footer keeps only the last-check time and Quit. Scan
-  requests preserve the icon through pending and
-  failed requests. This is a local presentation change, not a new backup rule.
+  Backups is a full-width navigation row with a folder icon, white label, trailing
+  chevron and subtle hover fill, followed by notifications. The footer keeps only
+  the last-check time and Quit. Scan requests preserve the icon through pending
+  and failed requests. This is a local presentation change, not a new backup rule.
 
 ## Existing foundation
 

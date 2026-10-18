@@ -452,18 +452,39 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.repo-card,
-#open-backups {
-  background: linear-gradient(140deg, #202a38, #17202c);
-}
-
 #open-backups {
   grid-column: 1 / -1;
+  justify-content: flex-start;
+  min-height: 44px;
+  margin: 3px 0;
+  padding: 11px 12px;
+  background: transparent;
+  border-color: transparent;
   color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 150ms ease, border-color 150ms ease;
 }
 
-.controls .primary,
-#open-backups {
+#open-backups:hover:not(:disabled) {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+#open-backups .action-icon {
+  color: var(--muted);
+}
+
+#open-backups .backups-chevron {
+  margin-left: auto;
+}
+
+#open-backups .backups-chevron svg {
+  width: 14px;
+  height: 14px;
+}
+
+.controls .primary {
   font-size: 11px;
   font-weight: 650;
 }
