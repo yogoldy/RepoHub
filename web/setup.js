@@ -88,7 +88,7 @@
     }
   }
   function show(index) {
-    step = index; render(); $('step-' + steps[step]).querySelector('h2').focus();
+    step = index; $('feedback').textContent = ''; render(); $('step-' + steps[step]).querySelector('h2').focus();
   }
   async function operation(kind, value) {
     const started = await request('/api/setup/' + kind, value);
