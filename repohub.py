@@ -1179,10 +1179,17 @@ class Handler(BaseHTTPRequestHandler):
                         return self.send(self.hub.setup.continue_current(payload))
                     if path.startswith('/api/setup/'):
                         return self.send(self.hub.setup.start(path.rsplit('/', 1)[1], payload), 202)
-                    expected = {'parent'} if path.endswith('/start') else {'id'}
-                    if set(payload) != expected:
+                    fields = set(payload)
+                    if path.endswith('/start'):
+                        valid_fields = fields in ({'parent'}, {'parent', 'destination'})
+                    else:
+                        valid_fields = fields == {'id'}
+                    if not valid_fields:
                         raise ValueError('Invalid discovery request')
-                    value = (self.hub.discovery.start(payload['parent']) if path.endswith('/start')
+                    destination = payload.get('destination', '')
+                    if not isinstance(destination, str) or (destination and not Path(destination).is_absolute()):
+                        raise ValueError('Invalid draft destination')
+                    value = (self.hub.discovery.start(payload['parent'], [destination] if destination else ()) if path.endswith('/start')
                              else self.hub.discovery.cancel(payload['id']))
                     return self.send(value, 202)
                 except FileExistsError as error:

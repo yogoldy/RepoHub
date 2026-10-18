@@ -61,11 +61,12 @@ class GitDiscovery:
             return {**self.job, 'results': [dict(row) for row in self.job['results']],
                     'warnings': [dict(row) for row in self.job['warnings']]}
 
-    def start(self, raw):
+    def start(self, raw, exclude=()):
         if not isinstance(raw, str) or not Path(raw).is_absolute():
             raise ValueError('Choose a parent folder')
         parent = Path(raw).resolve(strict=True)
-        if any(parent == item or item in parent.parents for item in self.protected):
+        protected = (*self.protected, *(Path(item).resolve() for item in exclude))
+        if any(parent == item or item in parent.parents for item in protected):
             raise ValueError('Choose a source parent outside backups and app state')
         identity = source_identity(parent)
         with self.lock:
@@ -75,7 +76,7 @@ class GitDiscovery:
             self.job = {'id': secrets.token_hex(12), 'state': 'running', 'parent': str(parent),
                         'visited': 0, 'results': [], 'warnings': [], 'incomplete': False}
             snapshot = self.status()
-            threading.Thread(target=self.run, args=(parent, identity), daemon=True).start()
+            threading.Thread(target=self.run, args=(parent, identity, protected), daemon=True).start()
             return snapshot
 
     def cancel(self, job_id):
@@ -91,7 +92,7 @@ class GitDiscovery:
             if len(self.job['warnings']) < 100:
                 self.job['warnings'].append({'path': str(path), 'reason': reason})
 
-    def run(self, parent, identity):
+    def run(self, parent, identity, protected):
         git = shutil.which('git')
         started = time.monotonic()
         maximum, depth_limit, result_limit, deadline = self.limits
@@ -110,7 +111,7 @@ class GitDiscovery:
                     self.warning(directory, 'traversal_limit'); break
                 if directory.is_symlink():
                     self.warning(directory, 'symlink_skipped'); continue
-                if any(directory == item or item in directory.parents for item in self.protected):
+                if any(directory == item or item in directory.parents for item in protected):
                     continue
                 try:
                     with self.lock:

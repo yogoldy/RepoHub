@@ -52,6 +52,19 @@ publication. No archives were lost. A new regression now exercises latest-only
 retention in nested groups, withholding cleanup until exact upload evidence and
 protecting sibling archives. Final native repeat and a new gate are required.
 
+The corrected isolated bundle at `da9c213` restarted with all three selected
+sources and the saved schedule intact, with setup already reviewed. A guarded
+explicit backup request then completed with no errors: all three archive
+checksums and source/archive manifests matched, including both parent-grouped
+paths. The test destination correctly remained upload-unconfirmed; no real
+iCloud delivery is claimed. The temporary app has a separate identity/state/port.
+The daily app has not been changed during this pilot.
+
+The actual welcome controller also tests two consecutive discovery runs: Cancel
+must become available on every scan, old result controls are cleared while
+scanning, and newly selected Git candidates retain the existing non-Git source.
+A draft destination is included in the scan exclusions before it is saved.
+
 Destination changes preserve old archives in place. Existing users see a prefilled
 review once, with an option to continue unchanged. Fresh users choose sources,
 destination, access, schedule and review before backups can start. Discovery is

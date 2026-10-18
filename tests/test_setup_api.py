@@ -91,8 +91,15 @@ class SetupAPITests(unittest.TestCase):
         review = self.finish_operation()['value']
         self.request('/api/setup/apply', {'draft': draft, 'review': review['review'], 'backup_now': False})
         self.assertEqual(self.finish_operation()['state'], 'complete')
+        self.request('/api/discovery/start', {'parent': str(self.source.parent), 'destination': str(self.dest)})
+        for _ in range(100):
+            _, discovery = self.request('/api/discovery')
+            if discovery['state'] != 'running':
+                break
+            time.sleep(.005)
         bundle = export_bundle(self.hub.diagnostics.directory, self.root / 'export')
         shared = (bundle / 'share/events.jsonl').read_text()
         self.assertIn('setup_review', shared); self.assertIn('setup_applied', shared)
+        self.assertIn('git_discovery', shared)
         self.assertNotIn(str(self.root), shared); self.assertNotIn('Ordinary', shared)
         self.assertNotIn(review['review'], shared)

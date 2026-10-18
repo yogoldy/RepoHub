@@ -72,6 +72,7 @@
     for (const id of ['mode-home', 'mode-manual', 'check-access', 'finish-backup', 'continue-current', 'reload']) $(id).disabled = busy;
     for (const id of ['pick-sources', 'pick-destination', 'find-git', 'privacy', 'notifications', 'login']) $(id).disabled = !native || busy || !!pending;
     $('find-git').disabled ||= draft.mode === 'home';
+    $('find-git').disabled ||= discovery?.state === 'running';
     if (receipt && step === 4) {
       $('review-paths').replaceChildren(...receipt.workspaces.map(row => pathRow(
         row.path.split('/').at(-1), row.path + ' → ' + row.backup_path)));
@@ -134,8 +135,11 @@
     render();
   });
   async function startDiscovery() {
-    discovery = await request('/api/discovery/start', {parent: draft.discovery_parent});
+    discovery = await request('/api/discovery/start', {parent: draft.discovery_parent, destination: draft.destination});
     chosen.clear(); $('discovery-panel').hidden = false;
+    $('discovery-results').replaceChildren();
+    $('add-discovered').disabled = true; $('cancel-discovery').disabled = false;
+    render();
     while (true) {
       const current = await request('/api/discovery');
       if (current.id !== discovery.id) throw new Error('Discovery changed. Start another scan.');
@@ -155,6 +159,8 @@
       li.append(label); return li;
     }));
     $('cancel-discovery').disabled = true;
+    $('add-discovered').disabled = discovery.state === 'failed';
+    render();
   }
   function scheduleFields() {
     $('schedule-fields').replaceChildren(...['battery', 'adapter'].map(power => {

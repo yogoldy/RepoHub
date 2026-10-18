@@ -54,6 +54,8 @@ class DiscoveryTests(unittest.TestCase):
         scan = GitDiscovery([protected.parent]); scan.start(str(self.parent))
         status = self.wait(scan)
         self.assertEqual([row['path'] for row in status['results']], [str(visible)])
+        draft = GitDiscovery([]); draft.start(str(self.parent), [str(visible.parent)])
+        self.assertNotIn(str(visible), [row['path'] for row in self.wait(draft)['results']])
         bounded = GitDiscovery([], max_directories=1)
         bounded.start(str(self.parent)); status = self.wait(bounded)
         self.assertTrue(status['incomplete'])

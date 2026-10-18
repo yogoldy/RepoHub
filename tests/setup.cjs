@@ -41,7 +41,12 @@ async function actualController(backupNow) {
       let result;
       if (path === '/api/setup') result = structuredClone(fixture);
       else if (path === '/api/session') result = {token: 'fresh-token'};
-      else if (path === '/api/setup/review') {
+      else if (path === '/api/discovery/start') result = {id: 'discovery', state: 'running'};
+      else if (path === '/api/discovery') {
+        assert.equal(nodes['cancel-discovery'].disabled, false, 'Each rescan must be cancellable');
+        result = {id: 'discovery', state: 'complete', visited: 3, results: [
+          {path: '/projects/Git', selectable: true}], incomplete: false};
+      } else if (path === '/api/setup/review') {
         assert.equal(options.headers['X-RepoHub-Token'], 'fresh-token');
         currentOperation = {id: 'check', state: 'complete', value: {review: 'checked',
           workspaces: [{path: '/projects/non-git', backup_path: '/cloud/Backups/non-git'}], removed: []}};
@@ -58,6 +63,14 @@ async function actualController(backupNow) {
   vm.runInContext(fs.readFileSync('web/setup.js', 'utf8'), context);
   for (let turn = 0; turn < 10; turn++) await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls.filter(call => call.path === '/api/setup/apply').length, 0);
+  for (let scan = 0; scan < 2; scan++) {
+    nodes['find-git'].onclick();
+    const picked = calls.filter(call => call.native?.action === 'chooseDiscoveryParent').at(-1).native;
+    await listeners.repoHubSetupPicked({detail: {request_id: picked.request_id, cancelled: false, paths: ['/projects']}});
+    assert.equal(nodes['add-discovered'].disabled, false);
+  }
+  const selection = nodes['discovery-results'].children[0].children[0].children[0];
+  selection.checked = true; selection.onchange(); nodes['add-discovered'].onclick();
   await nodes.next.onclick();
   await nodes.next.onclick();
   assert.match(nodes['access-status'].textContent, /helper can read/);
@@ -69,6 +82,8 @@ async function actualController(backupNow) {
   else await nodes.next.onclick();
   assert.equal(calls.filter(call => call.path === '/api/setup/apply').length, 1);
   assert.equal(calls.find(call => call.path === '/api/setup/apply').value.backup_now, backupNow);
+  assert.deepEqual(calls.find(call => call.path === '/api/setup/apply').value.draft.source.paths,
+    ['/projects/non-git', '/projects/Git']);
   assert.equal(nodes.complete.hidden, false);
   assert.equal(calls.some(call => call.native?.action === 'requestNotifications'), false);
   assert.equal(calls.some(call => call.path === '/api/backup'), false);
