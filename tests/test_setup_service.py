@@ -178,3 +178,14 @@ class SetupTests(unittest.TestCase):
         self.hub.backup()
         self.assertFalse(self.hub.public_status()['repos'][0]['health']['fresh'],
                          'An existing archive still requires a fresh cloud observation')
+
+    def test_replaced_draft_source_is_rejected_before_probing_its_new_contents(self):
+        draft = self.draft()
+        draft['source'] = {'mode': 'manual', 'paths': [str(self.source)]}
+        review = self.hub.setup.review(draft)
+        self.source.rename(self.source.parent / 'Original')
+        self.source.mkdir(); (self.source / 'work').write_text('unapproved replacement')
+        with patch('setup_service.probe_source') as probe, self.assertRaises(FileExistsError):
+            self.hub.setup.apply({'draft': draft, 'review': review['review'], 'backup_now': False})
+        probe.assert_not_called()
+        self.assertFalse((self.hub.data_dir / 'setup.json').exists())

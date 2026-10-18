@@ -541,6 +541,7 @@
       "test_ids": [
         "test_setup_service.SetupTests.test_fresh_install_is_idle_until_explicit_apply_and_preserves_default_schedule",
         "test_setup_service.SetupTests.test_first_backup_pending_needs_no_nonexistent_upload_receipt",
+        "test_setup_service.SetupTests.test_replaced_draft_source_is_rejected_before_probing_its_new_contents",
         "test_setup_service.SetupTests.test_stale_busy_denied_and_changed_selection_never_apply_a_partial_draft",
         "test_setup_service.SetupTests.test_existing_continue_and_fresh_cancel_do_not_activate_changes",
         "test_setup_service.SetupTests.test_interrupted_metadata_save_blocks_runtime_until_restart_recovers",

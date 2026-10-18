@@ -51,7 +51,7 @@ class SetupService:
                 'previous_destinations': hub.setup_record.get('previous_destinations', []),
                 'recovery_required': hub.setup_recovery_required}
 
-    def candidate(self, payload):
+    def candidate(self, payload, expected=None):
         if set(payload) != {'source', 'destination', 'settings', 'revision', 'discovery_parent'}:
             raise ValueError('Invalid setup request')
         if payload['revision'] != self.revision():
@@ -66,17 +66,22 @@ class SetupService:
         registry.value = copy.deepcopy(hub.registry.value)
         registry.protected = (*hub.registry.protected, Path(payload['destination']).resolve())
         configuration = registry.candidate(payload['source'])
+        if expected is not None and configuration != expected['configuration']:
+            raise FileExistsError('Source identities changed. Check access and review again.')
         active = [row for row in configuration['workspaces'] if row['active']]
         if not active:
             raise ValueError('Choose at least one folder before finishing setup')
         required = 16 * 1024 * 1024
         for row in active:
             probe_source(row['path'])
+            if source_identity(row['path']) != row['identity']:
+                raise FileExistsError('A source folder changed during access checks. Review it again.')
             for directory, _, files in os.walk(row['path'], followlinks=False,
                                                           onerror=lambda error: (_ for _ in ()).throw(error)):
                 required += sum((Path(directory) / name).lstat().st_size for name in files)
         destination = inspect_destination(payload['destination'], [row['path'] for row in active],
                                           hub.state_dir, cloud_root=hub.setup_cloud_root,
+                                          expected=expected['destination']['identity'] if expected else None,
                                           required_bytes=required)
         names = readable_paths(configuration['workspaces'])
         owned = {hub.layout.directory(key) for key, value in hub.index.items()
@@ -97,7 +102,8 @@ class SetupService:
         token = digest({'revision': payload['revision'], **stable})
         if payload['revision'] != self.revision():
             raise FileExistsError('Configuration changed during access checks. Review again.')
-        self.receipt = {'token': token, 'payload': copy.deepcopy(payload), 'checked_at': time.monotonic()}
+        self.receipt = {'token': token, 'payload': copy.deepcopy(payload), 'stable': copy.deepcopy(stable),
+                        'checked_at': time.monotonic()}
         rows = stable['configuration']['workspaces']
         current = {row['id'] for row in rows if row['active']}
         return {'review': token, 'workspaces': [
@@ -125,7 +131,7 @@ class SetupService:
         hub.lock.acquire()
         transaction = LayoutTransaction(hub.state_dir, self.writer)
         try:
-            stable, destination = self.candidate(payload['draft'])
+            stable, destination = self.candidate(payload['draft'], expected=receipt['stable'])
             if digest({'revision': payload['draft']['revision'], **stable}) != payload['review']:
                 raise FileExistsError('Selected folders changed. Check access and review again.')
             root = Path(destination['path'])

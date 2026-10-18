@@ -23,7 +23,7 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    installs can continue unchanged. Async access/review/apply operations retain
    draft and revision guards. The runtime uses the saved layout, rechecks physical
    destination identity and retains old-location archives when switching roots.
-   Eight service regressions, four HTTP/security regressions and the actual JS
+   Nine service regressions, four HTTP/security regressions and the actual JS
    controller exercise explicit saves. Native app compilation and unique-test
    bootstrap/restart checks passed. Native picker/layout acceptance is pending.
 5. **Implemented contract; acceptance pending:** GR23–25 register executable setup,
@@ -70,6 +70,9 @@ before an archive exists, a fresh source scan shows First backup pending and
 cannot generate a stalled-upload episode. Once an archive exists, upload
 freshness remains required. The test renders the actual JS policy from real
 helper output and never permits a green backed-up state without upload evidence.
+Apply also rejects a replaced source identity before probing the replacement's
+contents. Access checks revalidate each source after probing, and destination
+checks compare the reviewed identity before their temporary write probe.
 
 Destination changes preserve old archives in place. Existing users see a prefilled
 review once, with an option to continue unchanged. Fresh users choose sources,
