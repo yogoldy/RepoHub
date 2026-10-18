@@ -45,12 +45,14 @@ def git_candidate(path, git):
 
 
 class GitDiscovery:
-    def __init__(self, protected, *, max_directories=50000, max_depth=64, max_results=2000, seconds=120):
+    def __init__(self, protected, *, max_directories=50000, max_depth=64, max_results=2000, seconds=120,
+                 diagnostics=None):
         self.protected = tuple(Path(path).resolve() for path in protected)
         self.limits = (max_directories, max_depth, max_results, seconds)
         self.lock = threading.RLock()
         self.cancelled = threading.Event()
         self.job = None
+        self.diagnostics = diagnostics
 
     def status(self):
         with self.lock:
@@ -135,3 +137,8 @@ class GitDiscovery:
         with self.lock:
             self.job['state'] = final
             self.job['incomplete'] |= final != 'complete'
+            if self.diagnostics:
+                self.diagnostics.emit('git_discovery', result='failed' if final == 'failed' else
+                                      'partial' if self.job['incomplete'] else 'complete',
+                                      repo_count=len(self.job['results']),
+                                      duration_ms=(time.monotonic() - started) * 1000)

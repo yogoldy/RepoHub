@@ -352,7 +352,7 @@ class Hub:
         config = dict(config)
         self.state_dir = Path(config['state_dir']).resolve()
         self.state_dir.mkdir(parents=True, exist_ok=True)
-        LayoutTransaction(self.state_dir, atomic_json).recover()
+        recovered_setup = LayoutTransaction(self.state_dir, atomic_json).recover()
         self.setup_record = load_json(self.state_dir / 'data/setup.json', {})
         if self.setup_record.get('destination'):
             config['backup_root'] = self.setup_record['destination']['path']
@@ -372,6 +372,8 @@ class Hub:
             raise ValueError("Backups and app state must be outside the source repos")
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.diagnostics = DiagnosticLog(self.state_dir / "diagnostics")
+        if recovered_setup:
+            self.diagnostics.emit('setup_recovery', result='complete')
         self.diagnostics.emit("helper_started", build_id=sha256(Path(__file__))[:16])
         self.evidence = ChangeEvidence(self.diagnostics)
         self.lifecycle = BackupLifecycle(self.diagnostics)
@@ -395,7 +397,8 @@ class Hub:
         self.setup = SetupService(self, atomic_json)
         self.archive_digest = sha256
         self.discovery = GitDiscovery((self.backups, self.state_dir,
-                                       *(Path(path) for path in self.setup_record.get('previous_destinations', []))))
+                                       *(Path(path) for path in self.setup_record.get('previous_destinations', []))),
+                                      diagnostics=self.diagnostics)
         self.settings_path = self.data_dir / "settings.json"
         self.settings = validate_settings(load_json(self.settings_path, default_settings()))
         if not self.settings_path.exists():
@@ -927,7 +930,7 @@ class Hub:
                         previous = self.index.get(key)
                     current_archive = (previous or {}).get("archive")
                     verified = None
-                    if previous and Path(previous["archive"]).is_file():
+                    if previous and self.layout.contains(key, previous['archive']) and Path(previous["archive"]).is_file():
                         try:
                             observe("existing_verification")
                             verified = verify_current(root, previous)

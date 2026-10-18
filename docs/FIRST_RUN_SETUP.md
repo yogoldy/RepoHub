@@ -26,7 +26,21 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    Six service regressions, three HTTP/security regressions and the actual JS
    controller exercise explicit saves. Native app compilation and unique-test
    bootstrap/restart checks passed. Native picker/layout acceptance is pending.
-5. **Pending:** diagnostics, Golden Gate/CI, release and installed acceptance.
+5. **Implemented contract; acceptance pending:** GR23–25 register executable setup,
+   destination/migration and discovery regressions. Typed events are allowlisted
+   for shared exports without source/destination names or review fingerprints.
+   The existing macOS PR/main/release gate includes the new regressions and native
+   checks; workflow triggers and protected main policy remain unchanged. A clean
+   full gate receipt, isolated native interaction and installed update are pending.
+
+## Validation notes
+
+The first broad run executed 300 tests: 299 passed; a native disposable UserDefaults
+cross-process read failed under the restricted environment. The same five native
+appearance tests passed when run with their required disposable-domain access.
+This does not replace the final clean-source macOS gate. Other focused passes
+include all 20 existing workspace tests, seven package-selection tests, the native
+app build, native fresh bootstrap/restart and the setup/API/controller tests.
 
 Destination changes preserve old archives in place. Existing users see a prefilled
 review once, with an option to continue unchanged. Fresh users choose sources,

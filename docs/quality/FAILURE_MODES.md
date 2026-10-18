@@ -759,3 +759,33 @@ logs and shareable exports; exact dates remain in the private comparison request
 GR06 and GR09 register the regressions. Existing Python discovery runs them in
 GitHub Actions without a YAML change. Browser layout and native WebKit acceptance
 remain separate from these DOM-observation and evidence-contract tests.
+
+## First-run setup, destinations and discovery — October 18, 2026
+
+GR23 requires a fresh package to start without a personal configuration and remain
+idle until an exact reviewed draft passes helper-owned access checks. Setup saves
+share the backup/scan/configuration locks and journal their directory moves and
+metadata writes. A prepared journal blocks operation until recovery succeeds;
+revision, identity and archive checks do not become optional during recovery.
+Native checks compile the app, exercise a unique test bootstrap and restrict the
+welcome bridge to its exact trusted web view/page/port. UI controller and HTTP
+tests distinguish review from save and explicit first-backup requests.
+
+GR24 keeps stable IDs in metadata and names backup folders after sources, grouping
+duplicate leaf names by their distinguishing parent paths. Existing paths change
+only on reviewed apply. Hashes guard migration; uploaded observations cannot be
+reused after a path changes. Switching destinations leaves old archives in place
+and requires a new copy. A missing or replaced destination is never recreated or
+silently rebound. General provider support is outside this release.
+
+GR25 makes recursive Git discovery a bounded, cancellable candidate scan. It does
+not save selections or run backups. Git markers are validated, Git internal and
+protected folders are excluded, and unsupported external history is disclosed.
+Ordinary folders and repo-home mode keep their existing behavior. Source paths,
+names and review fingerprints stay out of the typed setup/discovery diagnostics.
+
+See [first-run acceptance](../FIRST_RUN_SETUP.md) for current evidence and the
+remaining native permission, iCloud and installed-update checks. The macOS PR,
+main and publication workflows all execute the same complete Golden Gate; new
+Python/JS wrappers are discovered automatically, with registered test IDs failing
+the gate if absent, skipped or unsuccessful.

@@ -194,6 +194,7 @@ class SetupService:
         record = {**self.hub.setup_record, 'version': 1, 'configured': True, 'reviewed': True}
         self.writer(self.hub.data_dir / 'setup.json', record)
         self.hub.setup_record = record
+        self.hub.diagnostics.emit('setup_continued', result='kept')
         return self.status()
 
     def allocate(self, key, path):

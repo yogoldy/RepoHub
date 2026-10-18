@@ -82,3 +82,17 @@ class SetupAPITests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(self.origin + '/setup/../../config.json', timeout=5)
         self.assertEqual(caught.exception.code, 404); caught.exception.close()
+
+    def test_setup_diagnostics_export_only_typed_results_without_selected_paths(self):
+        _, status = self.request('/api/setup')
+        draft = {key: status[key] for key in ['source', 'destination', 'settings', 'revision', 'discovery_parent']}
+        draft['source']['paths'] = [str(self.source)]; draft['destination'] = str(self.dest)
+        self.request('/api/setup/review', draft)
+        review = self.finish_operation()['value']
+        self.request('/api/setup/apply', {'draft': draft, 'review': review['review'], 'backup_now': False})
+        self.assertEqual(self.finish_operation()['state'], 'complete')
+        bundle = export_bundle(self.hub.diagnostics.directory, self.root / 'export')
+        shared = (bundle / 'share/events.jsonl').read_text()
+        self.assertIn('setup_review', shared); self.assertIn('setup_applied', shared)
+        self.assertNotIn(str(self.root), shared); self.assertNotIn('Ordinary', shared)
+        self.assertNotIn(review['review'], shared)

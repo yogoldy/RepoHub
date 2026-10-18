@@ -15,7 +15,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Run RepoHub's golden rules
+      - name: Run RepoHub's golden rules including first-run setup and discovery
         run: python3 tools/release_gate.py --require-clean --output "$RUNNER_TEMP/repohub-golden-rules.json"
       - name: Explain failed synthetic checks
         if: failure()

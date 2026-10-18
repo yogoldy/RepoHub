@@ -111,6 +111,14 @@ class LayoutTransaction:
         self.recover()
 
     @staticmethod
+    def sync_directory(path):
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+    @staticmethod
     def safe_target(root, target):
         if root not in target.parents:
             raise ValueError('Backup path escaped destination')
@@ -135,6 +143,7 @@ class LayoutTransaction:
             raise ValueError('Setup recovery destination identity changed')
         self.safe_target(root, stage)
         stage.mkdir(exist_ok=True, mode=0o700)
+        self.sync_directory(root)
         if journal['phase'] == 'stage':
             for number, entry in enumerate(journal['moves']):
                 old = root / relative_path(entry['old'])
@@ -144,6 +153,8 @@ class LayoutTransaction:
                     if tree_hashes(old) != entry['hashes']:
                         raise ValueError('Backup changed before migration')
                     old.rename(temporary)
+                    self.sync_directory(old.parent)
+                    self.sync_directory(stage)
                 if tree_hashes(temporary) != entry['hashes']:
                     raise ValueError('Staged backup verification failed')
             journal['phase'] = 'publish'
@@ -159,6 +170,8 @@ class LayoutTransaction:
                     raise FileExistsError('Reviewed backup path became occupied')
                 target.parent.mkdir(parents=True, exist_ok=True)
                 temporary.rename(target)
+                self.sync_directory(target.parent)
+                self.sync_directory(stage)
             if tree_hashes(target) != entry['hashes']:
                 raise ValueError('Migrated backup verification failed')
         # A journal is never removed until every configuration write has succeeded.
@@ -168,7 +181,9 @@ class LayoutTransaction:
             self.safe_target(root if name == '@destination-index' else self.state, target)
             self.writer(target, value)
         stage.rmdir()
+        self.sync_directory(root)
         self.path.unlink()
+        self.sync_directory(self.state)
         return True
 
 

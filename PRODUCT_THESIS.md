@@ -44,6 +44,11 @@ scope; this batch stays local until promotion is authorized.
   chevron and subtle hover fill, followed by notifications. The footer keeps only
   the last-check time and Quit. Scan requests preserve the icon through pending
   and failed requests. This is a local presentation change, not a new backup rule.
+- [x] **First-run setup candidate:** the approved five-step welcome window,
+  one iCloud destination, readable folder layouts, reviewed Git discovery and
+  recoverable configuration saves are implemented with synthetic/native-build
+  coverage. Final gate, native interaction and installed-Mac acceptance are
+  pending; see [the implementation record](docs/FIRST_RUN_SETUP.md).
 
 ## Existing foundation
 
@@ -61,7 +66,9 @@ The following are implemented and must not be rediscovered as unfinished feature
 
 ### R1 — Choose the backup destination
 
-**Status: Requested.** Retains the former output-folder setup item (3D).
+**Status: Implemented candidate; awaiting acceptance.** This release selects one
+folder inside iCloud Drive; other providers and multiple destinations remain
+outside it. See [first-run setup](docs/FIRST_RUN_SETUP.md).
 
 - Let the user select and review a destination through a native folder picker.
 - Validate access, available space and source/destination separation, including
@@ -97,7 +104,9 @@ records remain evidence with their original limits.
 
 ### R3 — Replayable visual onboarding
 
-**Status: Requested.** Retains guided onboarding (3F).
+**Status: Implemented candidate; awaiting acceptance.** The five-step welcome
+window supports fresh setup and an existing user's prefilled review without
+changing configuration before explicit apply. See [first-run setup](docs/FIRST_RUN_SETUP.md).
 
 Explain sources, destination, schedules, manual backup, verification and upload
 status through a short visual walkthrough tied to actual controls. Offer Skip,
@@ -108,7 +117,7 @@ tutorial on every launch.
 
 ### R4 — Preserve repo names in backup folders
 
-**Status: Requested.** Revised by Leo on October 18: one naming behavior,
+**Status: Implemented candidate; awaiting acceptance.** Revised by Leo on October 18: one naming behavior,
 without custom labels.
 
 - Name each workspace's backup folder after its source folder, preserving the
@@ -123,14 +132,16 @@ without custom labels.
   have the same destination name, including case/normalization collisions, show
   the conflicting source paths and require an explicit destination/layout
   resolution before proceeding. Never silently rename, merge or overwrite them;
-  the exact conflict-resolution interface remains to be designed.
+  reviewed parent grouping uses the shortest distinguishing source ancestry.
 - Migrate existing suffixed folders without losing archives, indexes, schedules
   or pending upload evidence. Preserve recovery after interruption and show the
-  resulting path. This roadmap change does not rename existing backups now.
+  resulting path. Existing backups change only when reviewed setup is applied.
 
 ### R5 — Recursive Git-based repo discovery
 
-**Status: Requested.** Replaces AI-assisted source setup (former Tier 4).
+**Status: Implemented candidate; awaiting acceptance.** Replaces AI-assisted source
+setup (former Tier 4). Discovery adds reviewed candidates to individual-folder
+selection; existing non-Git selections and repo-home mode remain supported.
 
 - Let the user choose a starting folder and scan its descendant folders for Git
   repository markers, instead of treating only immediate children as workspaces.
