@@ -5,33 +5,33 @@ separate tested commits before protected promotion and installed-Mac acceptance.
 
 ## Stages
 
-1. **Implemented component:** readable layout planning and a recoverable rename
+1. **Integrated:** readable layout planning and a recoverable rename
    transaction. IDs remain metadata; duplicate names gain distinguishing parent
    folders. Four controlled regressions cover interrupted staging/publication,
    partial configuration writes, swaps, foreign targets and symlink rejection.
-   This component is not yet connected to the daily runtime.
-2. **Implemented component:** one iCloud destination with physical identity,
+   The runtime uses this mapping after explicit reviewed apply.
+2. **Integrated:** one iCloud destination with physical identity,
    helper-owned write probe, free-space and source/state separation checks. Three
    controlled regressions cover aliases, overlap, disk full and replacement or
-   disappearance without path recreation. Runtime/picker integration is pending.
-3. **Implemented component:** bounded, cancellable recursive Git candidates,
+   disappearance without path recreation. The native picker is connected.
+3. **Integrated:** bounded, cancellable recursive Git candidates,
    with explicit incomplete results and unsupported external Git stores. Synthetic
    tests exercise nested/invalid/external repos, protected folders, loops, limits,
-   missing Git, cancellation and permission failures. Selection UI is pending.
-4. **Implemented, acceptance pending:** a separate five-step welcome window,
+   missing Git, cancellation and permission failures. Selection remains draft-only.
+4. **Integrated:** a separate five-step welcome window,
    native pickers, idle fresh bootstrap and reviewed transactional setup. Existing
    installs can continue unchanged. Async access/review/apply operations retain
    draft and revision guards. The runtime uses the saved layout, rechecks physical
    destination identity and retains old-location archives when switching roots.
    Nine service regressions, four HTTP/security regressions and the actual JS
    controller exercise explicit saves. Native app compilation and unique-test
-   bootstrap/restart checks passed. Native picker/layout acceptance is pending.
-5. **Implemented contract; acceptance pending:** GR23–25 register executable setup,
+   bootstrap/restart checks passed. Native evidence is recorded below.
+5. **Integrated contract:** GR23–25 register executable setup,
    destination/migration and discovery regressions. Typed events are allowlisted
    for shared exports without source/destination names or review fingerprints.
    The existing macOS PR/main/release gate includes the new regressions and native
-   checks; workflow triggers and protected main policy remain unchanged. A clean
-   full gate receipt, isolated native interaction and installed update are pending.
+   checks; workflow triggers and protected main policy remain unchanged. Release
+   PRs carry the exact candidate gate and post-publication installed results.
 
 ## Validation notes
 
@@ -80,3 +80,44 @@ destination, access, schedule and review before backups can start. Discovery is
 an explicit utility alongside individual selection; non-Git folders and repo-home
 auto-discovery remain supported. General providers, Apple signing and Air install
 are outside this update.
+
+## Published and installed acceptance
+
+The clean macOS gate at `890e3a5` passed 307 Python tests, 25 rules and 30 commands,
+with unchanged source and no skipped tests. [PR #11](https://github.com/yogoldy/RepoHub/pull/11)
+passed both branch checks, merged through protected main at `7203412`, passed the
+main gate and automatically published RepoHub 0.0.5 build 5. The live feed,
+download length, archive SHA-256 and Ed25519 signature matched the receipt.
+
+The existing Mac updated from 0.0.4 through Sparkle. App and helper reported the
+published revision; five saved configuration/settings/clock files and fifteen
+current archive hashes were unchanged before setup. The welcome window opened
+with the existing repo-home selection. Native discovery found both isolated Git
+fixtures, unchecked, while all fourteen daily sources stayed active and unchanged.
+The native destination picker selected the existing iCloud root. Helper-observed
+access passed; the existing 60-minute battery and 240-minute adapter schedules,
+after-edit settings and per-repo overrides were retained.
+
+Explicit Finish setup renamed all fifteen managed archive paths without changing
+their hashes, workspace IDs, sources, settings or clock. It started no backup and
+left no recovery journal. Fresh macOS observations reported uploaded at the new
+paths for all fourteen workspaces. This is actual iCloud evidence, separate from
+the isolated test destination's unconfirmed upload state. Private baseline and
+post-apply evidence remain outside Git.
+
+This installed check also found that Reload saved settings did nothing: its
+JavaScript confirmation was not hosted by the native welcome window. A controlled
+controller regression reproduced the failure. Reload now directly discards only
+the draft, clears old discovery/access/completion UI, and never calls apply. It is
+disabled while a native picker or discovery is active. The follow-up release PR
+must record its own clean gate, Sparkle install, native reload and explicit backup
+acceptance. Real permission denial/recovery was not forced on the daily app;
+Apple signing/notarization, other providers and Air remain outside this update.
+
+The first follow-up PR check passed, while its duplicate branch run failed the
+cancellation regression. Investigation reproduced a real late-cancellation race:
+the worker could accept cancellation during its final check, then report complete.
+An event-controlled regression now fixes that timing independently of runner
+speed and requires cancelled/incomplete state plus the existing partial diagnostic.
+Both corrections stay in the same protected follow-up release; the failed run is
+not accepted as release evidence.

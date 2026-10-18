@@ -70,6 +70,7 @@
     $('next').disabled = busy || !!pending || (step === 2 && !receipt);
     $('finish-backup').hidden = step !== 4;
     for (const id of ['mode-home', 'mode-manual', 'check-access', 'finish-backup', 'continue-current', 'reload']) $(id).disabled = busy;
+    $('reload').disabled ||= !!pending || discovery?.state === 'running';
     for (const id of ['pick-sources', 'pick-destination', 'find-git', 'privacy', 'notifications', 'login']) $(id).disabled = !native || busy || !!pending;
     $('find-git').disabled ||= draft.mode === 'home';
     $('find-git').disabled ||= discovery?.state === 'running';
@@ -211,6 +212,8 @@
       $('complete').hidden = false; $('setup-actions').hidden = true; $('continue-current').hidden = true;
       $('complete-copy').textContent = backupNow ? 'A backup was requested. Check its status in the menu bar.' : 'Your schedule is active. No backup was started by this save.';
       $('feedback').textContent = '';
+      busy = false;
+      $('reload').disabled = false;
     } catch (error) { failure(error); busy = false; render(); }
   }
   $('back').onclick = () => show(step - 1);
@@ -242,13 +245,31 @@
   async function load() {
     try {
       initial = await request('/api/setup'); draft = createDraft(initial);
-      receipt = null; step = 0; pending = null; $('error').textContent = '';
+      receipt = null;
+      receiptDraft = '';
+      step = 0;
+      pending = null;
+      discovery = null;
+      busy = false;
+      chosen.clear();
+      $('error').textContent = '';
+      $('feedback').textContent = '';
+      $('access-status').textContent = '';
+      $('review-paths').replaceChildren();
+      $('review-removals').textContent = '';
+      $('review-old').textContent = '';
+      $('complete').hidden = true;
+      $('setup-actions').hidden = false;
+      $('discovery-panel').hidden = true;
+      $('discovery-results').replaceChildren();
+      $('discovery-warnings').hidden = true;
+      $('discovery-warning-list').replaceChildren();
       $('existing-note').hidden = !initial.configured; scheduleFields(); render();
       if (initial.recovery_required) throw new Error('An interrupted setup save needs recovery. Restart RepoHub before continuing.');
     } catch (error) { failure(error); $('next').disabled = true; }
   }
-  $('reload').onclick = () => {
-    if (!draft || root.confirm('Discard this draft and reload saved settings?')) void load();
-  };
+  // This explicit draft-only action must also work in the native welcome host,
+  // which does not provide JavaScript confirm dialogs. It never applies changes.
+  $('reload').onclick = load;
   void load();
 })(typeof globalThis === 'object' ? globalThis : this);

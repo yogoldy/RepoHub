@@ -2,11 +2,13 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from git_discovery import GitDiscovery
+from workspace_registry import source_identity
 
 
 class DiscoveryTests(unittest.TestCase):
@@ -69,10 +71,33 @@ class DiscoveryTests(unittest.TestCase):
         with patch('git_discovery.shutil.which', return_value=None):
             scan = GitDiscovery([]); scan.start(str(self.parent)); status = self.wait(scan)
         self.assertEqual(status['state'], 'failed')
-        scan = GitDiscovery([])
-        with scan.lock:
-            scan.start(str(self.parent)); scan.cancel(scan.job['id'])
-        self.assertEqual(self.wait(scan)['state'], 'cancelled')
+        diagnostic = Mock()
+        scan = GitDiscovery([], diagnostics=diagnostic)
+        finishing = threading.Event()
+        release = threading.Event()
+
+        def final_identity_check(path):
+            if threading.current_thread() is not threading.main_thread():
+                finishing.set()
+                if not release.wait(5):
+                    raise AssertionError('Cancellation test did not release the worker')
+            return source_identity(path)
+
+        # Cancel after the final traversal check but before publishing its result.
+        # Events make the accepted request independent of runner scheduling speed.
+        with patch('git_discovery.source_identity', side_effect=final_identity_check):
+            started = scan.start(str(self.parent))
+            try:
+                self.assertTrue(finishing.wait(5))
+                self.assertEqual(scan.cancel(started['id'])['state'], 'running')
+            finally:
+                release.set()
+            status = self.wait(scan)
+        self.assertEqual(status['state'], 'cancelled')
+        self.assertTrue(status['incomplete'])
+        args, fields = diagnostic.emit.call_args
+        self.assertEqual(args, ('git_discovery',))
+        self.assertEqual(fields['result'], 'partial')
         self.repo('denied')
         original = os.scandir
         def denied(path):

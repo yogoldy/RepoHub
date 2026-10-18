@@ -771,6 +771,13 @@ Native checks compile the app, exercise a unique test bootstrap and restrict the
 welcome bridge to its exact trusted web view/page/port. UI controller and HTTP
 tests distinguish review from save and explicit first-backup requests.
 
+Installed acceptance exposed a native-only draft reload failure: an unhosted
+JavaScript confirm silently refused the action. The real controller regression
+models that refusal, proves reload restores saved selections without calling
+apply, and checks that discovery/access/completion UI cannot leak from the old
+draft. Reload is an explicit draft discard and uses no browser dialog; it waits
+for native picking or discovery to finish.
+
 GR24 keeps stable IDs in metadata and names backup folders after sources, grouping
 duplicate leaf names by their distinguishing parent paths. Existing paths change
 only on reviewed apply. Hashes guard migration; uploaded observations cannot be
@@ -783,6 +790,13 @@ not save selections or run backups. Git markers are validated, Git internal and
 protected folders are excluded, and unsupported external history is disclosed.
 Ordinary folders and repo-home mode keep their existing behavior. Source paths,
 names and review fingerprints stay out of the typed setup/discovery diagnostics.
+
+The first follow-up branch run exposed a cancellation race after the last
+traversal check: an accepted request could publish complete instead of cancelled.
+The regression now pauses the worker at its final identity check with events,
+accepts cancellation, then releases completion. It fails reliably before the
+fix. Final publication checks cancellation under the same lock, retaining
+incomplete results and a partial diagnostic rather than claiming a full scan.
 
 See [first-run acceptance](../FIRST_RUN_SETUP.md) for current evidence and the
 remaining native permission, iCloud and installed-update checks. The macOS PR,

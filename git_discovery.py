@@ -140,6 +140,10 @@ class GitDiscovery:
             final = 'failed'
             self.warning(parent, 'git_unavailable' if not git else 'parent_unavailable')
         with self.lock:
+            # A cancel accepted during the last directory/identity check must
+            # still win before completion is published under the same lock.
+            if final == 'complete' and self.cancelled.is_set():
+                final = 'cancelled'
             self.job['state'] = final
             self.job['incomplete'] |= final != 'complete'
             if self.diagnostics:
