@@ -13,7 +13,6 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var notificationsEnabled: Bool { UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true }
     var polling: Timer?
     var sourcePicker: NSOpenPanel?
-    var setupWindow: NSWindow?
     var setupWebView: WKWebView?
     var offeredSetup = false
     var packaged: PackagedApplication?
@@ -299,9 +298,10 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         guard let button = statusItem.button else { return }
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popoverWebView.window?.title = "Repo Hub Backups"
-        popoverWebView.window?.makeKey()
-        popoverWebView.window?.makeFirstResponder(popoverWebView)
+        let activeView = setupWebView ?? popoverWebView!
+        activeView.window?.title = setupWebView == nil ? "Repo Hub Backups" : "RepoHub Setup"
+        activeView.window?.makeKey()
+        activeView.window?.makeFirstResponder(activeView)
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -327,12 +327,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         case .getMenuAppearance, .saveMenuAppearance:
             if let body = message.body as? [String: Any] { menuAppearance(action: action, body: body) }
         case .openSetup: openSetup()
-        case .closeSetup:
-            setupWindow?.close()
-            setupWebView = nil
-            setupWindow = nil
-            pollStatus()
-            showPopover()
+        case .closeSetup: closeSetup()
         case .chooseRepoHome, .chooseRepoFolders, .chooseBackupDestination, .chooseDiscoveryParent:
             if let body = message.body as? [String: Any], let id = body["request_id"] as? String {
                 chooseSources(multiple: action == .chooseRepoFolders, requestID: id,
@@ -365,26 +360,26 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func openSetup() {
-        if setupWindow == nil {
+        if setupWebView == nil {
             let configuration = WKWebViewConfiguration()
             configuration.userContentController.add(self, name: "repoHub")
-            let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 740, height: 720), configuration: configuration)
+            let view = WKWebView(frame: NSRect(origin: .zero, size: popover.contentSize), configuration: configuration)
             setupWebView = view
             view.navigationDelegate = self
             view.underPageBackgroundColor = NSColor(calibratedRed: 0.063, green: 0.082, blue: 0.114, alpha: 1)
-            let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-            window.title = "Welcome to RepoHub"
-            window.minSize = NSSize(width: 580, height: 540)
-            window.isReleasedWhenClosed = false
-            window.contentView = view
-            window.appearance = NSAppearance(named: .darkAqua)
-            window.center()
-            setupWindow = window
             view.load(URLRequest(url: address.appendingPathComponent("setup.html")))
         }
-        popover.performClose(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        setupWindow?.makeKeyAndOrderFront(nil)
+        // Retain the menu web view for shared status presentation while setup
+        // occupies the same panel. Dismissing the panel keeps the unsaved draft.
+        popover.contentViewController?.view = setupWebView!
+        showPopover()
+    }
+
+    func closeSetup() {
+        popover.contentViewController?.view = popoverWebView
+        setupWebView = nil
+        pollStatus()
+        showPopover()
     }
 
     func chooseSources(multiple: Bool, requestID: String, sender: WKWebView? = nil,
@@ -413,7 +408,7 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             panel.message = multiple ? "Each selected folder is one repo. You can add more in setup." : "Immediate subfolders of this folder will be monitored as repos."
         }
         panel.prompt = "Choose"
-        if !inSetup { popover.behavior = .applicationDefined }
+        popover.behavior = .applicationDefined
         // A popover floats above an independent NSOpenPanel. Hide it while the
         // picker is active; its WebKit draft survives and is reopened on return.
         popover.performClose(nil)
@@ -423,17 +418,14 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             let detail: [String: Any] = ["request_id": requestID, "cancelled": response != .OK,
                                         "paths": response == .OK ? panel.urls.map { MenuBridge.canonicalSourcePath($0) } : []]
             self.sourcePicker = nil
-            if !inSetup {
-                self.popover.behavior = .transient
-                self.showPopover()
-            }
+            self.popover.behavior = .transient
+            self.showPopover()
             guard let data = try? JSONSerialization.data(withJSONObject: detail),
                   let json = String(data: data, encoding: .utf8) else { return }
             let event = inSetup ? "repoHubSetupPicked" : "repoHubSourcesPicked"
             target.evaluateJavaScript("window.dispatchEvent(new CustomEvent('" + event + "',{detail:" + json + "}))")
         }
-        if inSetup, let window = setupWindow { panel.beginSheetModal(for: window, completionHandler: completion) }
-        else { panel.begin(completionHandler: completion) }
+        panel.begin(completionHandler: completion)
     }
 
     func finderNotice(_ message: String) {

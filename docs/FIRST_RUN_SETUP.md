@@ -18,7 +18,7 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    with explicit incomplete results and unsupported external Git stores. Synthetic
    tests exercise nested/invalid/external repos, protected folders, loops, limits,
    missing Git, cancellation and permission failures. Selection remains draft-only.
-4. **Integrated:** a separate five-step welcome window,
+4. **Integrated:** five-step setup inside the menu-bar panel,
    native pickers, idle fresh bootstrap and reviewed transactional setup. Existing
    installs can continue unchanged. Async access/review/apply operations retain
    draft and revision guards. The runtime uses the saved layout, rechecks physical
@@ -34,6 +34,18 @@ separate tested commits before protected promotion and installed-Mac acceptance.
    PRs carry the exact candidate gate and post-publication installed results.
 
 ## Validation notes
+
+Local follow-up: setup uses the same popover as the backup view. Closing and
+reopening the panel retains its unsaved setup draft; leaving setup restores the
+retained backup view. Native folder pickers temporarily hide the panel and return
+to its active setup step. Earlier standalone-window observations below describe
+the released 0.0.5–0.0.7 implementation, before this local change.
+
+Local checks: native app compilation, 14 setup tests, 28 synthetic hub tests,
+10 scoped-backup tests and 87 native bridge checks passed. A hands-on check of
+the changed native panel and folder-picker return remains pending. The installed
+app was not replaced, and no release or full clean-source gate was run for this
+local follow-up.
 
 The first broad run executed 300 tests: 299 passed; a native disposable UserDefaults
 cross-process read failed under the restricted environment. The same five native
