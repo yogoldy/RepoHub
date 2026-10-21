@@ -832,3 +832,12 @@ Shareable diagnostics add only a bounded update_channel enum and typed reasons;
 an update ready state is not repository readiness or confirmed cloud upload.
 Live channel publication, Apple services and installed channel/permission
 continuity remain separate acceptance evidence, not implied by these fixtures.
+
+The optional manual `validate_signing` workflow input exercises real Apple
+credentials only after the complete clean-source gate. Counterexamples reject
+push/PR/fork invocation, stale or skipped gate evidence, a changed source digest,
+corrupt artifacts and failed independent archive signatures. Validation packages
+use a deliberately non-promotable receipt. The workflow has read-only repository
+permissions, never publishes or installs, and records bounded failure evidence
+while cleaning temporary packages and signing material. Apple service acceptance
+still requires an actual successful run; these counterexamples do not imply it.

@@ -610,7 +610,12 @@
         "test_channel_release.ChannelReleaseTests.test_stable_requires_exact_approval_both_hosts_notarization_and_protected_main",
         "test_channel_release.ChannelReleaseTests.test_interrupted_promotion_needs_explicit_resume_and_rechecks_requirements",
         "test_channel_release.ChannelReleaseTests.test_repository_lock_is_exclusive_and_never_removes_another_owners_lock",
-        "test_channel_release.ChannelReleaseTests.test_promotion_authenticates_archive_using_public_key_without_private_key"
+        "test_channel_release.ChannelReleaseTests.test_promotion_authenticates_archive_using_public_key_without_private_key",
+        "test_validate_signing.ValidateSigningTests.test_hosted_signing_requires_explicit_manual_request_and_exact_source",
+        "test_validate_signing.ValidateSigningTests.test_failed_stale_skipped_or_changed_gate_never_opens_signing_material",
+        "test_validate_signing.ValidateSigningTests.test_validation_package_cannot_be_promoted_as_a_managed_release",
+        "test_validate_signing.ValidateSigningTests.test_failure_or_source_change_cleans_package_and_never_leaks_error_text",
+        "test_validate_signing.ValidateSigningTests.test_workflow_keeps_signing_opt_in_read_only_and_after_full_gate"
       ],
       "remaining_gap": "Synthetic GitHub tests and public-key fixtures do not prove live prerelease/feed publication, Apple notarization, channel changes in the installed native app or Pro/Air update continuity. Those require separately authorized live delivery and native acceptance."
     }

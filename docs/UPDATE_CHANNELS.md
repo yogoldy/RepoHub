@@ -82,6 +82,34 @@ continues to run its normal protected checks.
 
 ## Testing and Stable promotion
 
+### Unpublished Apple-signing validation
+
+Before the first signed delivery, manually run the existing **Golden rules**
+workflow on the reviewed branch with `validate_signing=true`. This is separate
+from Dev/Testing publication. The default is false; ordinary pushes and pull
+requests do not load Apple or Sparkle secrets into this step.
+
+The complete clean macOS gate runs first. `tools/validate_signing.py` then checks
+its exact source/digest, imports the certificate export in a disposable keychain,
+and uses the existing Developer ID packaging/notarization path. Stapler,
+Gatekeeper, resource hashes, the Sparkle key match/signature, and an independent
+public-key archive verifier must pass. The workflow has only contents-read
+permission and no publishing token. A validation-only version/tag cannot satisfy
+the managed-release promotion contract. It creates no release, source tag, feed,
+installation or GitHub package artifact. Temporary app/archive/key material is
+cleaned; only bounded JSON evidence is printed in the job and its summary.
+
+After separately authorized branch publication, invoke it with
+`gh workflow run golden-rules.yml --ref <reviewed-branch> -f validate_signing=true`.
+The existing workflow file is already registered on main; the reviewed branch
+provides the opt-in input and validation implementation. Its full gate still
+runs for ordinary pushes/PRs without signing secrets. The job timeout allows the
+additional Apple submission wait; automatic release triggers are unchanged.
+
+The test does not change the repository's release mode. A failed prerequisite or
+signing step is not delivery evidence. Installed channel behavior and permission
+continuity still require the separate Pro/Air acceptance sequence.
+
 The intended main workflow retains checkout by triggering SHA, a complete clean
 gate rerun and the existing signing/notarization checks. Its publication command
 is `tools/channel_release.py testing --publish`, with the exact run ID and gate
