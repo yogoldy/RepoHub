@@ -10,6 +10,9 @@ the previous tiered roadmap at source
 `38d354d5ade1cc5664c43a15cb680bc31b0d0019`; Git retains that version and its
 implementation history. Leo approved the revised scope below on October 17 and
 consolidation of the testing roadmap into this reference on October 20.
+Leo reconfirmed the eleven-step delivery proposal as the canonical roadmap;
+it retains his subsequent decision to put account-free reporting before other
+Finder sync-folder providers. Older proposals do not define a separate queue.
 
 - **Requested:** agreed product direction, with implementation still pending.
 - **Implemented:** code exists; this does not imply every installed-Mac condition
@@ -25,12 +28,18 @@ Complete approved work in scoped commits with proportionate tests and evidence.
 
 ## Next delivery sequence
 
-Step 1 now has a local implementation candidate; live delivery and native
-acceptance remain pending. The later steps remain unstarted. Updating this roadmap is already handled here;
-it is not an additional prerequisite or a numbered development stage. This
-sequence replaces the old interaction-testing plan. It does not claim that
-existing controller, API, native or release tests are absent or incomplete merely
-because additional installed acceptance is needed.
+Step 1 has a locally validated implementation candidate; live channel delivery
+and native acceptance remain pending. Step 2 is in progress: the Developer ID
+identity is installed and valid, GitHub lists the required signing secrets, and
+a read-only request authenticated successfully with Apple's notarization service.
+The next checkpoint is an unpublished signed package proving certificate-export
+decryption, app/helper signing, Apple notarization, stapling and Sparkle signature
+verification together. That checkpoint has not run. Steps 3–11 remain pending.
+
+Updating this roadmap is already handled here; it is not an additional
+prerequisite or a numbered development stage. This sequence replaces the old
+interaction-testing plan. Existing controller, API, native and release coverage
+remains evidence within its original limits; installed acceptance is separate.
 
 1. **Implement Dev → Testing → Stable channels.** Dev provides quick delivery
    to opted-in Macs after focused tests, a native build and package/signature
@@ -46,7 +55,10 @@ because additional installed acceptance is needed.
    consistent app/helper identity across channels; verify signed components,
    hardened runtime, notarization and stapling. Test the existing ad-hoc app's
    transition without claiming that signing grants folder access. Membership
-   is active per Leo; credentials and signing-service setup remain unverified.
+   is active per Leo. A valid Developer ID Application identity, the required
+   GitHub secret names and read-only notarization authentication are verified.
+   Certificate-export password/import, complete signed-package notarization and
+   stapling, hosted signing and the installed transition remain unverified.
 3. **Deliver a Dev build to the Pro, including local commit `82b1a85`.** Confirm
    setup stays inside the menu-bar panel, dismissal/reopening retains drafts,
    and picker choose/cancel returns to the same step. Exercise repo selection,
@@ -294,11 +306,14 @@ confirmed on October 20 that neither needs further action at this time.
 These remain visible without becoming new product features or being called
 complete merely because code was merged:
 
-- **Apple signing:** Leo reported Apple Developer Program membership activated on
-  October 20. Certificate and signing-service configuration remain unverified.
-  Configure Developer ID signing and notarization, validate the signed
-  update, and test settings/folder-permission continuity. The working personal
-  Sparkle channel already exists; see [release delivery](docs/RELEASE_DELIVERY.md).
+- **Apple signing:** the Developer ID Application identity is installed and valid;
+  the required GitHub signing secret names are present, and read-only
+  notarization authentication passed. Secret storage does not establish usable
+  certificate-export decryption or successful hosted signing. First validate an
+  unpublished signed/notarized package, then hosted delivery and the installed
+  transition, including settings/folder-permission continuity. The working
+  personal Sparkle channel already exists; see
+  [release delivery](docs/RELEASE_DELIVERY.md).
 - **Installed-Mac reliability:** track actual folder permissions, native picker,
   notification, volume, login and recovery cases in the
   [two-Mac acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
