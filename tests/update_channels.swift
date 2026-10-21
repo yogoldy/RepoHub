@@ -8,6 +8,9 @@ import Foundation
             return
         }
         let domain = "com.leogoldberg.repohub.test.channels-" + UUID().uuidString
+        let mismatch = UpdateCycleOutcome.result(isSparkle: false, isBackupBusy: false,
+                                                 code: 1, isChannelMismatch: true)
+        precondition(mismatch.0 == "failed" && mismatch.1 == "channel_mismatch")
         let defaults = UserDefaults(suiteName: domain)!
         defer { defaults.removePersistentDomain(forName: domain) }
         precondition(UpdateChannelSettings.selected(in: defaults) == .stable)

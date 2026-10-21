@@ -43,8 +43,10 @@ enum UpdateChannelSettings {
 }
 
 enum UpdateCycleOutcome {
-    static func result(isSparkle: Bool, isBackupBusy: Bool, code: Int?) -> (String, String) {
+    static func result(isSparkle: Bool, isBackupBusy: Bool, code: Int?,
+                       isChannelMismatch: Bool = false) -> (String, String) {
         if isBackupBusy { return ("waiting", "backup_busy") }
+        if isChannelMismatch { return ("failed", "channel_mismatch") }
         // Values from the pinned Sparkle SUErrors.h. These are normal outcomes,
         // despite Sparkle reporting them through its error callback.
         if code == nil { return ("ready", "check_finished") }
@@ -221,7 +223,8 @@ extension AppUpdates: SPUUpdaterDelegate {
         let outcome = UpdateCycleOutcome.result(
             isSparkle: value?.domain == SUSparkleErrorDomain,
             isBackupBusy: value?.domain == "RepoHubUpdate" && value?.code == 1,
-            code: value?.code)
+            code: value?.code,
+            isChannelMismatch: value?.domain == "RepoHubUpdateChannel")
         record(outcome.0, reason: outcome.1)
     }
 }
