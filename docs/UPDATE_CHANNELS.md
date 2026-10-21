@@ -1,8 +1,10 @@
 # Dev, Testing and Stable updates
 
-Implemented locally for roadmap step 1, October 20, 2026. No channel feed has
-been created, no update published and no installed Mac changed by this work.
-Live publication and installed acceptance are separate follow-up actions.
+Implemented and branch-validated for roadmap step 1, October 20, 2026. The
+unpublished GitHub Apple-signing validation also passed; see the
+[exact-source record](RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
+No channel feed has been created, no update published and no installed Mac
+changed by this work. Live publication and installed acceptance remain pending.
 
 ## What each channel means
 
@@ -184,10 +186,11 @@ unchanged-archive promotion. The existing Golden rules workflow discovers these
 tests through the full gate. Tests simulate GitHub mutations and use synthetic
 archives/public RFC signature material; they never publish fixtures.
 
-Live feed creation, GitHub immutable-release settings, Developer ID configuration,
-Apple notarization and actual channel/update behavior on Pro/Air remain unverified
-until separately authorized delivery. A local pass is not a claim of live CI or
-installed-Mac acceptance.
+The branch gate and unpublished GitHub Developer ID/notarization test passed on
+the source recorded above. Live feed creation, hosted promotion/mutable-release
+behavior and actual channel/update behavior on Pro/Air still require separately
+authorized delivery. Signed-package validation does not establish installed-Mac
+permission continuity or native acceptance.
 
 References: [Sparkle channels and feeds](https://sparkle-project.org/documentation/publishing/),
 [updater cycle reset](https://sparkle-project.org/documentation/programmatic-setup/),

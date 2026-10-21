@@ -28,13 +28,15 @@ Complete approved work in scoped commits with proportionate tests and evidence.
 
 ## Next delivery sequence
 
-Step 1 has a locally validated implementation candidate; live channel delivery
-and native acceptance remain pending. Step 2 is in progress: the Developer ID
-identity is installed and valid, GitHub lists the required signing secrets, and
-a read-only request authenticated successfully with Apple's notarization service.
-The next checkpoint is an unpublished signed package proving certificate-export
-decryption, app/helper signing, Apple notarization, stapling and Sparkle signature
-verification together. That checkpoint has not run. Steps 3–11 remain pending.
+Step 1 has an implementation candidate validated locally and on its GitHub
+branch; live channel delivery and native acceptance remain pending. Step 2's
+unpublished package checkpoint passed: GitHub decrypted the certificate export,
+signed the packaged app/helper, obtained Apple notarization, and passed stapling,
+Gatekeeper and independent Sparkle archive verification. See the exact-source
+[signing validation record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
+The installed ad-hoc-to-Developer-ID transition and permission continuity remain
+pending. Steps 3–11 remain pending; the next action is signed Dev delivery to the
+Pro when authorized, including the initial bootstrap for its existing updater.
 
 Updating this roadmap is already handled here; it is not an additional
 prerequisite or a numbered development stage. This sequence replaces the old
@@ -48,7 +50,7 @@ remains evidence within its original limits; installed acceptance is separate.
    stable feed or public latest download. Record source identity, monotonic build
    numbering and channel-switch behavior. The updater, local publisher, Testing
    workflow, diagnostics and policy are implemented together in the current local
-   candidate; no feeds have been created or installations changed. See the
+   branch candidate; no channel feeds have been created or installations changed. See the
    [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
    Existing protected-main requirements remain in force.
 2. **Configure consistent Developer ID signing and notarization.** Use a
@@ -57,8 +59,9 @@ remains evidence within its original limits; installed acceptance is separate.
    transition without claiming that signing grants folder access. Membership
    is active per Leo. A valid Developer ID Application identity, the required
    GitHub secret names and read-only notarization authentication are verified.
-   Certificate-export password/import, complete signed-package notarization and
-   stapling, hosted signing and the installed transition remain unverified.
+   The unpublished GitHub signing/notarization package test passed on source
+   `49462f18482093ea380ccbaafe5a686db5d75ac7`; the installed transition and
+   subsequent-update permission continuity remain unverified.
 3. **Deliver a Dev build to the Pro, including local commit `82b1a85`.** Confirm
    setup stays inside the menu-bar panel, dismissal/reopening retains drafts,
    and picker choose/cancel returns to the same step. Exercise repo selection,
@@ -306,14 +309,13 @@ confirmed on October 20 that neither needs further action at this time.
 These remain visible without becoming new product features or being called
 complete merely because code was merged:
 
-- **Apple signing:** the Developer ID Application identity is installed and valid;
-  the required GitHub signing secret names are present, and read-only
-  notarization authentication passed. Secret storage does not establish usable
-  certificate-export decryption or successful hosted signing. First validate an
-  unpublished signed/notarized package, then hosted delivery and the installed
-  transition, including settings/folder-permission continuity. The working
-  personal Sparkle channel already exists; see
-  [release delivery](docs/RELEASE_DELIVERY.md).
+- **Apple signing:** the unpublished exact-source GitHub test verified usable
+  certificate-export decryption, Developer ID packaging, Apple notarization,
+  stapling, Gatekeeper acceptance and independent archive signature verification.
+  Live channel delivery and the installed transition, including settings/folder
+  permissions and subsequent-update continuity, remain pending. The existing
+  public release and release-mode variable were unchanged; see the
+  [signing validation record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
 - **Installed-Mac reliability:** track actual folder permissions, native picker,
   notification, volume, login and recovery cases in the
   [two-Mac acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).

@@ -4,7 +4,8 @@
 
 Leo approved Dev → Testing → Stable and explicitly approved local workflow edits
 that route checked main builds to Testing and disable the former direct-Stable
-command. This implementation is local until a separately authorized push. No live
+command. The branch was subsequently pushed with explicit authorization for the
+unpublished signing test below. It has not been merged to main. No live
 repository variable, channel feed, published release or installed Mac was changed.
 
 The complete operational contract is [Update channels](UPDATE_CHANNELS.md).
@@ -37,6 +38,38 @@ untested Apple services, real feeds, permissions and native UI behavior explicit
 The staged publisher temporarily performs no package pruning because the old
 four-package rule could delete an archive still referenced by another channel.
 No backup/archive data or unrelated release is deleted by this change.
+
+## Unpublished signing validation — October 20, 2026
+
+Leo authorized a branch-only push and manual signing test, without main merge,
+release publication, feed changes or installation. Both the local clean macOS
+gate and the [GitHub branch gate](https://github.com/yogoldy/RepoHub/actions/runs/39531738911)
+passed on `49462f18482093ea380ccbaafe5a686db5d75ac7`. The local gate ran 334
+Python tests with zero skips, all 26 registered rules and all 31 build/tool checks.
+
+The [manual signing run](https://github.com/yogoldy/RepoHub/actions/runs/39531752665)
+repeated the full gate, then successfully used the saved GitHub credentials to
+decrypt/import the P12 in a disposable keychain, sign the coordinated Developer
+ID app/helper, obtain Apple's Accepted notarization result, staple/validate the
+ticket, pass Gatekeeper assessment, and prepare and independently authenticate
+the Sparkle-signed archive. No credential values were recorded in source or the
+bounded receipt. The job's failure-explanation step was intentionally skipped
+because its prerequisite checks passed; it is not a skipped regression test.
+
+The validation-only version `0.0.0`, build `1`, and non-release tag cannot pass the
+managed release/promotion contract; no global release number was reserved.
+Archive: 28,704,263 bytes, SHA-256
+`57f66caa875a78a83af9df3985782238470c32b13dc814554612bf155f7f6c36`.
+Its receipt records `result=passed`, unchanged source, `published=false` and
+`installed=false`. Temporary package/archive/signing files were cleaned; the
+bounded JSON remains in the Actions log and summary.
+
+After the test, main remained `77ad73b6ebd5f52b2f92ce437abf59506827457a`, public
+latest remained `repohub-v0.0.7-b7`, and `REPOHUB_RELEASE_MODE` remained
+`personal_adhoc`. The existing main publisher has not yet received the branch's
+Testing-only changes. The test does not enable Developer ID release mode or
+claim live channel delivery, installed acceptance, permission continuity or Air
+coverage. Those remain subsequent roadmap actions with their own authorization.
 
 ## Historical personal delivery record — October 17, 2026
 
