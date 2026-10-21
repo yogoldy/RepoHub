@@ -93,6 +93,8 @@ const change = value => { get('update-channel').value = value; get('update-chann
     await page.open();
     assert(get('update-channel-controls').hidden);
     assert(get('update-channel-save').disabled);
+    assert(get('check-updates').disabled);
+    assert.match(get('update-channel-description').textContent, /unavailable/);
     assert.match(get('update-channel-error').textContent, /unsupported/);
   }
   badReply = undefined;

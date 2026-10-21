@@ -829,9 +829,16 @@ prevents an external preference change from switching policy midway through an
 update session. Tests use disposable preference domains and a second process to
 check persistence and revocation without touching either daily installation.
 The shipped controller hides choices until a valid native response enables them;
-forged DOM selection or contradictory replies cannot enable saving. Diagnostics
-preserve the effective channel and a bounded enabled/disabled policy, rejecting
+forged DOM selection or contradictory replies cannot enable saving. The page
+must not imply confirmed Stable settings when loading failed: it shows
+settings as unavailable and disables its update action until a valid reply loads.
+Diagnostics preserve the effective channel and a bounded enabled/disabled policy, rejecting
 contradictory disabled/experimental combinations independently of the UI.
+The read-only browser check also reproduced shared flex-row styling overriding
+the action container's `hidden` attribute. Scoped hidden selectors now force
+both experimental containers to `display: none`; the October 21 browser readback
+confirmed this computed style and the absence of channel Save/Cancel controls.
+That preview has no native bridge and does not count as installed channel acceptance.
 
 Counterexamples cover wrong channels, missing/skipped/stale checks, corrupt
 archives, uploaded-byte mismatches, foreign/failing GitHub runs, incomplete

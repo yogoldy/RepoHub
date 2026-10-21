@@ -25,7 +25,9 @@ a channel selector or channel Save/Cancel controls. The native updater also forc
 Stable and rejects experimental saves unless a deliberate local Boolean opt-in
 was present when the process started. An old saved Dev/Testing selection alone
 does not enable experimental offers. Missing or malformed native policy replies
-keep the page's selector hidden and saving disabled.
+keep the page's selector hidden, show settings as unavailable, and disable saving
+and the page's update action until a valid reply loads. Shared action-row CSS
+explicitly honors the hidden state for these controls.
 
 ### Enable experimental channels on a test Mac
 

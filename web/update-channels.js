@@ -7,6 +7,7 @@
   let saved = 'stable';
   let revision = 'initial';
   let experimentalEnabled = false;
+  let policyLoaded = !bridge;
   let loading = false;
   let saving = false;
   let generation = 0;
@@ -62,13 +63,15 @@
       || !channels.has($('update-channel').value) || $('update-channel').value === saved;
     $('update-channel-save').textContent = saving ? 'Saving…' : 'Save changes';
     $('update-channel-cancel').disabled = saving;
-    $('check-updates').disabled = !bridge || loading || saving;
+    $('check-updates').disabled = !bridge || !policyLoaded || loading || saving;
     const descriptions = {
       stable: 'Public releases promoted after automated checks and installed-Mac acceptance.',
       testing: 'Candidates that passed the full automated checks; installed-Mac testing may still be in progress.',
       dev: 'Experimental builds with focused checks. May contain unfinished behavior.',
     };
-    $('update-channel-description').textContent = loading ? '' : experimentalEnabled
+    $('update-channel-description').textContent = loading ? ''
+      : !policyLoaded ? 'Update settings are unavailable. Reopen this page to try again.'
+      : experimentalEnabled
       ? descriptions[$('update-channel').value] || ''
       : 'Stable updates are checked automatically. You can also check now.';
     $('update-channel-note').textContent = !bridge ? 'Preview only. Save this preference in the installed Mac app.'
@@ -81,6 +84,7 @@
     $('update-channel-error').textContent = '';
     $('update-channel').value = saved;
     experimentalEnabled = false;
+    policyLoaded = !bridge;
     loading = !!bridge;
     render();
     if (!bridge) return;
@@ -90,6 +94,7 @@
       saved = result.channel;
       revision = result.revision;
       experimentalEnabled = result.experimental_channels === 'enabled';
+      policyLoaded = true;
       $('update-channel').value = saved;
     } catch (error) {
       if (current === generation) $('update-channel-error').textContent = error.message;
@@ -122,6 +127,7 @@
       saved = result.channel;
       revision = result.revision;
       experimentalEnabled = result.experimental_channels === 'enabled';
+      policyLoaded = true;
       $('update-channel').value = saved;
     } catch (error) {
       $('update-channel-error').textContent = error.message;

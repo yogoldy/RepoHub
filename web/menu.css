@@ -360,7 +360,8 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   stroke-linejoin: round;
 }
 #settings-back[hidden], #info-back[hidden], [data-info-page][hidden],
-[data-settings-page][hidden], #schedule-actions[hidden] {
+[data-settings-page][hidden], #schedule-actions[hidden],
+#update-channel-controls[hidden], #update-channel-actions[hidden] {
   display: none !important;
 }
 .settings-content {
