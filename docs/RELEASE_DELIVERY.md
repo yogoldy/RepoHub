@@ -31,8 +31,9 @@ enabled Pro/Air installations should be offered experimental updates; public
 experimental downloads are acceptable. Follow the
 [ordinary-user offer policy](UPDATE_CHANNELS.md#experimental-offers-and-open-source-distribution):
 keep normal installations on Stable and experimental controls out of the ordinary
-flow. The local test-enablement/UI distinction remains pending; private hosting
-and device authentication are outside this requirement. Channel changes are explicitly saved per
+flow. The local test-enablement/UI distinction is implemented on the branch;
+enabling and accepting it on installed Macs remain pending. Private hosting and
+device authentication are outside this requirement. Channel changes are explicitly saved per
 Mac and do not downgrade an already-installed newer build. Use the same signing
 identity across channels when Apple credentials are configured in roadmap step 2.
 Personal ad-hoc Dev/Testing is honestly marked; new Stable promotion rejects it.

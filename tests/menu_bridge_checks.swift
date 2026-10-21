@@ -18,6 +18,13 @@ import Foundation
         var extra = channelSave
         extra["feed"] = "https://outside.invalid/feed.xml"
         precondition(MenuBridge.action(body: extra, frameURL: url, isMainFrame: true) == nil)
+        for field in ["experimental_channels", "experimentalUpdateChannelsEnabled", "enabled"] {
+            var message = channelSave
+            message[field] = true
+            precondition(MenuBridge.action(body: message, frameURL: url, isMainFrame: true) == nil)
+        }
+        precondition(MenuBridge.action(body: ["action": "enableExperimentalChannels"],
+            frameURL: url, isMainFrame: true) == nil)
         for field in ["request_id", "revision"] {
             var message = channelSave
             message[field] = "untrusted"

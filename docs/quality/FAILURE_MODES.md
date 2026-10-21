@@ -819,6 +819,20 @@ and explicitly promoted Stable. Stable remains the default on each Mac. Native
 actions accept only fixed channel names and exact owned menu-page requests;
 revision conflicts and an active update/backup prevent an ambiguous save.
 
+A saved Dev preference previously worked without a separate deliberate opt-in,
+and every installation showed experimental choices. An explicit Boolean local
+preference now enables those choices only after restarting the app. Missing,
+false or malformed enablement forces effective Stable selection even when a Dev
+preference remains on disk. Native saves reject experimental channels without
+that opt-in; page messages cannot enable it. The launch-time policy snapshot
+prevents an external preference change from switching policy midway through an
+update session. Tests use disposable preference domains and a second process to
+check persistence and revocation without touching either daily installation.
+The shipped controller hides choices until a valid native response enables them;
+forged DOM selection or contradictory replies cannot enable saving. Diagnostics
+preserve the effective channel and a bounded enabled/disabled policy, rejecting
+contradictory disabled/experimental combinations independently of the UI.
+
 Counterexamples cover wrong channels, missing/skipped/stale checks, corrupt
 archives, uploaded-byte mismatches, foreign/failing GitHub runs, incomplete
 Pro/Air acceptance, missing Stable approval and a substituted publisher lock.
@@ -828,7 +842,7 @@ matching rewritten checksum still fail signature verification. Interrupted
 promotion can be explicitly resumed only after its requirements are checked
 again. Candidate/prerelease feed publication must not move public latest.
 
-Shareable diagnostics add only a bounded update_channel enum and typed reasons;
+Shareable diagnostics add bounded update_channel and experimental_channels enums and typed reasons;
 an update ready state is not repository readiness or confirmed cloud upload.
 Live channel publication, Apple services and installed channel/permission
 continuity remain separate acceptance evidence, not implied by these fixtures.

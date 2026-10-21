@@ -33,6 +33,36 @@ import CryptoKit
         _ = try PackagedApplication(bundle: bundle)
         let retainedConfig = try Data(contentsOf: application.configURL)
         precondition(retainedConfig == initialConfig)
+        let preferences = UserDefaults(suiteName: identity)!
+        defer { preferences.removePersistentDomain(forName: identity) }
+        preferences.set(["channel": "dev", "revision": UUID().uuidString],
+            forKey: UpdateChannelSettings.key)
+        let ordinaryUpdates = AppUpdates(application: application, preferences: preferences)
+        ordinaryUpdates.record("ready", reason: "matching_helper")
+        let updateFile = application.stateDirectory.appendingPathComponent("update-status.json")
+        func updateEvidence() throws -> [String: String] {
+            try JSONSerialization.jsonObject(with: Data(contentsOf: updateFile)) as! [String: String]
+        }
+        var update = try updateEvidence()
+        precondition(update["update_channel"] == "stable")
+        precondition(update["experimental_channels"] == "disabled")
+        precondition(ordinaryUpdates.channelSettings()["channel"] == update["update_channel"])
+        preferences.set(true, forKey: UpdateChannelSettings.experimentalKey)
+        ordinaryUpdates.record("checking", reason: "user_requested")
+        update = try updateEvidence()
+        precondition(update["update_channel"] == "stable")
+        let experimentalUpdates = AppUpdates(application: application, preferences: preferences)
+        experimentalUpdates.record("ready", reason: "matching_helper")
+        update = try updateEvidence()
+        precondition(update["update_channel"] == "dev")
+        precondition(update["experimental_channels"] == "enabled")
+        precondition(experimentalUpdates.channelSettings()["channel"] == update["update_channel"])
+        precondition(experimentalUpdates.channelSettings()["experimental_channels"]
+            == update["experimental_channels"])
+        precondition(update["source_revision"] == manifest["source_revision"] as? String)
+        precondition(update["build"] == "100")
+        let afterUpdateEvidence = try Data(contentsOf: application.configURL)
+        precondition(afterUpdateEvidence == initialConfig)
         func rejected() {
             do {
                 _ = try PackagedApplication.verify(resources: resources, bundle: bundle)

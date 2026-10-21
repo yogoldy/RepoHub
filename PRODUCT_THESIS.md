@@ -46,8 +46,9 @@ The installed ad-hoc-to-Developer-ID transition and permission continuity remain
 pending. Leo clarified that ordinary users must not be offered Dev/Testing
 updates; public experimental downloads are acceptable. Private hosting and
 hardware authentication are not required. The planned public feed URLs can remain,
-but experimental settings controls still need deliberate local test enablement
-for the Pro and Air instead of appearing in the ordinary user flow.
+and experimental settings controls now require deliberate local test enablement
+instead of appearing in the ordinary user flow. The opt-in has not been enabled
+on either daily installation; installed acceptance remains pending.
 Steps 3–11 remain pending, including the Pro's initial updater bootstrap.
 
 Updating this roadmap is already handled here; it is not an additional
@@ -72,7 +73,9 @@ remains evidence within its original limits; installed acceptance is separate.
    repositories, authentication services or hardware restrictions. Validate
    Stable defaults, explicit test enablement, persisted preference behavior,
    exact-channel update offers, diagnostic agreement and byte-identical Stable
-   promotion. The clarified UI/enablement behavior is still pending implementation.
+   promotion. The clarified UI/enablement behavior is implemented locally with
+   isolated native/controller/diagnostic regressions. Enabling the Pro/Air and
+   accepting their installed behavior remain pending delivery.
 2. **Configure consistent Developer ID signing and notarization.** Use a
    consistent app/helper identity across channels; verify signed components,
    hardened runtime, notarization and stapling. Test the existing ad-hoc app's

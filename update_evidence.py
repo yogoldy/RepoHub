@@ -12,10 +12,16 @@ def update_evidence(value, release):
     if not isinstance(value, dict) or not isinstance(release, dict):
         return None
     fields = {'update_phase', 'update_reason', 'source_revision', 'build'}
-    if set(value) not in (fields, fields | {'update_channel'}):
+    optional = {'update_channel', 'experimental_channels'}
+    if not fields.issubset(value) or not set(value).issubset(fields | optional):
         return None
     if 'update_channel' in value and value['update_channel'] not in ('stable', 'testing', 'dev'):
         return None
+    if 'experimental_channels' in value:
+        if value['experimental_channels'] not in ('enabled', 'disabled') or 'update_channel' not in value:
+            return None
+        if value['experimental_channels'] == 'disabled' and value['update_channel'] != 'stable':
+            return None
     if (not isinstance(value.get('update_phase'), str)
             or not isinstance(value.get('update_reason'), str)
             or value['update_phase'] not in PHASES or value['update_reason'] not in REASONS):
@@ -28,4 +34,6 @@ def update_evidence(value, release):
     result = {'update_phase': value['update_phase'], 'update_reason': value['update_reason']}
     if 'update_channel' in value:
         result['update_channel'] = value['update_channel']
+    if 'experimental_channels' in value:
+        result['experimental_channels'] = value['experimental_channels']
     return result

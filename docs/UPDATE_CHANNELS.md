@@ -20,14 +20,45 @@ locally on Leo's Pro and Air. This is a local testing preference, not an access
 control or a promise to prevent other people from downloading public packages.
 No client receives an Apple or Sparkle private signing key to download updates.
 
-The existing branch already defaults to Stable and enforces exact-channel offers,
-but currently shows all three choices in Settings. The ordinary-user UI/local
-test-enablement distinction remains to be implemented and validated; this
-documentation update does not implement it. Validate Stable defaults, deliberate
-test enablement, persisted preferences, guarded channel requests, exact offered
-channels and bounded diagnostic agreement. Keep existing update/backup busy
-guards, no-downgrade behavior, full Testing checks and exact-archive Stable
-promotion. Source openness is not a reason to weaken those stability checks.
+Ordinary installations show Stable update guidance and Check for Updates, without
+a channel selector or channel Save/Cancel controls. The native updater also forces
+Stable and rejects experimental saves unless a deliberate local Boolean opt-in
+was present when the process started. An old saved Dev/Testing selection alone
+does not enable experimental offers. Missing or malformed native policy replies
+keep the page's selector hidden and saving disabled.
+
+### Enable experimental channels on a test Mac
+
+Quit RepoHub, then run in that Mac's Terminal:
+
+```sh
+defaults write com.leogoldberg.repohub experimentalUpdateChannelsEnabled -bool true
+```
+
+Reopen the channel-capable app. Settings → App updates now shows Stable, Testing
+and Dev, with explicit Save changes. Enabling the controls alone keeps the saved
+channel (Stable for a new preference); it does not install or publish anything.
+This command can be used deliberately by others too; it is not machine authentication.
+
+To return to ordinary Stable offers, quit RepoHub and run:
+
+```sh
+defaults delete com.leogoldberg.repohub experimentalUpdateChannelsEnabled
+```
+
+Reopen the app. The effective channel is now Stable even if Dev/Testing was saved.
+The saved preference is retained, so re-enabling experimental channels later
+restores that selection. Neither operation downgrades the installed app, changes
+backup settings or removes archives. Both commands affect only this Mac; they
+are not applied to the Pro or Air by the implementation tests. The opt-in is
+read once per launch so external changes cannot switch policy halfway through
+an update session. Test bundles use their own preference domain and fixture feed.
+
+Tests exercise Stable defaults, strict Boolean enablement, persisted preferences
+in another process, opt-out with an existing Dev selection, guarded channel
+requests, exact offered channels and bounded diagnostic agreement. Existing
+update/backup busy guards, no-downgrade behavior, full Testing checks and
+exact-archive Stable promotion remain. Native installed acceptance is pending.
 
 ## What each channel means
 
@@ -38,8 +69,7 @@ promotion. Source openness is not a reason to weaken those stability checks.
 | Stable | Testing requirements, protected-main source/tree checks, notarized Developer ID package, exact-package Pro/Air acceptance and explicit approval | Explicit promotion only; no rebuild |
 
 The channels separate update offers; publicly hosted downloads are not restricted.
-The ordinary-user settings distinction above remains pending. Normal installations
-currently default to Stable. Each Mac selects a channel in
+Normal installations offer Stable only. A deliberately enabled test Mac selects a channel in
 Settings → App updates and uses Save changes. Selection changes no backup rules,
 sources, schedules or permissions. Save is rejected during an update session or
 when the matching helper cannot confirm backups are idle. Draft changes,
@@ -67,11 +97,41 @@ retain their isolated fixture feed and disabled background discovery.
   and evidence are replaced together as one asset. It records the exact gate run;
   Stable also records the acceptance receipt digest. Public proofs contain no
   local paths or raw test logs. Stage metadata can change; archive bytes cannot.
-- Channel diagnostics export only `stable`, `testing` or `dev` plus typed update
-  reasons. An updater's ready state never establishes repository backup/upload
-  success. Existing evidence without a channel remains readable.
+- Channel diagnostics export only `stable`, `testing` or `dev`, the launch-time
+  `experimental_channels` value (`enabled`/`disabled`), and typed update reasons.
+  Disabled policy paired with an experimental effective channel is rejected.
+  An updater's ready state never establishes repository backup/upload success.
+  Existing evidence without these optional fields remains readable.
 
 ## Local Dev command
+
+### First signed Dev handoff
+
+Before the first local publication, prepare the existing release environment on
+the Pro with Developer ID mode, the original Sparkle key and its matching public
+key, the certificate export/password, and the notarization API credentials listed
+in [release delivery](RELEASE_DELIVERY.md). A local code-signing identity alone
+does not satisfy the publisher's disposable-keychain credential contract. Stored
+GitHub secret values cannot be downloaded to populate a local environment.
+Do not paste private keys or passwords into chat or shell command history; supply
+them through a user-controlled secure local session. Do not rotate the Sparkle
+key merely because local publication has not yet been configured.
+
+The October 20 preparation confirmed a valid local Developer ID signing identity
+and the presence of the previously exported certificate/API-key files without
+opening them. Leo confirmed that the original Sparkle key is available locally.
+The local release environment is not populated, so its secret imports and a real
+signed Dev package remain unverified. No experimental feed, publication,
+installation or opt-in on either daily Mac is implied by the implementation.
+
+Once credentials and publication are authorized, rerun the focused clean-source
+gate immediately before publication; a prior receipt is not a standing approval
+and the publisher requires a fresh receipt. Verify the resulting Dev feed and
+downloaded archive before the Pro's controlled bootstrap installation. Its older
+installed app cannot select Dev yet. Keep that installation, permission continuity
+and subsequent updater acceptance separate from the local gate.
+
+### Focused validation and publication
 
 Run from the canonical RepoHub checkout after committing the intended change:
 

@@ -19,24 +19,44 @@ enum UpdateChannel: String, CaseIterable {
 
 enum UpdateChannelSettings {
     static let key = "updateChannelSelection"
+    static let experimentalKey = "experimentalUpdateChannelsEnabled"
 
-    static func settings(in defaults: UserDefaults = .standard) -> [String: String] {
+    static func experimentalEnabled(in defaults: UserDefaults = .standard) -> Bool {
+        // Only an explicit Boolean opt-in enables experimental offers.
+        guard let value = defaults.object(forKey: experimentalKey) as? NSNumber,
+              CFGetTypeID(value) == CFBooleanGetTypeID() else { return false }
+        return value.boolValue
+    }
+
+    static func settings(in defaults: UserDefaults = .standard,
+                         experimentalEnabled: Bool? = nil) -> [String: String] {
+        let enabled = experimentalEnabled ?? self.experimentalEnabled(in: defaults)
+        let fallback = ["channel": "stable", "revision": "initial",
+                        "experimental_channels": enabled ? "enabled" : "disabled"]
         guard let saved = defaults.dictionary(forKey: key) as? [String: String],
               let channel = saved["channel"], UpdateChannel(rawValue: channel) != nil,
               let revision = saved["revision"], UUID(uuidString: revision) != nil else {
-            return ["channel": "stable", "revision": "initial"]
+            return fallback
         }
-        return ["channel": channel, "revision": revision]
+        return ["channel": enabled ? channel : "stable", "revision": revision,
+                "experimental_channels": enabled ? "enabled" : "disabled"]
     }
 
-    static func selected(in defaults: UserDefaults = .standard) -> UpdateChannel {
-        UpdateChannel(rawValue: settings(in: defaults)["channel"]!)!
+    static func selected(in defaults: UserDefaults = .standard,
+                         experimentalEnabled: Bool? = nil) -> UpdateChannel {
+        UpdateChannel(rawValue: settings(in: defaults,
+            experimentalEnabled: experimentalEnabled)["channel"]!)!
     }
 
     static func save(channel: String, revision: String,
-                     in defaults: UserDefaults = .standard) -> String {
+                     in defaults: UserDefaults = .standard,
+                     experimentalEnabled: Bool? = nil) -> String {
         guard UpdateChannel(rawValue: channel) != nil else { return "invalid" }
-        guard settings(in: defaults)["revision"] == revision else { return "conflict" }
+        let enabled = experimentalEnabled ?? self.experimentalEnabled(in: defaults)
+        guard enabled || channel == "stable" else { return "experimental_disabled" }
+        guard settings(in: defaults, experimentalEnabled: enabled)["revision"] == revision else {
+            return "conflict"
+        }
         defaults.set(["channel": channel, "revision": UUID().uuidString], forKey: key)
         return "saved"
     }
@@ -60,12 +80,18 @@ enum UpdateCycleOutcome {
 // helper shutdown boundary; a successful download alone is not an installed app.
 final class AppUpdates: NSObject {
     let application: PackagedApplication
+    // Read once per launch: changing developer preferences cannot switch policy
+    // halfway through an update session. Quit/reopen after changing the opt-in.
+    private let experimentalChannelsEnabled: Bool
+    private let preferences: UserDefaults
     #if canImport(Sparkle)
     private var controller: SPUStandardUpdaterController!
     #endif
 
-    init(application: PackagedApplication) {
+    init(application: PackagedApplication, preferences: UserDefaults = .standard) {
         self.application = application
+        self.preferences = preferences
+        self.experimentalChannelsEnabled = UpdateChannelSettings.experimentalEnabled(in: preferences)
         super.init()
         #if canImport(Sparkle)
         controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
@@ -84,14 +110,19 @@ final class AppUpdates: NSObject {
     }
 
     func channelSettings() -> [String: String] {
-        UpdateChannelSettings.settings()
+        UpdateChannelSettings.settings(in: preferences, experimentalEnabled: experimentalChannelsEnabled)
+    }
+
+    private var selectedChannel: UpdateChannel {
+        UpdateChannelSettings.selected(in: preferences, experimentalEnabled: experimentalChannelsEnabled)
     }
 
     func saveChannel(_ channel: String, revision: String) -> String {
         #if canImport(Sparkle)
         guard !controller.updater.sessionInProgress else { return "busy" }
         do { try requireIdle() } catch { return "busy" }
-        let result = UpdateChannelSettings.save(channel: channel, revision: revision)
+        let result = UpdateChannelSettings.save(channel: channel, revision: revision,
+            in: preferences, experimentalEnabled: experimentalChannelsEnabled)
         if result == "saved" {
             record("ready", reason: "channel_changed")
             controller.updater.resetUpdateCycleAfterShortDelay()
@@ -104,7 +135,8 @@ final class AppUpdates: NSObject {
 
     func record(_ phase: String, reason: String) {
         let evidence: [String: String] = ["update_phase": phase, "update_reason": reason,
-            "update_channel": UpdateChannelSettings.selected().rawValue,
+            "update_channel": selectedChannel.rawValue,
+            "experimental_channels": experimentalChannelsEnabled ? "enabled" : "disabled",
             "source_revision": application.release.source_revision,
             "build": application.release.build]
         if let data = try? JSONSerialization.data(withJSONObject: evidence, options: [.sortedKeys]) {
@@ -146,11 +178,11 @@ final class AppUpdates: NSObject {
 extension AppUpdates: SPUUpdaterDelegate {
     func feedURLString(for updater: SPUUpdater) -> String? {
         // Disposable test bundles must keep their explicitly configured fixture feed.
-        application.testMode ? nil : UpdateChannelSettings.selected().feedURL
+        application.testMode ? nil : selectedChannel.feedURL
     }
 
     func allowedChannels(for updater: SPUUpdater) -> Set<String> {
-        let selected = UpdateChannelSettings.selected()
+        let selected = selectedChannel
         return selected == .stable ? [] : [selected.rawValue]
     }
 
@@ -162,7 +194,7 @@ extension AppUpdates: SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, shouldProceedWithUpdate item: SUAppcastItem,
                  updateCheck: SPUUpdateCheck) throws {
         try requireIdle()
-        guard application.testMode || UpdateChannelSettings.selected().accepts(item.channel) else {
+        guard application.testMode || selectedChannel.accepts(item.channel) else {
             record("failed", reason: "channel_mismatch")
             throw NSError(domain: "RepoHubUpdateChannel", code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "This update does not match this Mac's selected channel."])

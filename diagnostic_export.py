@@ -21,6 +21,7 @@ ENUMS = {
     'update_phase': UPDATE_PHASES,
     'update_reason': UPDATE_REASONS,
     'update_channel': {'stable', 'testing', 'dev'},
+    'experimental_channels': {'enabled', 'disabled'},
     'schedule_state': TIMING_STATES,
     'timing_reason': TIMING_REASONS,
     'timing_surface': {'card', 'detail'},
