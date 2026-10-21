@@ -35,8 +35,11 @@ signed the packaged app/helper, obtained Apple notarization, and passed stapling
 Gatekeeper and independent Sparkle archive verification. See the exact-source
 [signing validation record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
 The installed ad-hoc-to-Developer-ID transition and permission continuity remain
-pending. Steps 3–11 remain pending; the next action is signed Dev delivery to the
-Pro when authorized, including the initial bootstrap for its existing updater.
+pending. Before signed Dev delivery, implement Leo's subsequent requirement that
+only his Pro and Air can access Dev/Testing feeds and packages. The existing
+public experimental-feed implementation does not enforce this. Private hosting
+and credential-versus-hardware-bound enrollment are still being decided.
+Steps 3–11 remain pending, including the Pro's initial updater bootstrap.
 
 Updating this roadmap is already handled here; it is not an additional
 prerequisite or a numbered development stage. This sequence replaces the old
@@ -53,6 +56,14 @@ remains evidence within its original limits; installed acceptance is separate.
    branch candidate; no channel feeds have been created or installations changed. See the
    [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
    Existing protected-main requirements remain in force.
+   **Required before first experimental publication:** enforce Dev/Testing access
+   for Leo's Pro and Air at both feed and archive endpoints, with separate
+   enrollment/revocation. Ordinary installations offer only Stable. Protect
+   credentials outside the app bundle, page DOM, Git and diagnostic exports;
+   hiding channel controls alone is insufficient. Validate unauthorized and
+   revoked requests, authenticated downloads, credential handling across redirects,
+   public Stable operation, and byte-identical promotion to public Stable.
+   Hosting and enrollment details require an explicit decision before provisioning.
 2. **Configure consistent Developer ID signing and notarization.** Use a
    consistent app/helper identity across channels; verify signed components,
    hardened runtime, notarization and stapling. Test the existing ad-hoc app's

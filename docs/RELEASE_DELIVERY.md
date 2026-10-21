@@ -26,8 +26,11 @@ The complete operational contract is [Update channels](UPDATE_CHANNELS.md).
   remains in this source; the old `tools/publish_release.py` CLI fails closed.
 
 Public latest remains the existing Stable URL. Dev and Testing use separate
-opt-in prerelease feeds and never become latest. All channels are public downloads;
-channel selection is not authentication. Channel changes are explicitly saved per
+prerelease feeds and never become latest. Leo subsequently required access only
+for his Pro and Air: [private experimental delivery](UPDATE_CHANNELS.md#private-experimental-access--required-not-implemented)
+must be implemented before activation. The current branch's public experimental
+URLs and unauthenticated channel selection do not meet that requirement yet.
+Channel changes are explicitly saved per
 Mac and do not downgrade an already-installed newer build. Use the same signing
 identity across channels when Apple credentials are configured in roadmap step 2.
 Personal ad-hoc Dev/Testing is honestly marked; new Stable promotion rejects it.
