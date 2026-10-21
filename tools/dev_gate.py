@@ -60,7 +60,8 @@ def run(output):
         report['result'] = 'passed'
     finally:
         output.parent.mkdir(parents=True, exist_ok=True)
-        with output.open('x', opener=lambda name, flags: os.open(name, flags | os.O_NOFOLLOW, 0o600)) as stream:
+        descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(descriptor, 'w') as stream:
             json.dump(report, stream, indent=2)
             stream.write('\n')
     return report

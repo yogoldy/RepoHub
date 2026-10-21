@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from tools.channel_policy import (
     ACCEPTANCE_CASES, DEV_CHECKS, channel_plan, feed_url, require_acceptance,
@@ -184,6 +185,29 @@ class ChannelReleaseTests(unittest.TestCase):
                 ('profile', 'macos'), ('source_unchanged', False), ('source_digest', '')]:
             with self.subTest(field=field), self.assertRaises(ValueError):
                 require_focused_gate(dict(value, **{field: replacement}), SHA)
+
+    def test_dev_gate_writes_private_failure_receipt_when_source_changes(self):
+        from tools.dev_gate import run
+        result = SimpleNamespace(testsRun=8, skipped=[], expectedFailures=[], wasSuccessful=lambda: True)
+        dummy = unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])
+        def git(arguments, **kwargs):
+            return SHA if arguments[1] == 'rev-parse' else b''
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'receipt.json'
+            with patch('tools.dev_gate.platform.system', return_value='Darwin'), \
+                    patch('tools.dev_gate.platform.machine', return_value='arm64'), \
+                    patch('tools.dev_gate.source_fingerprint', side_effect=['a' * 64, 'b' * 64]), \
+                    patch('tools.dev_gate.subprocess.check_output', side_effect=git), \
+                    patch('tools.dev_gate.subprocess.run'), \
+                    patch('tools.dev_gate.unittest.defaultTestLoader.discover', return_value=dummy), \
+                    patch('tools.dev_gate.unittest.TextTestRunner') as runner:
+                runner.return_value.run.return_value = result
+                with self.assertRaisesRegex(ValueError, 'source_changed'):
+                    run(output)
+            receipt = json.loads(output.read_text())
+            self.assertEqual(receipt['result'], 'failed')
+            self.assertFalse(receipt['source_unchanged'])
+            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
 
     def test_full_gate_requires_executed_rules_and_native_package_workflow_commands(self):
         receipt = gate()
