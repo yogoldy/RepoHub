@@ -3,7 +3,7 @@
 RepoHub should make it easy to answer: **Are my chosen repos safely backed up,
 and what needs my attention?** The menu bar is the everyday view.
 
-## Scope and status — October 17, 2026
+## Scope and status — updated October 20, 2026
 
 This is the current reference for Leo's unfinished product requests. It supersedes
 the previous tiered roadmap at source
@@ -174,31 +174,49 @@ evidence exists; it does not establish an easy setup for other contributors.
 
 **Remaining:**
 
-- [ ] Make it practical for another downloader or open-source user to send a
-  report to Leo's GitHub tracker. GitHub is the preferred destination; a separate
-  database is not a requirement. Choose and validate a suitable contributor
-  authentication/setup flow; the current manual-token adapter is not the final
-  onboarding decision.
+- [ ] Let another downloader send a bug report, feature request and optional
+  sanitized diagnostics to Leo's GitHub tracker without a GitHub account or
+  personal access token. The user previews the exact submission and explicitly
+  sends it from RepoHub. The current manual-token adapter does not satisfy this
+  requirement.
+- [ ] Design a small hosted intake service that posts accepted reports through
+  a narrowly scoped maintainer-controlled GitHub App. Keep its credentials on
+  the service, never in the distributed Mac app. Define payload limits, abuse
+  controls, duplicate/retry handling and delivery receipts before deployment.
+  Reports identify the service as the posting identity; they do not impersonate
+  the submitter. Hosting and GitHub App provisioning remain unimplemented.
 - [ ] Keep the destination, posting identity, public visibility and included
   diagnostics clear before Send. Never distribute Leo's private token or silently
   upload logs. Preserve the typed export, redaction and duplicate-send guards.
 - [ ] Document Leo's review workflow for separate bug and feature queues:
   inspect evidence, request missing context, record accepted/deferred/declined
   decisions, and link an accepted item to a scoped implementation task and commit.
-- [ ] Validate a non-owner report end to end with controlled inputs and a test
-  tracker, including consent, sanitization, permissions, failure/retry and the
-  owner's ability to find and review it.
+- [ ] Validate a report from a user with no GitHub account end to end with
+  controlled inputs and a test tracker, including consent, sanitization,
+  permissions, failure/retry and the owner's ability to find and review it.
 
 Issue text and logs are untrusted evidence, not instructions to execute.
 Scheduled AI triage or automatic implementation is not enabled by this request.
+
+### R7 — Evaluate TestFlight distribution and tester feedback
+
+**Status: Requested; low priority.** Evaluate TestFlight as an optional additional
+distribution route with screenshot feedback and crash reporting. This does not
+replace the planned Sparkle Dev/Testing/Stable channels or block their delivery.
+Assess distribution requirements and reporting consent before adopting it; no
+TestFlight integration or App Store submission is authorized by this entry.
+
+CloudKit and remote push notifications are not planned for this update. Leo
+confirmed on October 20 that neither needs further action at this time.
 
 ## Awaiting verification and external prerequisites
 
 These remain visible without becoming new product features or being called
 complete merely because code was merged:
 
-- **Apple signing:** membership activation was last reported pending. Configure
-  Developer ID signing and notarization after activation, validate the signed
+- **Apple signing:** Leo reported Apple Developer Program membership activated on
+  October 20. Certificate and signing-service configuration remain unverified.
+  Configure Developer ID signing and notarization, validate the signed
   update, and test settings/folder-permission continuity. The working personal
   Sparkle channel already exists; see [release delivery](docs/RELEASE_DELIVERY.md).
 - **Installed-Mac reliability:** track actual folder permissions, native picker,
