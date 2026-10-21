@@ -810,3 +810,25 @@ remaining native permission, iCloud and installed-update checks. The macOS PR,
 main and publication workflows all execute the same complete Golden Gate; new
 Python/JS wrappers are discovered automatically, with registered test IDs failing
 the gate if absent, skipped or unsuccessful.
+
+## GR26 — Staged updates preserve Stable and package identity
+
+A single GitHub latest feed made every accepted main release visible to every
+installation. The staged-channel contract separates local Dev, full-gate Testing
+and explicitly promoted Stable. Stable remains the default on each Mac. Native
+actions accept only fixed channel names and exact owned menu-page requests;
+revision conflicts and an active update/backup prevent an ambiguous save.
+
+Counterexamples cover wrong channels, missing/skipped/stale checks, corrupt
+archives, uploaded-byte mismatches, foreign/failing GitHub runs, incomplete
+Pro/Air acceptance, missing Stable approval and a substituted publisher lock.
+Promotion changes feed/proof metadata while preserving the signed archive. A
+public-key RFC fixture passes cryptographic verification; altered bytes with a
+matching rewritten checksum still fail signature verification. Interrupted
+promotion can be explicitly resumed only after its requirements are checked
+again. Candidate/prerelease feed publication must not move public latest.
+
+Shareable diagnostics add only a bounded update_channel enum and typed reasons;
+an update ready state is not repository readiness or confirmed cloud upload.
+Live channel publication, Apple services and installed channel/permission
+continuity remain separate acceptance evidence, not implied by these fixtures.

@@ -249,7 +249,8 @@ def build_artifacts(work, plan, mode, notary_key, update_key):
             raise ValueError('apple_notarization_not_accepted')
         command(['xcrun', 'stapler', 'staple', str(app)])
     artifacts = work / 'artifacts'
-    receipt = prepare(app, artifacts, plan['archive_url'], update_key, cache)
+    channel_options = {'update_channel': plan['channel']} if plan.get('schema') == 2 else {}
+    receipt = prepare(app, artifacts, plan['archive_url'], update_key, cache, **channel_options)
     if (receipt['source_revision'] != plan['source_revision'] or receipt['build'] != plan['build']
             or receipt['test_only'] is not False or receipt['distribution'] != mode):
         raise ValueError('prepared_source_mismatch')
@@ -260,35 +261,8 @@ def build_artifacts(work, plan, mode, notary_key, update_key):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--run-id', required=True, type=int)
-    parser.add_argument('--gate-receipt', type=Path, required=True)
-    args = parser.parse_args()
-    if (os.environ.get('GITHUB_ACTIONS') != 'true'
-            or os.environ.get('GITHUB_REPOSITORY') != REPOSITORY
-            or os.environ.get('REPOHUB_RELEASE_ENABLED') != 'true'):
-        raise ValueError('enabled_github_release_runner_required')
-    os.umask(0o077)
-    revision = command(['git', 'rev-parse', 'HEAD']).strip()
-    if command(['git', 'status', '--porcelain']).strip():
-        raise ValueError('clean_source_required')
-    require_gate(json.loads(args.gate_receipt.read_text()), revision)
-    github = GitHub()
-    github.assert_source(args.run_id, revision)
-    history = github.releases()
-    for release in history:
-        if release_number(release) is not None and not release.get('draft'):
-            if github.receipt(release)['source_revision'] == revision:
-                print('This source already has a published release; no duplicate created.')
-                return
-    plan = release_plan(history, revision)
-    with tempfile.TemporaryDirectory(prefix='repohub-release-') as folder:
-        work = Path(folder)
-        mode = selected_mode()
-        material = personal_signing_material if mode == 'personal_adhoc' else signing_material
-        with material(work) as (notary_key, update_key):
-            artifacts = build_artifacts(work, plan, mode, notary_key, update_key)
-            print(json.dumps(publish_verified(github, plan, artifacts, args.run_id)))
+    # The old CLI cannot bypass the explicitly approved staged Stable process.
+    raise ValueError('legacy_stable_publication_disabled_use_channel_release')
 
 
 if __name__ == '__main__':

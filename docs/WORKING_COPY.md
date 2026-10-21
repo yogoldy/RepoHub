@@ -22,9 +22,11 @@ agreed feature through protected main promotion. Once the feature is complete:
    within the approved scope; never bypass protection or merge a failing check.
 5. Merge the passing feature through the protected PR process. No additional
    approval is needed solely because this final step moves the feature to main.
-6. Report the actual merge and workflow results. Under the existing personal
-   delivery policy, accepted main source can publish a Sparkle update automatically.
-   Verify the feed and download when delivery is part of the task. Publishing does
+6. Report the actual merge and workflow results. Under the October 20 staged
+   delivery policy, accepted main source may publish to Testing automatically.
+   Stable requires separately explicit promotion approval and native acceptance;
+   a request to push a feature does not imply public Stable approval. Verify the
+   applicable feed/download when delivery is part of the task. Publishing does
    not mean an installed Mac has received or installed that version.
 
 An explicit “local only,” “do not push,” or narrower instruction overrides this

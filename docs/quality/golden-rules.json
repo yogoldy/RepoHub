@@ -588,6 +588,31 @@
         "test_setup_ui.SetupUITests.test_actual_welcome_controller_requires_access_review_and_explicit_save"
       ],
       "remaining_gap": "Large real inventories and unusual Git layouts need observed runs. External Git storage is explicitly unsupported by discovery; no background auto-add is implemented."
+    },
+    {
+      "id": "GR26",
+      "title": "Experimental update channels cannot silently promote Stable",
+      "breakpoint": "A single latest-release feed exposed every successful main build publicly; channel changes or promotion could lose provenance, skip acceptance or rebuild a different archive.",
+      "diagnostic_events": ["application_update"],
+      "cause_and_solution": "Default each Mac to Stable; use exact guarded revision-checked channel preferences and fixed feeds. Publish Dev locally after focused clean-source checks, require exact successful full-gate runs for Testing, and require explicit approval plus both-host exact-package acceptance for notarized Stable promotion. Reserve global builds under a repository lock and verify uploaded bytes and archive signatures before changing feeds.",
+      "required_behavior": "Experimental publication preserves public latest. Promotion changes metadata only and retains archive bytes. Skipped/stale gates, malformed or wrong-channel feeds, foreign sources and incomplete acceptance fail closed. Interrupted promotion requires explicit resume and rechecks. Channel diagnostics are bounded and never establish backup or upload success.",
+      "test_ids": [
+        "test_update_channels.UpdateChannelTests.test_shipped_channel_page_explicit_save_discard_and_conflicts",
+        "test_update_channels.UpdateChannelTests.test_native_default_feed_isolation_and_revision_checked_selection",
+        "test_update_channels.UpdateChannelTests.test_channel_diagnostics_are_bounded_and_cannot_establish_backup_success",
+        "test_channel_release.ChannelReleaseTests.test_candidate_publication_compares_download_before_feed_without_moving_stable",
+        "test_channel_release.ChannelReleaseTests.test_dev_gate_cannot_be_missing_skipped_stale_dirty_or_full_gate_substitute",
+        "test_channel_release.ChannelReleaseTests.test_testing_requires_exact_successful_nonfork_push_and_real_contract",
+        "test_channel_release.ChannelReleaseTests.test_full_gate_requires_executed_rules_and_native_package_workflow_commands",
+        "test_channel_release.ChannelReleaseTests.test_workflow_targets_testing_and_legacy_stable_entry_is_disabled",
+        "test_channel_release.ChannelReleaseTests.test_pointer_is_a_prerelease_never_latest_and_retries_only_identical_bytes",
+        "test_channel_release.ChannelReleaseTests.test_promotions_are_sequential_and_testing_preserves_archive_bytes",
+        "test_channel_release.ChannelReleaseTests.test_stable_requires_exact_approval_both_hosts_notarization_and_protected_main",
+        "test_channel_release.ChannelReleaseTests.test_interrupted_promotion_needs_explicit_resume_and_rechecks_requirements",
+        "test_channel_release.ChannelReleaseTests.test_repository_lock_is_exclusive_and_never_removes_another_owners_lock",
+        "test_channel_release.ChannelReleaseTests.test_promotion_authenticates_archive_using_public_key_without_private_key"
+      ],
+      "remaining_gap": "Synthetic GitHub tests and public-key fixtures do not prove live prerelease/feed publication, Apple notarization, channel changes in the installed native app or Pro/Air update continuity. Those require separately authorized live delivery and native acceptance."
     }
   ]
 }

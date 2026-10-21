@@ -25,7 +25,8 @@ Complete approved work in scoped commits with proportionate tests and evidence.
 
 ## Next delivery sequence
 
-All steps below remain pending. Updating this roadmap is already handled here;
+Step 1 now has a local implementation candidate; live delivery and native
+acceptance remain pending. The later steps remain unstarted. Updating this roadmap is already handled here;
 it is not an additional prerequisite or a numbered development stage. This
 sequence replaces the old interaction-testing plan. It does not claim that
 existing controller, API, native or release tests are absent or incomplete merely
@@ -36,10 +37,11 @@ because additional installed acceptance is needed.
    checks. Testing requires the full automated gate; Stable requires installed
    acceptance and Leo's explicit promotion approval. Dev must not replace the
    stable feed or public latest download. Record source identity, monotonic build
-   numbering and channel-switch behavior. This staged policy is not implemented
-   yet: update the delivery policy, agent instructions, updater and publisher
-   together before using the Dev exception. Existing protected-main requirements
-   remain in force.
+   numbering and channel-switch behavior. The updater, local publisher, Testing
+   workflow, diagnostics and policy are implemented together in the current local
+   candidate; no feeds have been created or installations changed. See the
+   [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
+   Existing protected-main requirements remain in force.
 2. **Configure consistent Developer ID signing and notarization.** Use a
    consistent app/helper identity across channels; verify signed components,
    hardened runtime, notarization and stapling. Test the existing ad-hoc app's
@@ -308,9 +310,10 @@ complete merely because code was merged:
   events with displayed status in the [timing acceptance record](docs/BACKUP_TIMING_ACCEPTANCE_2026-10-16.md).
   Automated agreement is not a substitute for that personal walkthrough.
 
-For Leo's personal channel, protected main plus the automated Golden Gate can
-publish before installed-Mac testing. Follow the [current delivery policy](docs/RELEASE_DELIVERY.md);
-do not reinstate superseded pre-delivery restrictions from historical records.
+Protected main plus the full Golden Gate may publish to Testing before installed
+acceptance. Stable requires explicit approval and recorded Pro/Air results.
+Follow the [current delivery policy](docs/RELEASE_DELIVERY.md); do not apply the
+superseded automatic-Stable policy from historical records.
 
 ## Superseded scope
 
