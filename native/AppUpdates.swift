@@ -3,6 +3,45 @@ import AppKit
 import Sparkle
 #endif
 
+enum UpdateChannel: String, CaseIterable {
+    case stable, testing, dev
+
+    var feedURL: String {
+        let base = "https://github.com/yogoldy/RepoHub/releases/"
+        return self == .stable ? base + "latest/download/appcast.xml"
+            : base + "download/repohub-channel-" + rawValue + "/appcast.xml"
+    }
+
+    func accepts(_ itemChannel: String?) -> Bool {
+        self == .stable ? itemChannel == nil || itemChannel == "" : itemChannel == rawValue
+    }
+}
+
+enum UpdateChannelSettings {
+    static let key = "updateChannelSelection"
+
+    static func settings(in defaults: UserDefaults = .standard) -> [String: String] {
+        guard let saved = defaults.dictionary(forKey: key) as? [String: String],
+              let channel = saved["channel"], UpdateChannel(rawValue: channel) != nil,
+              let revision = saved["revision"], UUID(uuidString: revision) != nil else {
+            return ["channel": "stable", "revision": "initial"]
+        }
+        return ["channel": channel, "revision": revision]
+    }
+
+    static func selected(in defaults: UserDefaults = .standard) -> UpdateChannel {
+        UpdateChannel(rawValue: settings(in: defaults)["channel"]!)!
+    }
+
+    static func save(channel: String, revision: String,
+                     in defaults: UserDefaults = .standard) -> String {
+        guard UpdateChannel(rawValue: channel) != nil else { return "invalid" }
+        guard settings(in: defaults)["revision"] == revision else { return "conflict" }
+        defaults.set(["channel": channel, "revision": UUID().uuidString], forKey: key)
+        return "saved"
+    }
+}
+
 enum UpdateCycleOutcome {
     static func result(isSparkle: Bool, isBackupBusy: Bool, code: Int?) -> (String, String) {
         if isBackupBusy { return ("waiting", "backup_busy") }
@@ -42,8 +81,28 @@ final class AppUpdates: NSObject {
         #endif
     }
 
+    func channelSettings() -> [String: String] {
+        UpdateChannelSettings.settings()
+    }
+
+    func saveChannel(_ channel: String, revision: String) -> String {
+        #if canImport(Sparkle)
+        guard !controller.updater.sessionInProgress else { return "busy" }
+        do { try requireIdle() } catch { return "busy" }
+        let result = UpdateChannelSettings.save(channel: channel, revision: revision)
+        if result == "saved" {
+            record("ready", reason: "channel_changed")
+            controller.updater.resetUpdateCycleAfterShortDelay()
+        }
+        return result
+        #else
+        return "unavailable"
+        #endif
+    }
+
     func record(_ phase: String, reason: String) {
         let evidence: [String: String] = ["update_phase": phase, "update_reason": reason,
+            "update_channel": UpdateChannelSettings.selected().rawValue,
             "source_revision": application.release.source_revision,
             "build": application.release.build]
         if let data = try? JSONSerialization.data(withJSONObject: evidence, options: [.sortedKeys]) {
@@ -83,6 +142,16 @@ final class AppUpdates: NSObject {
 
 #if canImport(Sparkle)
 extension AppUpdates: SPUUpdaterDelegate {
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        // Disposable test bundles must keep their explicitly configured fixture feed.
+        application.testMode ? nil : UpdateChannelSettings.selected().feedURL
+    }
+
+    func allowedChannels(for updater: SPUUpdater) -> Set<String> {
+        let selected = UpdateChannelSettings.selected()
+        return selected == .stable ? [] : [selected.rawValue]
+    }
+
     func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
         try requireIdle()
         record("checking", reason: updateCheck == .updatesInBackground ? "scheduled_check" : "user_requested")
@@ -91,6 +160,11 @@ extension AppUpdates: SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, shouldProceedWithUpdate item: SUAppcastItem,
                  updateCheck: SPUUpdateCheck) throws {
         try requireIdle()
+        guard application.testMode || UpdateChannelSettings.selected().accepts(item.channel) else {
+            record("failed", reason: "channel_mismatch")
+            throw NSError(domain: "RepoHubUpdateChannel", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "This update does not match this Mac's selected channel."])
+        }
         record("downloading", reason: "update_available")
     }
 

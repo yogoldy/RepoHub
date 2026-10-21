@@ -5,13 +5,16 @@ PHASES = frozenset({'checking', 'waiting', 'downloading', 'installing', 'relaunc
 REASONS = frozenset({'user_requested', 'scheduled_check', 'backup_busy', 'helper_shutdown', 'helper_stopped',
                      'verified_update', 'update_available', 'sparkle_aborted',
                      'component_mismatch', 'matching_helper', 'recovery_unavailable',
-                     'no_update', 'user_cancelled', 'check_finished'})
+                     'no_update', 'user_cancelled', 'check_finished', 'channel_changed', 'channel_mismatch'})
 
 
 def update_evidence(value, release):
     if not isinstance(value, dict) or not isinstance(release, dict):
         return None
-    if set(value) != {'update_phase', 'update_reason', 'source_revision', 'build'}:
+    fields = {'update_phase', 'update_reason', 'source_revision', 'build'}
+    if set(value) not in (fields, fields | {'update_channel'}):
+        return None
+    if 'update_channel' in value and value['update_channel'] not in ('stable', 'testing', 'dev'):
         return None
     if (not isinstance(value.get('update_phase'), str)
             or not isinstance(value.get('update_reason'), str)
@@ -22,4 +25,7 @@ def update_evidence(value, release):
             or not re.fullmatch('[0-9a-f]{40}', str(value.get('source_revision', '')))
             or not re.fullmatch('[1-9][0-9]*', str(value.get('build', '')))):
         return None
-    return {'update_phase': value['update_phase'], 'update_reason': value['update_reason']}
+    result = {'update_phase': value['update_phase'], 'update_reason': value['update_reason']}
+    if 'update_channel' in value:
+        result['update_channel'] = value['update_channel']
+    return result

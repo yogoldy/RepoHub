@@ -169,6 +169,20 @@
       </section>
       <section id="settings-page-updates" data-settings-page="updates" hidden>
         <p>Download and install a verified app version.</p>
+        <label>Update channel on this Mac
+          <select id="update-channel">
+            <option value="stable">Stable</option>
+            <option value="testing">Testing</option>
+            <option value="dev">Dev</option>
+          </select>
+        </label>
+        <p id="update-channel-description" class="settings-note"></p>
+        <p id="update-channel-note" class="settings-note"></p>
+        <p id="update-channel-error" role="alert"></p>
+        <div class="settings-actions">
+          <button type="button" id="update-channel-cancel">Cancel</button>
+          <button type="button" id="update-channel-save" class="primary" disabled>Save changes</button>
+        </div>
         <button type="button" id="check-updates">Check for Updates…</button>
         <p id="updates-note" class="settings-note">Your backup folders and settings stay separate.</p>
       </section>
@@ -234,4 +248,5 @@
 
 
 <script src="/menu-appearance.js"></script>
+<script src="/update-channels.js"></script>
 </body></html>

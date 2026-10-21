@@ -324,6 +324,8 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         case .connectGitHub:
             if packaged?.testMode != true { GitHubConnection.configure() }
         case .checkForUpdates: checkForUpdates()
+        case .getUpdateChannel, .saveUpdateChannel:
+            if let body = message.body as? [String: Any] { updateChannel(action: action, body: body) }
         case .getMenuAppearance, .saveMenuAppearance:
             if let body = message.body as? [String: Any] { menuAppearance(action: action, body: body) }
         case .openSetup: openSetup()
@@ -380,6 +382,25 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         setupWebView = nil
         pollStatus()
         showPopover()
+    }
+
+    func updateChannel(action: MenuAction, body: [String: Any]) {
+        guard let updates = updates, let requestID = body["request_id"] as? String else { return }
+        let result: String
+        if action == .saveUpdateChannel, let channel = body["channel"] as? String,
+           let revision = body["revision"] as? String {
+            result = updates.saveChannel(channel, revision: revision)
+        } else {
+            result = "loaded"
+        }
+        var detail = updates.channelSettings()
+        detail["result"] = result
+        detail["request_id"] = requestID
+        guard let data = try? JSONSerialization.data(withJSONObject: detail),
+              let json = String(data: data, encoding: .utf8) else { return }
+        popoverWebView.evaluateJavaScript(
+            "window.dispatchEvent(new CustomEvent('repoHubUpdateChannel',{detail:" + json + "}))"
+        )
     }
 
     func chooseSources(multiple: Bool, requestID: String, sender: WKWebView? = nil,

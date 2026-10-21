@@ -1122,6 +1122,7 @@ class Handler(BaseHTTPRequestHandler):
                       "/workspace-setup.js": "workspace-setup.js", "/workspace-setup.css": "workspace-setup.css",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
                       "/menu-appearance.js": "menu-appearance.js",
+                      "/update-channels.js": "update-channels.js",
                       "/setup.html": "setup.html", "/setup.js": "setup.js", "/setup.css": "setup.css",
                       "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:

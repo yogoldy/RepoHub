@@ -29,6 +29,7 @@ WEB_ASSETS = (
     'diagnostics-client.js',
     'index.html',
     'menu-appearance.js',
+    'update-channels.js',
     'menu.css',
     'menu.html',
     'menu.js',

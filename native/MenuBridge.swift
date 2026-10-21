@@ -1,7 +1,7 @@
 import Foundation
 
 enum MenuAction: String {
-    case requestNotifications, notificationSettings, privacySettings, loginSettings, openBackups, openRepo, toggleNotifications, connectGitHub, chooseRepoHome, chooseRepoFolders, chooseBackupDestination, chooseDiscoveryParent, openSetup, closeSetup, checkForUpdates, getMenuAppearance, saveMenuAppearance, quit
+    case requestNotifications, notificationSettings, privacySettings, loginSettings, openBackups, openRepo, toggleNotifications, connectGitHub, chooseRepoHome, chooseRepoFolders, chooseBackupDestination, chooseDiscoveryParent, openSetup, closeSetup, checkForUpdates, getMenuAppearance, saveMenuAppearance, getUpdateChannel, saveUpdateChannel, quit
 }
 
 enum MenuBridge {
@@ -36,6 +36,17 @@ enum MenuBridge {
         } else if [.chooseRepoHome, .chooseRepoFolders, .chooseBackupDestination, .chooseDiscoveryParent].contains(action) {
             guard Set(payload.keys) == ["action", "request_id"], let id = payload["request_id"] as? String,
                   id.range(of: "^[a-f0-9]{24}$", options: .regularExpression) != nil else { return nil }
+        } else if action == .getUpdateChannel || action == .saveUpdateChannel {
+            let keys: Set<String> = action == .getUpdateChannel
+                ? ["action", "request_id"] : ["action", "request_id", "channel", "revision"]
+            guard Set(payload.keys) == keys, let id = payload["request_id"] as? String,
+                  id.range(of: "^[a-f0-9]{24}$", options: .regularExpression) != nil else { return nil }
+            if action == .saveUpdateChannel {
+                guard let channel = payload["channel"] as? String,
+                      ["stable", "testing", "dev"].contains(channel),
+                      let revision = payload["revision"] as? String,
+                      revision == "initial" || UUID(uuidString: revision) != nil else { return nil }
+            }
         } else if action == .getMenuAppearance || action == .saveMenuAppearance {
             let keys: Set<String> = action == .getMenuAppearance
                 ? ["action", "request_id"] : ["action", "request_id", "mode", "revision"]
