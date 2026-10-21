@@ -152,6 +152,21 @@ def require_publication_environment(mode):
 class ChannelGitHub(GitHub):
     lock_sha = None
 
+    def require_mutable_repository(self, hosted=False):
+        if hosted:
+            # GITHUB_TOKEN intentionally has no Administration permission.
+            # Inspect release metadata here, then recheck the new publication
+            # before exposing its feed. Never introduce a broader admin token.
+            latest = self.latest()
+            pointers = [item for item in self.releases()
+                        if item.get('tag_name') in ('repohub-channel-dev', 'repohub-channel-testing')]
+            if latest.get('immutable') is not False or any(item.get('immutable') is not False for item in pointers):
+                raise ValueError('mutable_channel_release_metadata_required')
+        else:
+            settings = self.api('immutable-releases')
+            if settings.get('enabled') is not False or settings.get('enforced_by_owner') is not False:
+                raise ValueError('channel_feed_requires_mutable_releases_no_settings_changed')
+
     def write(self, endpoint, payload=None, method='POST'):
         arguments = ['gh', 'api', '--method', method, f'repos/{REPOSITORY}/{endpoint}']
         if payload is not None:
@@ -228,6 +243,10 @@ class ChannelGitHub(GitHub):
         self.assert_lock()
         command(['gh', 'release', 'edit', plan['tag'], '--repo', REPOSITORY,
                  '--draft=false', '--prerelease', '--latest=false'])
+        published = self.api('releases/tags/' + plan['tag'])
+        if (published.get('draft') or published.get('prerelease') is not True
+                or published.get('immutable') is not False):
+            raise ValueError('mutable_prerelease_unconfirmed_no_feed_change')
 
     def replace_promotion_metadata(self, tag, folder):
         self.assert_lock()
@@ -259,7 +278,10 @@ class ChannelGitHub(GitHub):
         self.assert_lock()
         if stage == 'stable':
             command(['gh', 'release', 'edit', receipt['tag'], '--repo', REPOSITORY,
-                     '--prerelease=false', '--latest'])
+                     '--prerelease=false', '--latest', '--title', 'RepoHub ' + receipt['version'],
+                     '--notes', 'Promoted unchanged from Testing after automated checks and '
+                     'recorded Pro/Air acceptance.\nSource: ' + receipt['source_revision']
+                     + '\nBuild: ' + receipt['build']])
             if self.latest()['tag_name'] != receipt['tag']:
                 raise ValueError('stable_publication_unconfirmed')
             return
@@ -398,6 +420,7 @@ def main():
         github.assert_source(args.run_id, revision)
     elif not args.tag or not args.to or not args.run_id:
         raise ValueError('promotion_tag_channel_and_run_required')
+    github.require_mutable_repository(hosted=os.environ.get('GITHUB_ACTIONS') == 'true')
     with github.locked(revision), tempfile.TemporaryDirectory(prefix='repohub-channel-') as temporary:
         work = Path(temporary)
         if args.operation == 'promote':

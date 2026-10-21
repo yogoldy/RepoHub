@@ -123,6 +123,28 @@ class ChannelReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'legacy_stable_publication_disabled'):
             retired_publisher()
 
+    def test_immutable_release_settings_are_checked_without_disabling_them(self):
+        github = ChannelGitHub()
+        with patch.object(github, 'api', return_value={'enabled': False, 'enforced_by_owner': False}), \
+                patch.object(github, 'write') as mutation:
+            github.require_mutable_repository()
+            mutation.assert_not_called()
+        for settings in ({'enabled': True, 'enforced_by_owner': False}, {},
+                         {'enabled': False, 'enforced_by_owner': True}):
+            with patch.object(github, 'api', return_value=settings), patch.object(github, 'write') as mutation:
+                with self.assertRaises(ValueError):
+                    github.require_mutable_repository()
+                mutation.assert_not_called()
+        with patch.object(github, 'latest', return_value={'immutable': False}), \
+                patch.object(github, 'releases', return_value=[]), patch.object(github, 'api') as admin:
+            github.require_mutable_repository(hosted=True)
+            admin.assert_not_called()
+        with patch.object(github, 'assert_lock'), patch.object(github, 'api', return_value={
+                'draft': False, 'prerelease': True, 'immutable': True}), \
+                patch('tools.channel_release.command'):
+            with self.assertRaisesRegex(ValueError, 'no_feed_change'):
+                github.publish_candidate(channel_plan(8, SHA, 'testing'))
+
     def test_fixed_feeds_global_build_numbers_and_failed_draft_reservations(self):
         self.assertNotEqual(feed_url('dev'), feed_url('testing'))
         self.assertIn('/latest/', feed_url('stable'))
@@ -328,6 +350,14 @@ class ChannelReleaseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     github.publish_feed('dev', newer, folder)
             self.assertFalse(any(call[:3] == ['gh', 'release', 'upload'] for call in calls))
+            calls.clear()
+            with patch.object(github, 'assert_lock'), patch.object(github, 'latest', return_value={'tag_name': receipt['tag']}), \
+                    patch('tools.channel_release.command', side_effect=command):
+                github.publish_feed('stable', receipt, folder)
+            self.assertEqual(len(calls), 1)
+            self.assertIn('--prerelease=false', calls[0])
+            self.assertIn('--latest', calls[0])
+            self.assertEqual(calls[0][calls[0].index('--title') + 1], 'RepoHub ' + receipt['version'])
 
     def test_stable_requires_main_ancestry_and_identical_tree_and_never_regresses(self):
         github = ChannelGitHub()

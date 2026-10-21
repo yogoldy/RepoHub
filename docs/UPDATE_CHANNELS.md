@@ -127,6 +127,16 @@ is implemented. A promotion interrupted after metadata publication can be retrie
 with `--resume`; the command rechecks gates, approval and acceptance. Existing
 matching feed bytes are idempotent; older or same-build different feeds are refused.
 
+Read-only inspection on October 20 found repository immutable releases disabled
+and the existing 0.0.7 release mutable. Local publishers repeat the administrative
+repository check before release/lock writes. Hosted publishing retains its narrow
+contents/actions token: it checks published release/pointer metadata instead,
+then checks the new candidate is still a mutable prerelease before exposing a
+feed. If repository immutability changes during a run, publication can leave an
+unreferenced prerelease, but cannot silently move Stable or report successful
+channel delivery. No setting is disabled and no admin credential is added to CI.
+Live feed creation still requires acceptance.
+
 GitHub asset replacement is not atomic. Replacing a prerelease pointer can briefly
 make that experimental feed unavailable. Failure stops confirmation and is not
 reported as successful delivery; it does not select another channel or modify
