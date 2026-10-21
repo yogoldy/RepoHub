@@ -3,6 +3,14 @@
 RepoHub should make it easy to answer: **Are my chosen repos safely backed up,
 and what needs my attention?** The menu bar is the everyday view.
 
+The goal is an open-source application that other people can understand and use
+reliably. "Productizable" refers to usable setup, clear explanations, coherent
+UI, meaningful diagnostics, continuous integration and stable update delivery;
+it is not a monetization requirement. These are continuing product principles,
+not a separate redesign or an instruction to add unnecessary infrastructure.
+The repository is public. License selection remains an owner decision: GitHub
+reported no detected license and no project license file was found on October 20.
+
 ## Scope and status — updated October 20, 2026
 
 This is the current reference for Leo's unfinished product requests. It supersedes
@@ -35,10 +43,11 @@ signed the packaged app/helper, obtained Apple notarization, and passed stapling
 Gatekeeper and independent Sparkle archive verification. See the exact-source
 [signing validation record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
 The installed ad-hoc-to-Developer-ID transition and permission continuity remain
-pending. Before signed Dev delivery, implement Leo's subsequent requirement that
-only his Pro and Air can access Dev/Testing feeds and packages. The existing
-public experimental-feed implementation does not enforce this. Private hosting
-and credential-versus-hardware-bound enrollment are still being decided.
+pending. Leo clarified that ordinary users must not be offered Dev/Testing
+updates; public experimental downloads are acceptable. Private hosting and
+hardware authentication are not required. The planned public feed URLs can remain,
+but experimental settings controls still need deliberate local test enablement
+for the Pro and Air instead of appearing in the ordinary user flow.
 Steps 3–11 remain pending, including the Pro's initial updater bootstrap.
 
 Updating this roadmap is already handled here; it is not an additional
@@ -56,14 +65,14 @@ remains evidence within its original limits; installed acceptance is separate.
    branch candidate; no channel feeds have been created or installations changed. See the
    [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
    Existing protected-main requirements remain in force.
-   **Required before first experimental publication:** enforce Dev/Testing access
-   for Leo's Pro and Air at both feed and archive endpoints, with separate
-   enrollment/revocation. Ordinary installations offer only Stable. Protect
-   credentials outside the app bundle, page DOM, Git and diagnostic exports;
-   hiding channel controls alone is insufficient. Validate unauthorized and
-   revoked requests, authenticated downloads, credential handling across redirects,
-   public Stable operation, and byte-identical promotion to public Stable.
-   Hosting and enrollment details require an explicit decision before provisioning.
+   **Ordinary-user offer isolation:** ordinary installations follow Stable and
+   keep experimental controls out of their normal settings flow. Deliberately
+   enable Dev/Testing locally on Leo's Pro and Air. Public feeds/packages and
+   deliberate advanced access by others are acceptable; do not add private
+   repositories, authentication services or hardware restrictions. Validate
+   Stable defaults, explicit test enablement, persisted preference behavior,
+   exact-channel update offers, diagnostic agreement and byte-identical Stable
+   promotion. The clarified UI/enablement behavior is still pending implementation.
 2. **Configure consistent Developer ID signing and notarization.** Use a
    consistent app/helper identity across channels; verify signed components,
    hardened runtime, notarization and stapling. Test the existing ad-hoc app's

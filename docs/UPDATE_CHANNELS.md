@@ -6,31 +6,28 @@ unpublished GitHub Apple-signing validation also passed; see the
 No channel feed has been created, no update published and no installed Mac
 changed by this work. Live publication and installed acceptance remain pending.
 
-## Private experimental access — required, not implemented
+## Experimental offers and open-source distribution
 
-Leo subsequently required Dev and Testing access only for his MacBook Pro and
-MacBook Air. This supersedes the earlier plan to expose experimental packages
-as public downloads with opt-in feeds. Both feeds and archives must require
-authorization; hiding controls or obscuring URLs does not satisfy the requirement.
-Stable remains public. Ordinary installations must offer only Stable, with
-Dev/Testing enabled through explicit enrollment of Leo's two Macs.
+Leo clarified that ordinary users must not be offered experimental updates, but
+source and experimental packages may remain public. This supersedes the brief
+private-download proposal: no private repository, authentication service,
+hardware allowlist or download credentials are required or were provisioned.
+Deliberate advanced access to a public experimental package is acceptable.
 
-The current branch still uses public GitHub experimental-feed URLs and accepts
-channel selection without enrollment. It must not be activated for Dev/Testing
-publication until private delivery is implemented and validated. Hosting and
-credential-versus-hardware-bound enrollment remain a pending design decision;
-no private repository, authentication service or device credential was created.
-Per-Mac revocation and safe credential storage/redirect handling are required.
-No client receives an Apple or Sparkle private signing key for downloading updates.
+Ordinary installations follow Stable, with experimental controls kept out of
+the normal settings flow. Dev/Testing participation is deliberately enabled
+locally on Leo's Pro and Air. This is a local testing preference, not an access
+control or a promise to prevent other people from downloading public packages.
+No client receives an Apple or Sparkle private signing key to download updates.
 
-Acceptance must demonstrate rejected unauthorized/revoked feed and archive
-requests, valid downloads on the two enrolled Macs, guarded UI/native selection,
-no credential exposure in URLs/DOM/diagnostics or to unapproved redirect hosts,
-and functioning public Stable updates. Promotion must publish the accepted
-private Testing archive publicly with identical bytes and signature, without
-including experimental-access credentials. Existing source/gate and installed
-acceptance requirements still apply. This section records requested work; it
-does not claim that the current publisher enforces it.
+The existing branch already defaults to Stable and enforces exact-channel offers,
+but currently shows all three choices in Settings. The ordinary-user UI/local
+test-enablement distinction remains to be implemented and validated; this
+documentation update does not implement it. Validate Stable defaults, deliberate
+test enablement, persisted preferences, guarded channel requests, exact offered
+channels and bounded diagnostic agreement. Keep existing update/backup busy
+guards, no-downgrade behavior, full Testing checks and exact-archive Stable
+promotion. Source openness is not a reason to weaken those stability checks.
 
 ## What each channel means
 
@@ -40,9 +37,9 @@ does not claim that the current publisher enforces it.
 | Testing | Full clean macOS Golden Gate and an exact successful Golden rules push run from this repository | Accepted main automation, or explicit promotion of a Dev package after its exact source passes the full gate |
 | Stable | Testing requirements, protected-main source/tree checks, notarized Developer ID package, exact-package Pro/Air acceptance and explicit approval | Explicit promotion only; no rebuild |
 
-The current implementation separates update offers but does not restrict access;
-the private-delivery requirement above must be implemented before activation.
-Normal installations currently default to Stable. Each Mac selects a channel in
+The channels separate update offers; publicly hosted downloads are not restricted.
+The ordinary-user settings distinction above remains pending. Normal installations
+currently default to Stable. Each Mac selects a channel in
 Settings → App updates and uses Save changes. Selection changes no backup rules,
 sources, schedules or permissions. Save is rejected during an update session or
 when the matching helper cannot confirm backups are idle. Draft changes,

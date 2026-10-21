@@ -10,6 +10,14 @@
 - Use one task branch and commit your own changes before reporting completion. Report branch/SHA, unfinished work and deliberate skips. Never absorb unrelated working-tree changes.
 - Run the synthetic backup/persistence/security tests and verify the installed status page. Compile the native app when native code or packaging changes. The Repo views UI is deliberately removed; preserve existing JSON and scoped APIs. Latest-only retention is authorized for app-managed snapshots: verify and persist the replacement, then require explicit macOS upload confirmation before cleanup; leave legacy backups intact. Missing upload signals must stay Unknown. Match checks must hash source file contents and verify archive bytes; do not turn metadata-only checks into green success.
 
+## Product intent and ordinary-user experience
+
+- RepoHub is intended to be an open-source application usable by people other than Leo, not only an owner-operated development tool. "Productizable" means understandable, reliable and usable; it does not imply monetization or proprietary distribution.
+- Preserve the work toward clear setup, permissions guidance, status explanations, useful diagnostics/reporting, coherent interface behavior, CI and safe updates. Favor sensible defaults and recovery that ordinary users can understand without knowing the implementation. Do not add service infrastructure solely because a more elaborate design is possible.
+- Ordinary installations follow Stable. Dev/Testing offers are deliberately enabled locally for Leo's Pro and Air; keep experimental controls out of the ordinary settings flow. Public source and publicly downloadable experimental packages are acceptable. Offer isolation is not access control: do not add private hosting, device authentication, hardware allowlists or download credentials for this requirement. Never embed Apple/Sparkle private signing keys in a client.
+- Keep normal update delivery seamless and preserve the tested-package promotion and acceptance checks. A channel preference must not redefine backup readiness or introduce a competing status classifier.
+- License selection remains Leo's decision. Public visibility was verified on October 20, but no project license file was found; do not silently select a license or imply that this choice is settled.
+
 ## Golden-rule release contract
 
 - Before Testing delivery or Stable promotion, run `python3 tools/release_gate.py --require-clean` on clean committed macOS source and inspect its JSON receipt. The sole Dev exception is `python3 tools/dev_gate.py --output <new-private-receipt>` plus the staged publisher's native/package/signature checks on the exact committed source. Dev is local-Pro publication only and cannot move public latest. Missing/skipped referenced regressions, failed builds or dirty/mutated source cannot be accepted as evidence for the requested tier.
