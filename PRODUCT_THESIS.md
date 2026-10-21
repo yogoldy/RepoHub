@@ -8,7 +8,8 @@ and what needs my attention?** The menu bar is the everyday view.
 This is the current reference for Leo's unfinished product requests. It supersedes
 the previous tiered roadmap at source
 `38d354d5ade1cc5664c43a15cb680bc31b0d0019`; Git retains that version and its
-implementation history. Leo approved the revised scope below on October 17.
+implementation history. Leo approved the revised scope below on October 17 and
+consolidation of the testing roadmap into this reference on October 20.
 
 - **Requested:** agreed product direction, with implementation still pending.
 - **Implemented:** code exists; this does not imply every installed-Mac condition
@@ -17,15 +18,87 @@ implementation history. Leo approved the revised scope below on October 17.
   than a new feature.
 - **Superseded:** removed from the active roadmap by Leo's revised direction.
 
-Roadmap entries do not by themselves start feature implementation, set an
-implementation order, authorize external submissions, or authorize a Git push.
+The sequence below records the current intended order. Roadmap entries do not
+by themselves start feature implementation, authorize external submissions,
+or authorize a Git push.
 Complete approved work in scoped commits with proportionate tests and evidence.
 
-## Current local update batch
+## Next delivery sequence
 
-Leo authorized the package-resource change below as the first implementation in
-this batch. The remaining requested features still need their own implementation
-scope; this batch stays local until promotion is authorized.
+All steps below remain pending. Updating this roadmap is already handled here;
+it is not an additional prerequisite or a numbered development stage. This
+sequence replaces the old interaction-testing plan. It does not claim that
+existing controller, API, native or release tests are absent or incomplete merely
+because additional installed acceptance is needed.
+
+1. **Implement Dev → Testing → Stable channels.** Dev provides quick delivery
+   to opted-in Macs after focused tests, a native build and package/signature
+   checks. Testing requires the full automated gate; Stable requires installed
+   acceptance and Leo's explicit promotion approval. Dev must not replace the
+   stable feed or public latest download. Record source identity, monotonic build
+   numbering and channel-switch behavior. This staged policy is not implemented
+   yet: update the delivery policy, agent instructions, updater and publisher
+   together before using the Dev exception. Existing protected-main requirements
+   remain in force.
+2. **Configure consistent Developer ID signing and notarization.** Use a
+   consistent app/helper identity across channels; verify signed components,
+   hardened runtime, notarization and stapling. Test the existing ad-hoc app's
+   transition without claiming that signing grants folder access. Membership
+   is active per Leo; credentials and signing-service setup remain unverified.
+3. **Deliver a Dev build to the Pro, including local commit `82b1a85`.** Confirm
+   setup stays inside the menu-bar panel, dismissal/reopening retains drafts,
+   and picker choose/cancel returns to the same step. Exercise repo selection,
+   navigation, Finder shortcuts, status explanations, default/per-repo settings
+   Save/Cancel, Back up now and Rescan now. Check the visible Show me folder
+   highlight, its reset, repeated/repo-switched activation, keyboard and reduced
+   motion, without opening Finder or modifying settings as a demo side effect.
+4. **Test permission and failure recovery on the Pro.** Use isolated fixtures
+   and an isolated identity/account for disruptive cases: actual folder-access
+   refusal/grant/revocation/restart, optional notification permission lifecycle,
+   helper interruption/reconnection, stale status, unreadable roots/nested files,
+   destination denial and volume disappearance/substitution/remount. Preserve
+   configuration, IDs, schedules and previous verified archives; compare native
+   display, helper observations and diagnostics. Never reset daily permissions.
+5. **Save useful visual regressions and run the full Testing gate.** Add checks
+   for concrete gaps alongside existing controller/API/native coverage. Use
+   synthetic data and isolated settings; select tools for the needed behavior,
+   rather than making a particular browser MCP installation a prerequisite.
+   Controlled failures must fail the gate. Browser checks do not establish actual
+   macOS permission or Finder behavior.
+6. **Deliver another signed update to the Pro.** Verify permission/configuration
+   continuity across an update, app/helper versions, channel eligibility and
+   recovery. A successful initial installation does not establish update safety.
+7. **Test installation and a subsequent update on the Air.** Verify onboarding,
+   helper-observed access, native pickers, backup hashes and actual upload
+   observations on the same candidate package. Preserve the Air's own settings;
+   use an isolated account/identity for fresh-install conditions. Exercise the
+   complete CI/distribution/install/update loop, with explicit evidence for each
+   host and cleanup of owned test services. A fix creates a new candidate whose
+   affected acceptance checks must be rerun.
+8. **Promote the accepted package to Stable.** Require the Testing gate, recorded
+   installed results and Leo's approval. Promote the tested package without an
+   untested rebuild; follow protected-main checks and record source/package
+   identity, version and recovery options.
+9. **Support other Finder sync-folder destinations (R2).** Test provider
+   placeholders, access, disappearance/recovery and preservation. Keep local
+   verification distinct from confirmed remote upload.
+10. **Implement account-free reporting and maintainer review (R6).** Users
+    preview and explicitly send sanitized diagnostics without a GitHub account;
+    a hosted service posts to Leo's tracker with server-held credentials.
+11. **Evaluate TestFlight (R7; low priority).** Consider tester feedback and crash
+    reporting after the Sparkle workflow is established.
+
+Readability standards remain current. Broad cleanup and Leo's representative
+AI-teacher review are deferred and require separate scope approval; they do not
+block channels or signing. CloudKit, remote push notifications, Tailwind and
+TestSprite evaluation remain deferred. Update commands, links and coverage claims
+as each step lands; do not retain a competing release order in historical guides.
+
+## Implemented foundation and pending local follow-up
+
+The previous local update batch shipped through releases 0.0.5–0.0.7. The
+setup-panel follow-up `82b1a85` is committed locally, not pushed or installed;
+native opening/dismissal and picker-return acceptance remain in step 3 above.
 
 - [x] **Explicit packaged web assets:** the bundle builder copies a declared list
   rather than the whole `web` directory. Extra local files are excluded; missing
@@ -37,18 +110,20 @@ scope; this batch stays local until promotion is authorized.
   non-green readiness remain unchanged. A visible scan action uses the existing
   guarded scan API without creating a backup. Diagnostic policy 7 retains older
   wording for historical receipts; GR06 covers the waiting/recovery and request
-  boundaries. Installed-Mac delivery remains part of the next update.
+  boundaries. These controls were delivered in the first-run setup release batch.
 - [x] **Prominent scan and backup controls:** Back up now and Rescan now share
   equal-width gold buttons with distinct circular-arrow/scan icons. Repository
   Backups is a full-width navigation row with a folder icon, white label, trailing
   chevron and subtle hover fill, followed by notifications. The footer keeps only
   the last-check time and Quit. Scan requests preserve the icon through pending
   and failed requests. This is a local presentation change, not a new backup rule.
-- [x] **First-run setup candidate:** the approved five-step welcome window,
+- [x] **First-run setup:** the approved five-step welcome flow,
   one iCloud destination, readable folder layouts, reviewed Git discovery and
   recoverable configuration saves are integrated. The first protected release
-  passed the clean gate and installed migration; a draft-reload correction has
-  its own final delivery checks. See [the implementation record](docs/FIRST_RUN_SETUP.md).
+  passed the clean gate and installed migration; draft reload, discovery
+  cancellation and selected-destination Finder corrections shipped in 0.0.6 and
+  0.0.7. See [the implementation record](docs/FIRST_RUN_SETUP.md). The local panel
+  host change remains separately pending above.
 
 ## Existing foundation
 
@@ -66,7 +141,7 @@ The following are implemented and must not be rediscovered as unfinished feature
 
 ### R1 — Choose the backup destination
 
-**Status: Implemented candidate; awaiting acceptance.** This release selects one
+**Status: Implemented and installed on the Pro in the 0.0.5–0.0.7 release batch.** Selects one
 folder inside iCloud Drive; other providers and multiple destinations remain
 outside it. See [first-run setup](docs/FIRST_RUN_SETUP.md).
 
@@ -104,9 +179,11 @@ records remain evidence with their original limits.
 
 ### R3 — Replayable visual onboarding
 
-**Status: Implemented candidate; awaiting acceptance.** The five-step welcome
-window supports fresh setup and an existing user's prefilled review without
-changing configuration before explicit apply. See [first-run setup](docs/FIRST_RUN_SETUP.md).
+**Status: Setup implemented and installed; local panel follow-up awaits native
+acceptance.** The five-step welcome flow supports fresh setup and an existing
+user's prefilled review without changing configuration before explicit apply.
+This does not close the separate walkthrough/Show me interaction checks in
+step 3 above. See [first-run setup](docs/FIRST_RUN_SETUP.md).
 
 Explain sources, destination, schedules, manual backup, verification and upload
 status through a short visual walkthrough tied to actual controls. Offer Skip,
@@ -117,7 +194,7 @@ tutorial on every launch.
 
 ### R4 — Preserve repo names in backup folders
 
-**Status: Implemented candidate; awaiting acceptance.** Revised by Leo on October 18: one naming behavior,
+**Status: Implemented, with installed Pro migration/hash/upload evidence.** Revised by Leo on October 18: one naming behavior,
 without custom labels.
 
 - Name each workspace's backup folder after its source folder, preserving the
@@ -138,7 +215,7 @@ without custom labels.
 
 ### R5 — Recursive Git-based repo discovery
 
-**Status: Implemented candidate; awaiting acceptance.** Replaces AI-assisted source
+**Status: Implemented, with installed Pro discovery/cancel/reload evidence.** Replaces AI-assisted source
 setup (former Tier 4). Discovery adds reviewed candidates to individual-folder
 selection; existing non-Git selections and repo-home mode remain supported.
 
@@ -222,10 +299,10 @@ complete merely because code was merged:
 - **Installed-Mac reliability:** track actual folder permissions, native picker,
   notification, volume, login and recovery cases in the
   [two-Mac acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
-- **Interaction coverage and readability:** retain the separately scoped
-  [testing/readability roadmap](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md).
-  Its historical checkpoints require reconciliation with later work before
-  selecting another stage; this update does not authorize a broad refactor.
+- **Interaction coverage and readability:** interaction checks are integrated
+  into steps 3–7 above. The [readability standards](docs/READABILITY_STANDARDS.md)
+  remain current; representative teacher review and broad cleanup are deferred,
+  rather than prerequisites for this release sequence.
 - **Informed ownership:** retain Leo's requested hands-on comparison of backend
   events with displayed status in the [timing acceptance record](docs/BACKUP_TIMING_ACCEPTANCE_2026-10-16.md).
   Automated agreement is not a substitute for that personal walkthrough.
@@ -238,6 +315,7 @@ do not reinstate superseded pre-delivery restrictions from historical records.
 
 | Previous plan | Current direction |
 | --- | --- |
+| Separate nine-stage interaction/testing roadmap | This document's delivery sequence incorporates its remaining interaction and recovery checks; readability standards remain current and broad cleanup is deferred. |
 | AI proposal import, assistant connections and AI-guided folder setup (Tier 4) | R5: local recursive discovery using Git, followed by user review. |
 | Custom backup-folder labels and an optional “Backup” suffix | R4: preserve the source folder name as the only naming behavior; keep IDs and hashes in metadata. |
 | Direct cloud-provider APIs/account connectors and a separate expanded independent-restore roadmap (Tier 5) | R1/R2: user-selected Finder destinations and evidence-based validation of those folders. Historical restore evidence and existing integrity safeguards remain. |

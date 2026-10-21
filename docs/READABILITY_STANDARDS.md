@@ -1,6 +1,6 @@
 # RepoHub readability standards
 
-Version 1, established for roadmap Step 1 on 2026-10-13 at Leo's request. These conventions apply to new code and deliberately touched code. They do not authorize rewriting existing files, adding a formatter/framework, changing behavior or beginning the later roadmap stages. Broad cleanup and Leo's AI teacher review remain [Step 7](INTERACTION_TESTING_READABILITY_ROADMAP.md).
+Version 1, established on 2026-10-13 at Leo's request. These conventions apply to new code and deliberately touched code. They do not authorize rewriting existing files, adding a formatter/framework or changing behavior. The [current product roadmap](../PRODUCT_THESIS.md#next-delivery-sequence) supersedes the old stage numbering. Broad cleanup and Leo's representative AI-teacher review remain deferred and require separate scope approval.
 
 ## Purpose: each function should contribute like a paragraph
 
@@ -141,4 +141,4 @@ For handoff, state the current version/branch, what changed, why, how it was che
 
 ## Adoption and remaining work
 
-Step 1 delivers this initial standard and concrete examples under Leo's authorization. Suggestions may refine it without pretending a code rewrite already happened. Leo's AI teacher still reviews the representative cleanup before broad changes in Step 7. Steps 2-9 require their own go-ahead under the current roadmap approval boundary.
+These standards and concrete examples were established under Leo's authorization. Suggestions may refine them without pretending a code rewrite already happened. Leo's AI teacher still reviews representative cleanup before broad changes. Such cleanup remains deferred under the current product roadmap and requires separate scope approval.

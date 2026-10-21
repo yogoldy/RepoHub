@@ -20,4 +20,4 @@
 
 ## Readability for new and deliberately changed code
 
-- Follow [the readability standard](docs/READABILITY_STANDARDS.md): clear names, multiline formatting, recognizable function responsibilities and comments explaining important decisions. Keep formatting, structural cleanup and behavior fixes in separate commits. This pointer does not authorize broad refactoring; use the [approved roadmap and stage authorization](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md).
+- Follow [the readability standard](docs/READABILITY_STANDARDS.md): clear names, multiline formatting, recognizable function responsibilities and comments explaining important decisions. Keep formatting, structural cleanup and behavior fixes in separate commits. The [current product roadmap](PRODUCT_THESIS.md#next-delivery-sequence) incorporates the former interaction-testing plan. Broad refactoring and the representative teacher review remain deferred and require separate scope approval.
