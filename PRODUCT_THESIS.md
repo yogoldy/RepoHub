@@ -79,12 +79,13 @@ because additional installed acceptance is needed.
    installed results and Leo's approval. Promote the tested package without an
    untested rebuild; follow protected-main checks and record source/package
    identity, version and recovery options.
-9. **Support other Finder sync-folder destinations (R2).** Test provider
-   placeholders, access, disappearance/recovery and preservation. Keep local
-   verification distinct from confirmed remote upload.
-10. **Implement account-free reporting and maintainer review (R6).** Users
-    preview and explicitly send sanitized diagnostics without a GitHub account;
-    a hosted service posts to Leo's tracker with server-held credentials.
+9. **Implement account-free reporting and maintainer review (R6).** Users
+   preview and explicitly send sanitized diagnostics without a GitHub account;
+   a hosted service posts to Leo's tracker with server-held credentials. Establish
+   this feedback path before expanding provider-specific behavior.
+10. **Support other Finder sync-folder destinations (R2).** Test provider
+    placeholders, access, disappearance/recovery and preservation. Keep local
+    verification distinct from confirmed remote upload.
 11. **Evaluate TestFlight (R7; low priority).** Consider tester feedback and crash
     reporting after the Sparkle workflow is established.
 
