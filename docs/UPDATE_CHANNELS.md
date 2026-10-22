@@ -3,8 +3,41 @@
 Implemented and branch-validated for roadmap step 1, October 20, 2026. The
 unpublished GitHub Apple-signing validation also passed; see the
 [exact-source record](RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
-No channel feed has been created, no update published and no installed Mac
-changed by this work. Live publication and installed acceptance remain pending.
+The first live Dev package and its Pro bootstrap are recorded below. Testing,
+subsequent Sparkle-update acceptance and Stable promotion remain pending.
+
+## Live Dev checkpoint — October 22, 2026
+
+- Published [0.0.9 / build 9](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.0.9-b9)
+  from `a9b3895f36a4c76ac68882863baf1ffae26a4d43`; the Dev feed is live.
+  Stable/public latest remains `repohub-v0.0.7-b7`. Failed draft build 8 remains
+  reserved and unpublished with no assets; its draft-lookup regression is in GR26.
+- The fresh focused gate passed 77 tests with zero skips and a native build on
+  unchanged clean source. The first sandboxed gate could not synchronize isolated
+  macOS test preferences; the native regression and complete gate passed with
+  the required host access, without weakening their assertions.
+- The downloaded 28,703,225-byte archive has SHA-256
+  `a80d1f046769ac5144b940295fd204edd361b0f3d097dda4ad65a5d93079e1e1`.
+  Its receipt/source, independent Sparkle signature, strict code signature,
+  Gatekeeper notarized Developer ID assessment and stapled ticket verified.
+- The Pro now runs that exact app/helper build. The previous app is preserved
+  locally for rollback; all six protected configuration-file hashes match their
+  pre-install snapshot. No source selection, backup destination, schedule or
+  existing archive was changed by installation. The Air was not changed.
+- macOS requested Desktop consent when moving from the old ad-hoc identity
+  (code-hash requirement, no Team ID) to Developer ID (Team `LJM5FKB7DY`, unchanged
+  bundle identifier). Leo reported Allow. The helper listed all 15 sources without
+  permission errors; this is not complete content-verification or upload evidence.
+  Permission continuity must still be tested with a subsequent signed update.
+- The Pro's deliberate experimental opt-in is enabled; native diagnostics report
+  `experimental_channels=enabled`, `update_channel=stable`. Selecting Dev and
+  using the guarded Save changes remains pending. Computer Use lost the transient
+  panel before its click; no direct preference write bypassed the channel save.
+- The temporary publishing launcher needed hidden inputs and did not provision
+  persistent credentials. Secure one-time Keychain provisioning and a repeatable
+  local publishing command are the next priority before another Dev publication.
+  Preserve explicit publication authorization, exact-source checks and Stable
+  isolation; downloading/installing updates must never need signing secrets.
 
 ## Experimental offers and open-source distribution
 
@@ -121,10 +154,11 @@ key merely because local publication has not yet been configured.
 
 The October 20 preparation confirmed a valid local Developer ID signing identity
 and the presence of the previously exported certificate/API-key files without
-opening them. Leo confirmed that the original Sparkle key is available locally.
-The local release environment is not populated, so its secret imports and a real
-signed Dev package remain unverified. No experimental feed, publication,
-installation or opt-in on either daily Mac is implied by the implementation.
+opening them. The October 22 user-operated hidden-input session verified the
+original Sparkle key, certificate import and Apple authentication and published
+the first signed Dev package. Credentials were confined to the signing process;
+no reusable local credential environment was provisioned. That temporary handoff
+is not the finished repeatable Dev workflow; Keychain provisioning remains pending.
 
 Once credentials and publication are authorized, rerun the focused clean-source
 gate immediately before publication; a prior receipt is not a standing approval

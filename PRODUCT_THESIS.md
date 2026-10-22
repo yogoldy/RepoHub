@@ -36,22 +36,31 @@ Complete approved work in scoped commits with proportionate tests and evidence.
 
 ## Next delivery sequence
 
-Step 1 has an implementation candidate validated locally and on its GitHub
-branch; live channel delivery and native acceptance remain pending. Step 2's
-unpublished package checkpoint passed: GitHub decrypted the certificate export,
-signed the packaged app/helper, obtained Apple notarization, and passed stapling,
-Gatekeeper and independent Sparkle archive verification. See the exact-source
-[signing validation record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
-The installed ad-hoc-to-Developer-ID transition and permission continuity remain
-pending. Leo clarified that ordinary users must not be offered Dev/Testing
-updates; public experimental downloads are acceptable. Private hosting and
-hardware authentication are not required. The planned public feed URLs can remain,
-and experimental settings controls now require deliberate local test enablement
-instead of appearing in the ordinary user flow. The opt-in has not been enabled
-on either daily installation; installed acceptance remains pending.
-Steps 3–11 remain pending, including the Pro's initial updater bootstrap.
+The first signed Dev release, `0.0.9` / build 9, was published and installed on
+the Pro on October 22 from `a9b3895f36a4c76ac68882863baf1ffae26a4d43`.
+Its 77-test focused Dev gate, native build, Apple notarization, stapling,
+Gatekeeper and independent downloaded-archive signature checks passed. The app
+and helper report that exact build/source; six protected configuration files
+retained their pre-install hashes. Stable remains build 7; the Air is untouched.
+See the [live Dev checkpoint](docs/UPDATE_CHANNELS.md#live-dev-checkpoint--october-22-2026)
+and earlier [unpublished signing record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
 
-The pending local candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
+The ad-hoc-to-Developer-ID transition requested Desktop access again; Leo granted
+it. This establishes initial consent, not permission continuity across a future
+signed update. The helper listed all 15 configured sources without permission
+errors; content verification and the broader native acceptance remain separate.
+The Pro's local experimental opt-in is enabled. Its effective channel remains
+Stable until Dev is selected and explicitly saved in Settings. The Testing feed,
+subsequent Sparkle update, Air acceptance and Stable promotion remain pending.
+
+**Next priority, before another Dev publication:** replace the temporary hidden-
+input launcher with one-time secure Keychain provisioning and a repeatable local
+publishing command. Do not require pasted signing secrets for every release.
+Validate missing/locked credentials, cancellation, key continuity, secret-free
+logs and unchanged channel/release guards. Keychain authorization prompts may
+still occur; never promise silent access or store secrets in source/configuration.
+
+The installed Dev candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
 a backup deferred by actively changing source files no longer leaves a generic
 failure overriding later Rescan now results. Attempt history and genuine errors
 remain visible. GR02 covers manual-scan recovery and archive preservation; this
@@ -69,7 +78,8 @@ remains evidence within its original limits; installed acceptance is separate.
    stable feed or public latest download. Record source identity, monotonic build
    numbering and channel-switch behavior. The updater, local publisher, Testing
    workflow, diagnostics and policy are implemented together in the current local
-   branch candidate; no channel feeds have been created or installations changed. See the
+   branch candidate. The Dev feed is live and build 9 is installed on the Pro; the
+   Testing feed and subsequent updater acceptance remain pending. See the
    [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
    Existing protected-main requirements remain in force.
    **Ordinary-user offer isolation:** ordinary installations follow Stable and
@@ -80,8 +90,9 @@ remains evidence within its original limits; installed acceptance is separate.
    Stable defaults, explicit test enablement, persisted preference behavior,
    exact-channel update offers, diagnostic agreement and byte-identical Stable
    promotion. The clarified UI/enablement behavior is implemented locally with
-   isolated native/controller/diagnostic regressions. Enabling the Pro/Air and
-   accepting their installed behavior remain pending delivery.
+   isolated native/controller/diagnostic regressions. The Pro opt-in is enabled;
+   its guarded Dev selection and installed behavior, and Air enablement and
+   acceptance, remain pending.
 2. **Configure consistent Developer ID signing and notarization.** Use a
    consistent app/helper identity across channels; verify signed components,
    hardened runtime, notarization and stapling. Test the existing ad-hoc app's
@@ -89,8 +100,9 @@ remains evidence within its original limits; installed acceptance is separate.
    is active per Leo. A valid Developer ID Application identity, the required
    GitHub secret names and read-only notarization authentication are verified.
    The unpublished GitHub signing/notarization package test passed on source
-   `49462f18482093ea380ccbaafe5a686db5d75ac7`; the installed transition and
-   subsequent-update permission continuity remain unverified.
+   `49462f18482093ea380ccbaafe5a686db5d75ac7`. The first signed Dev bootstrap is
+   installed with renewed Desktop consent; subsequent-update permission
+   continuity remains unverified.
 3. **Deliver a Dev build to the Pro, including local commit `82b1a85`.** Confirm
    setup stays inside the menu-bar panel, dismissal/reopening retains drafts,
    and picker choose/cancel returns to the same step. Exercise repo selection,
