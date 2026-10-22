@@ -13,8 +13,10 @@ import xml.etree.ElementTree as ET
 
 try:
     from tools.package_app import dependency, extract, sha256, validate_options, verify
+    from tools.signing_identity import verify_identity
 except ModuleNotFoundError:
     from package_app import dependency, extract, sha256, validate_options, verify
+    from signing_identity import verify_identity
 
 SPARKLE = 'http://www.andymatuschak.org/xml-namespaces/sparkle'
 
@@ -74,6 +76,7 @@ def prepare(app, output, archive_url, key_file, cache, update_channel='stable'):
     subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(app)], check=True)
     mode = archive_distribution(info, manifest)
     if mode == 'developer_id':
+        verify_identity(app)
         # A locally signed build alone does not establish distribution readiness.
         subprocess.run(['/usr/bin/xcrun', 'stapler', 'validate', str(app)], check=True)
         subprocess.run(['/usr/sbin/spctl', '--assess', '--type', 'execute', str(app)], check=True)

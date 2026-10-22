@@ -461,7 +461,7 @@
         "update_checkpoint"
       ],
       "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, copy web resources from an explicit allowlist covering served routes, verify resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
-      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Unlisted web files never ship; missing or linked required web assets fail packaging. Test apps cannot use the daily identity or port.",
+      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Developer ID packages retain build 9's app/interpreter/cloud-helper Team IDs, code identifiers and designated requirements; a different or code-hash-only identity stops packaging and archive preparation. Unlisted web files never ship; missing or linked required web assets fail packaging. Test apps cannot use the daily identity or port.",
       "test_ids": [
         "test_app_package.AppPackageTests.test_bundle_web_allowlist_excludes_unlisted_files_and_directories",
         "test_app_package.AppPackageTests.test_bundle_web_allowlist_rejects_missing_or_linked_required_assets",
@@ -477,9 +477,12 @@
         "test_update_shutdown.UpdateShutdownTests.test_bundled_sigterm_waits_for_archive_publication_and_preserves_prior_copy",
         "test_update_feed.UpdateFeedTests.test_feed_uses_actual_build_signature_and_exact_length",
         "test_update_feed.UpdateFeedTests.test_key_file_must_be_private_regular_and_owned",
+        "test_signing_identity.SigningIdentityTests.test_changed_team_helper_identifier_or_hash_requirement_is_rejected",
+        "test_signing_identity.SigningIdentityTests.test_package_inspection_checks_all_access_components_and_rejects_escaping_helper",
+        "test_signing_identity.SigningIdentityTests.test_wrong_identity_stops_archive_before_notarization_or_signing_key_use",
         "test_update_shutdown.UpdateShutdownTests.test_loopback_startup_does_not_wait_for_hostname_resolution"
       ],
-      "remaining_gap": "Final native isolated acceptance on application source 985814d passed cancellation, signed replacement, invalid signature, truncated archive, equal-version refusal, busy-backup refusal and automatic rollback after injected helper failure, with unchanged synthetic archive/configuration hashes. Clean local gate: 233 tests, 20 rules, 25 commands; GitHub automated-contract passed that exact source. Production Developer ID/notarization, permission continuity, key/feed custody, first coordinated launchd migration and persistent recovery explanation remain open. Daily Macs unchanged."
+      "remaining_gap": "Historical isolated acceptance on 985814d passed cancellation, signed replacement, invalid signature, truncation, equal-version/busy refusal and injected-failure rollback with unchanged fixture data. October 22 Dev build 9 passed Developer ID/notarization and was installed on the Pro with unchanged protected configuration. Leo granted Desktop access after the ad-hoc-to-Developer-ID identity transition. Signed-to-signed privacy-grant continuity and a subsequent installed Sparkle update remain unverified; signature compatibility is necessary evidence, not proof of TCC consent retention. Air acceptance remains pending."
     },
     {
       "id": "GR21",

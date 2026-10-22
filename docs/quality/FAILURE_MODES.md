@@ -672,6 +672,27 @@ Wildcard binding is rejected. This is an application change, so prior native
 updater acceptance is historical until repeated for the new candidate.
 
 
+### Permission identity across signed updates (GR20)
+
+The October 22 transition from ad-hoc build 7 to Developer ID build 9 requested
+Desktop consent again; Leo selected Allow. The preserved ad-hoc app's designated
+requirement was a binary hash with no Team ID. Build 9 instead has the persistent
+Developer ID requirement for Team `LJM5FKB7DY`. This is evidence of a signing-identity
+transition, not a reproduced signed-to-signed permission failure.
+
+`tools/signing_identity.py` records the observed app, Python helper and cloud tool
+identifiers/requirements from build 9. Both Developer ID packaging and archive
+preparation reject another team, changed helper identity, custom/hash-only
+requirements and escaping component links. Counterexamples include a valid
+signature with an incompatible declared requirement; notarization is insufficient
+for this contract. The installed build 9 passes this read-only check. No daily
+privacy setting is reset or edited. A subsequent signed Sparkle update must still
+demonstrate retained consent and helper-observed source access independently.
+
+Apple documents designated requirements and privacy-resource sharing in
+[TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+
+
 ## GR21 — accepted source and atomic release availability
 
 A passing feature-branch or PR gate is not an accepted main release. Publication
@@ -841,6 +862,7 @@ Python/JS wrappers are discovered automatically, with registered test IDs failin
 the gate if absent, skipped or unsuccessful.
 
 ## GR26 — Staged updates preserve Stable and package identity
+
 
 A single GitHub latest feed made every accepted main release visible to every
 installation. The staged-channel contract separates local Dev, full-gate Testing
