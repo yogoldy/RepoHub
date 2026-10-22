@@ -3,11 +3,18 @@ import errno
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
+import threading
 import unittest
+import urllib.request
 from unittest.mock import patch
 
-from repohub import Hub, archive_manifest, content_manifest, sha256, workspace_id
+from repohub import (Hub, Handler, SourceChanged, ThreadingHTTPServer, archive_manifest,
+                     content_manifest, sha256, snapshot, verify_current, workspace_id)
+from diagnostics import diagnostic_ref, read_events
+from diagnostic_export import export_bundle
+from status_health import ProblemTracker
 
 
 class ScopedBackupTests(unittest.TestCase):
@@ -35,6 +42,126 @@ class ScopedBackupTests(unittest.TestCase):
 
     def archive(self, name):
         return self.hub.index[workspace_id(name)]['archive']
+
+    def present_status(self, key):
+        status = self.hub.public_status()
+        repo = next(row for row in status['repos'] if row['id'] == key)
+        # Synthetic upload evidence is explicit and does not query real iCloud.
+        repo['health'] = {'fresh': True}
+        repo['cloud'] = {'state': 'uploaded', 'archive': self.hub.index[key]['archive']}
+        script = """const p=require('./web/repo-status.js');
+const s=JSON.parse(require('node:fs').readFileSync(0,'utf8'));
+console.log(JSON.stringify({repo:p.present(s.repo,s.backup),
+  menu:p.menuBar({repos:[s.repo],backup:s.backup})}));"""
+        result = subprocess.check_output(['node', '-e', script],
+            cwd=Path(__file__).resolve().parents[1],
+            input=json.dumps({'repo': repo, 'backup': status['backup']}), text=True)
+        return json.loads(result)
+
+    def test_source_changed_backup_defers_and_manual_scan_recovers_without_backup(self):
+        key = workspace_id('Changed')
+        root = self.repos['Changed'].resolve()
+        saved = copy.deepcopy(self.hub.index[key])
+        digest = sha256(saved['archive'])
+        def changing(current_root, current):
+            if current_root == root:
+                raise SourceChanged('private fixture is changing')
+            return verify_current(current_root, current)
+        with patch('repohub.verify_current', side_effect=changing):
+            self.hub.backup(keys=[key], reason='manual')
+        attempt = copy.deepcopy(self.hub.status['backup'])
+        self.assertEqual(attempt['errors'], [])
+        self.assertEqual(attempt['deferred'], [{'repo': 'Changed', 'repo_id': key,
+            'reason': 'source_changed_during_verification'}])
+        self.assertEqual(self.present_status(key)['repo']['label'], 'Checking again')
+        self.assertNotEqual(self.present_status(key)['menu']['title'], ' !')
+        observed = self.hub.public_status()
+        facts = self.hub.evidence.snapshots[observed['diagnostic_observation_id']][key]
+        self.assertEqual(facts['verification_state'], 'changing')
+        self.assertFalse(facts['has_error'])
+
+        server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        server.hub = self.hub
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        origin = f'http://127.0.0.1:{server.server_port}'
+        def rescan():
+            complete = threading.Event()
+            original_scan = self.hub.scan
+            def observed_scan(**kwargs):
+                try:
+                    return original_scan(**kwargs)
+                finally:
+                    complete.set()
+            request = urllib.request.Request(origin + '/api/scan', b'{}',
+                {'Origin': origin, 'Content-Type': 'application/json', 'X-RepoHub-Token': self.hub.csrf})
+            with patch.object(self.hub, 'scan', side_effect=observed_scan) as scan:
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    self.assertEqual(response.status, 202)
+                self.assertTrue(complete.wait(5))
+                scan.assert_called_once_with(force=True)
+        try:
+            with patch.object(self.hub, 'backup') as backup:
+                with patch('repohub.verify_current', side_effect=changing):
+                    rescan()
+                self.assertEqual(self.present_status(key)['repo']['label'], 'Checking again')
+                rescan()
+                self.assertEqual(self.present_status(key)['repo']['category'], 'backed_up')
+                (root / 'work').write_text('new edits after recovery')
+                rescan()
+                self.assertEqual(self.present_status(key)['repo']['category'], 'backup_pending')
+                backup.assert_not_called()
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join()
+        self.assertEqual(self.hub.status['backup'], attempt)  # Historical attempt is retained.
+        self.assertEqual(self.hub.index[key], saved)
+        self.assertEqual(sha256(saved['archive']), digest)
+        tracker = ProblemTracker()
+        tracker.update(self.hub.public_status(), 0)
+        problems = tracker.update(self.hub.public_status(), 1000)
+        self.assertFalse([problem for problem in problems if problem['id'].startswith('backup:')])
+        events = list(read_events(self.hub.diagnostics.directory))
+        run = [row for row in events if row.get('run_id') == attempt['run_id']]
+        deferred = [row for row in run if row['event'] == 'verification_deferred']
+        self.assertEqual(len(deferred), 1)
+        self.assertEqual(deferred[0]['repo_ref'], diagnostic_ref(key))
+        self.assertEqual(deferred[0]['reason'], 'source_changed_during_verification')
+        self.assertFalse([row for row in run if row['event'] == 'repo_backup_failed'])
+        self.assertEqual(next(row for row in run if row['event'] == 'backup_finished')['result'], 'deferred')
+        exported = self.base / 'export'
+        export_bundle(self.hub.diagnostics.directory, exported)
+        records = [json.loads(line) for path in exported.rglob('events.jsonl')
+                   for line in path.read_text().splitlines()]
+        self.assertTrue(any(row['event'] == 'verification_deferred'
+                            and row.get('reason') == 'source_changed_during_verification' for row in records))
+
+    def test_source_change_deferral_does_not_hide_real_failure_after_rescan(self):
+        changing_key = workspace_id('Changed')
+        failing_key = workspace_id('Unchanged')
+        def outcomes(root, current):
+            if root == self.repos['Changed'].resolve():
+                raise SourceChanged('unstable fixture')
+            if root == self.repos['Unchanged'].resolve():
+                # Matching prose must never turn an ordinary error into a deferral.
+                raise RuntimeError('Repo changed during content verification; retry later')
+            return verify_current(root, current)
+        # Snapshot failure prevents the existing archive-repair path from succeeding.
+        def fail_copy(root, *args, **kwargs):
+            if root == self.repos['Unchanged'].resolve():
+                raise PermissionError('denied fixture')
+            return snapshot(root, *args, **kwargs)
+        with patch('repohub.verify_current', side_effect=outcomes), \
+                patch('repohub.snapshot', side_effect=fail_copy):
+            self.hub.backup(keys=[changing_key, failing_key])
+        self.assertEqual([row['repo_id'] for row in self.hub.status['backup']['errors']], [failing_key])
+        self.hub.scan(force=True)
+        self.assertEqual(self.present_status(failing_key)['repo']['category'], 'failure')
+        self.assertEqual(self.present_status(failing_key)['menu']['title'], ' !')
+        self.assertNotEqual(self.present_status(changing_key)['repo']['category'], 'failure')
+        events = list(read_events(self.hub.diagnostics.directory))
+        self.assertEqual(next(row for row in reversed(events) if row['event'] == 'backup_finished')['result'], 'failed')
 
     def test_repeated_finder_writes_do_not_replace_archives_or_rewrite_cloud_index(self):
         index = self.hub.backups/'index.json'

@@ -41,6 +41,35 @@ never tooltip prose. GR06 and GR22 register the regression tests. Browser previe
 cannot save native preferences. Actual installed menu-bar layout and restart
 acceptance remain required when this local candidate is delivered.
 
+### Source-change recovery through Rescan now — issue #14, October 22, 2026
+
+An installed build recorded `SourceChanged` as both `verification_deferred` and
+`repo_backup_failed`. Rescan now refreshed verification, but the old backup
+error still took precedence in the shared presentation and problem tracker.
+This produced a persistent “Needs attention — failure” for retryable source
+activity. Local evidence confirmed ongoing writes too; a scan cannot make an
+actively written source stable or replace a backup.
+
+The typed exception now records `backup.deferred` and a `verification_deferred`
+event linked to the attempt's run/repo/archive. An otherwise successful run ends
+as `deferred`; mixed genuine errors still end as `failed`. The current verification
+becomes `changing`, which the existing shared renderer, diagnostics and menu-bar
+aggregation already understand. No new readiness classifier, message matching,
+source exclusions, schedule change or immediate backup retry is introduced.
+The previous archive/index stay intact. The deferred attempt remains historical
+when a later successful scan replaces the live verification state.
+
+The isolated regression first failed on the original persistent error. It now
+exercises the guarded `/api/scan` route through ongoing writes, matched contents
+and newly detected edits, confirming no backup call or archive/index change.
+Synthetic exact-archive upload evidence is explicit; it is not a real iCloud
+observation. A second case retains a genuine permission failure beside a
+source-change deferral after rescan, including the menu warning. Typed export
+keeps the deferred reason and attempt history. Both tests are registered in GR02
+and discovered by the existing GitHub workflow/full gate and focused Dev suite.
+Installed/native acceptance of this local fix remains pending delivery; the
+running installed helper is unchanged.
+
 ### GR01 — Preserve complete contained workspace bytes
 
 **Susceptible boundary:** Hidden, ignored and uncommitted files silently omitted; archive member handling loses directories or modes.

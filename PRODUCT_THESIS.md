@@ -51,6 +51,12 @@ instead of appearing in the ordinary user flow. The opt-in has not been enabled
 on either daily installation; installed acceptance remains pending.
 Steps 3–11 remain pending, including the Pro's initial updater bootstrap.
 
+The pending local candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
+a backup deferred by actively changing source files no longer leaves a generic
+failure overriding later Rescan now results. Attempt history and genuine errors
+remain visible. GR02 covers manual-scan recovery and archive preservation; this
+fix still requires installed acceptance after delivery.
+
 Updating this roadmap is already handled here; it is not an additional
 prerequisite or a numbered development stage. This sequence replaces the old
 interaction-testing plan. Existing controller, API, native and release coverage

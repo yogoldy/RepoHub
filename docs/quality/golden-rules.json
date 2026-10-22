@@ -27,10 +27,11 @@
         "repo_checked",
         "archive_stage",
         "repo_backup_failed",
+        "verification_deferred",
         "scan_retry_requested"
       ],
-      "cause_and_solution": "Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members.",
-      "required_behavior": "Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits.",
+      "cause_and_solution": "Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members. A typed SourceChanged during a backup is a deferred attempt, not a persistent generic error that shadows later manual scans. Preserve attempt history separately from live verification and retain ordinary I/O/corruption failures.",
+      "required_behavior": "Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits. Manual Rescan now must recover a deferred source-change display without starting a backup or erasing its diagnostic history. Continued writes stay Checking again; a stable comparison may become backed up only with matching upload evidence, or backup pending when edits remain. Real failures remain visible after rescanning.",
       "test_ids": [
         "test_hub.HubTests.test_same_size_same_mtime_edit_is_detected_and_replaced",
         "test_hub.HubTests.test_timestamp_only_changes_match_hashes_and_do_not_replace_backup",
@@ -39,6 +40,8 @@
         "test_hub.HubTests.test_source_mutation_is_transient_and_retry_is_scoped",
         "test_hub.HubTests.test_archive_mutation_is_not_source_mutation",
         "test_hub.HubTests.test_retry_api_requires_trusted_explicit_repo_and_never_uploads",
+        "test_scoped_backups.ScopedBackupTests.test_source_changed_backup_defers_and_manual_scan_recovers_without_backup",
+        "test_scoped_backups.ScopedBackupTests.test_source_change_deferral_does_not_hide_real_failure_after_rescan",
         "test_change_evidence.EvidenceTests.test_changing_source_has_explainable_icon_and_manual_retry_trail"
       ],
       "remaining_gap": "Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided."
