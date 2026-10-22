@@ -90,7 +90,7 @@ def verify_helper(helper):
     try:
         validate_key_file(helper)
         result = subprocess.run(['/usr/bin/codesign', '--verify', '--strict',
-                                 '-R', helper_requirement(), str(helper)], capture_output=True)
+                                 '-R', '=' + helper_requirement(), str(helper)], capture_output=True)
         if result.returncode:
             raise LocalDevError('trusted_helper_required')
     except (OSError, ValueError):

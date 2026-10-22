@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import tempfile
 from types import SimpleNamespace
@@ -242,6 +243,21 @@ class LocalDevTests(unittest.TestCase):
             self.assertEqual(result.stdout, '')
             self.assertEqual(result.stderr.strip(), 'publisher_credentials_unavailable')
         self.assertEqual(before, subprocess.check_output(['security', 'list-keychains', '-d', 'user']))
+
+    @unittest.skipUnless(platform.system() == 'Darwin', 'codesign predicate fixture requires macOS')
+    def test_codesign_predicate_is_inline_and_checks_the_fixture_identifier(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = Path(temporary) / 'signed-fixture'
+            shutil.copyfile('/usr/bin/true', helper)
+            helper.chmod(0o700)
+            subprocess.run(['codesign', '--force', '--sign', '-', '--identifier',
+                            'repohub.publisher.fixture', str(helper)],
+                           check=True, capture_output=True, timeout=20)
+            with patch('tools.local_dev.helper_requirement', return_value='identifier "repohub.publisher.fixture"'):
+                local_dev.verify_helper(helper)
+            with patch('tools.local_dev.helper_requirement', return_value='identifier "foreign"'):
+                with self.assertRaisesRegex(local_dev.LocalDevError, 'trusted_helper'):
+                    local_dev.verify_helper(helper)
 
     def test_local_signing_tool_and_secrets_never_ship_to_app_users(self):
         from tools.package_app import NATIVE, runtime_modules

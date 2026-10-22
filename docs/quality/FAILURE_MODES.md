@@ -893,6 +893,13 @@ disabled so a locked-item test cannot wait for a consent dialog. Real Keychain
 provisioning still needs the owner's secure entry; a subsequent signed Sparkle
 update and retained Desktop permission remain separate acceptance work.
 
+The first real signed-helper preparation caught an inline-requirement syntax
+error missed by the mocked command fixture: `codesign -R` interpreted bare text
+as a filename. Prefix the predicate with `=`; the Security framework's string
+API still takes bare text. A real ad-hoc-signed temporary binary now reproduces
+the pre-fix rejection, passes the corrected expected identifier and fails a
+foreign identifier. This regression uses no real signing key or daily app.
+
 
 A single GitHub latest feed made every accepted main release visible to every
 installation. The staged-channel contract separates local Dev, full-gate Testing

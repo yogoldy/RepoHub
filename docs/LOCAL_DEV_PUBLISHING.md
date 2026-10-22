@@ -93,7 +93,7 @@ Testing and Stable acceptance pending until exercised separately.
 
 Automated tests use synthetic credentials and an isolated temporary Keychain.
 They test duplicate refusal, locked reads, complete/bounded pipe input, unsigned
-helper refusal, secret-free logs/errors, fresh retries, source/gate failure and
+helper refusal, real codesign predicate evaluation, secret-free logs/errors, fresh retries, source/gate failure and
 Dev-only dispatch. They do not read real secrets, publish a package, install an
 update or reset daily permissions. The full Golden Gate discovers these tests;
 the focused Dev suite includes the local-publisher and signing-identity modules.
