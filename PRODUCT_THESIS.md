@@ -49,16 +49,19 @@ The ad-hoc-to-Developer-ID transition requested Desktop access again; Leo grante
 it. This establishes initial consent, not permission continuity across a future
 signed update. The helper listed all 15 configured sources without permission
 errors; content verification and the broader native acceptance remain separate.
-The Pro's local experimental opt-in is enabled. Its effective channel remains
-Stable until Dev is selected and explicitly saved in Settings. The Testing feed,
+The Pro's local experimental opt-in is enabled; after the explicit Settings save,
+native evidence reports Dev and Sparkle reports no newer update. The Testing feed,
 subsequent Sparkle update, Air acceptance and Stable promotion remain pending.
 
-**Next priority, before another Dev publication:** replace the temporary hidden-
-input launcher with one-time secure Keychain provisioning and a repeatable local
-publishing command. Do not require pasted signing secrets for every release.
-Validate missing/locked credentials, cancellation, key continuity, secret-free
-logs and unchanged channel/release guards. Keychain authorization prompts may
-still occur; never promise silent access or store secrets in source/configuration.
+**Immediate work, before another Dev publication:** the local Keychain publishing
+wrapper is implemented with one-time hidden input, signed helper verification,
+existing-key continuity checks and credential-free focused tests before release.
+It reuses the staged Dev publisher and needs no per-release pasted secrets.
+Provisioning with real credentials still needs Leo's secure Terminal entry.
+Keychain authorization prompts may still occur. The app/helper signing-identity
+guard is also implemented and matches installed build 9; a subsequent signed
+Sparkle update must still prove permission continuity. See
+[local Dev publishing](docs/LOCAL_DEV_PUBLISHING.md) for setup, guards and limits.
 
 The installed Dev candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
 a backup deferred by actively changing source files no longer leaves a generic
@@ -91,8 +94,8 @@ remains evidence within its original limits; installed acceptance is separate.
    exact-channel update offers, diagnostic agreement and byte-identical Stable
    promotion. The clarified UI/enablement behavior is implemented locally with
    isolated native/controller/diagnostic regressions. The Pro opt-in is enabled;
-   its guarded Dev selection and installed behavior, and Air enablement and
-   acceptance, remain pending.
+   its guarded saved Dev selection and a no-newer-update check are observed.
+   Subsequent update acceptance and Air enablement/acceptance remain pending.
 2. **Configure consistent Developer ID signing and notarization.** Use a
    consistent app/helper identity across channels; verify signed components,
    hardened runtime, notarization and stapling. Test the existing ad-hoc app's

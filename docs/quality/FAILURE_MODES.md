@@ -863,6 +863,36 @@ the gate if absent, skipped or unsuccessful.
 
 ## GR26 — Staged updates preserve Stable and package identity
 
+### Repeatable local Dev credentials
+
+The first signed Dev handoff deliberately discarded its hidden inputs, but it
+was incorrectly described as a finished one-time workflow. A failed draft lookup
+also consumed the one-use launcher and required a replacement script. This was
+developer publishing friction, not a requirement for normal update recipients.
+
+`tools/local_dev.py` now separates one-time secure setup from repeatable explicit
+Dev publication. Setup checks the original public key against repository
+configuration, verifies private/public continuity and Apple credentials, and
+saves the existing material in Keychain only after success. The Developer-ID-
+signed helper trusts its own code identity; no allow-all ACL or silent credential
+replacement is used. Bounded pipe input is read completely rather than assuming
+one read returns the entire credential bundle. No signer is shipped to app users.
+
+The gate runs without signing credentials; source drift or a failed gate prevents
+loading them. Missing/locked/cancelled Keychain access and an untrusted helper
+stop before release mutation. A failure records its actual stage and permits a
+new run of the same command. Child signing output is not persisted or echoed;
+errors expose typed reasons only. These developer run records are private, not
+backup readiness evidence or shareable application diagnostics.
+
+Fixtures exercise two publications without secret prompts, gate/source failure,
+locked access, publisher failure/retry, existing-item refusal, configured-key
+mismatch, secret-free errors, unsigned-helper refusal and a disposable Keychain
+roundtrip without changing the user's search list. Fixture UI is explicitly
+disabled so a locked-item test cannot wait for a consent dialog. Real Keychain
+provisioning still needs the owner's secure entry; a subsequent signed Sparkle
+update and retained Desktop permission remain separate acceptance work.
+
 
 A single GitHub latest feed made every accepted main release visible to every
 installation. The staged-channel contract separates local Dev, full-gate Testing

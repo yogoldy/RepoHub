@@ -29,15 +29,21 @@ subsequent Sparkle-update acceptance and Stable promotion remain pending.
   bundle identifier). Leo reported Allow. The helper listed all 15 sources without
   permission errors; this is not complete content-verification or upload evidence.
   Permission continuity must still be tested with a subsequent signed update.
-- The Pro's deliberate experimental opt-in is enabled; native diagnostics report
-  `experimental_channels=enabled`, `update_channel=stable`. Selecting Dev and
-  using the guarded Save changes remains pending. Computer Use lost the transient
-  panel before its click; no direct preference write bypassed the channel save.
+- The Pro's deliberate experimental opt-in is enabled. Initially the effective
+  channel remained Stable. After the explicit Settings save, native evidence
+  reports `experimental_channels=enabled`, `update_channel=dev`, `no_update`.
+  Computer Use lost the transient panel before its click; no direct preference
+  write bypassed the channel save. A subsequent installed update remains pending.
 - The temporary publishing launcher needed hidden inputs and did not provision
   persistent credentials. Secure one-time Keychain provisioning and a repeatable
-  local publishing command are the next priority before another Dev publication.
+  local publishing command were the next priority before another Dev publication.
   Preserve explicit publication authorization, exact-source checks and Stable
   isolation; downloading/installing updates must never need signing secrets.
+
+The repeatable [local Dev publishing workflow](LOCAL_DEV_PUBLISHING.md) is now
+implemented locally with a signed Keychain helper and synthetic/disposable-
+Keychain coverage. Real credential provisioning and a subsequent signed Sparkle
+update remain pending; neither is implied by implementation tests.
 
 ## Experimental offers and open-source distribution
 
@@ -139,6 +145,11 @@ retain their isolated fixture feed and disabled background discovery.
   Existing evidence without these optional fields remains readable.
 
 ## Local Dev command
+
+Use [local Dev publishing](LOCAL_DEV_PUBLISHING.md) for one-time secure setup and
+the repeatable `tools/local_dev.py publish --publish` wrapper. The low-level
+publisher commands below remain available for CI and explicit release control;
+manually re-entering environment secrets is not the intended routine workflow.
 
 ### First signed Dev handoff
 
