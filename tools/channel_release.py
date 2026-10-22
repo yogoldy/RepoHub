@@ -234,9 +234,13 @@ class ChannelGitHub(GitHub):
             '--title', 'RepoHub ' + plan['version'] + ' (' + plan['channel'] + ')',
             '--notes', 'Staged ' + plan['channel'] + ' candidate. Not a Stable release.\nSource: '
             + plan['source_revision']])
-        draft = self.api('releases/tags/' + plan['tag'])
-        if (draft.get('draft') is not True or draft.get('prerelease') is not True
-                or draft.get('target_commitish') != plan['source_revision']):
+        # The release-by-tag REST endpoint does not expose unpublished drafts.
+        # gh resolves draft metadata without requiring its not-yet-created tag.
+        draft = json.loads(command(['gh', 'release', 'view', plan['tag'], '--repo', REPOSITORY,
+            '--json', 'isDraft,isPrerelease,targetCommitish,tagName']))
+        if (draft.get('isDraft') is not True or draft.get('isPrerelease') is not True
+                or draft.get('targetCommitish') != plan['source_revision']
+                or draft.get('tagName') != plan['tag']):
             raise ValueError('exact_candidate_draft_required')
 
     def publish_candidate(self, plan):

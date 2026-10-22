@@ -327,6 +327,47 @@ class ChannelReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify_package(folder)
 
+    def test_candidate_checks_draft_metadata_without_requiring_a_published_tag(self):
+        plan = channel_plan(9, SHA, 'dev')
+        github = ChannelGitHub()
+        draft = {'isDraft': True, 'isPrerelease': True, 'targetCommitish': SHA,
+                 'tagName': plan['tag']}
+
+        def api(endpoint):
+            if endpoint == 'git/matching-refs/tags/' + plan['tag']:
+                return []  # GitHub has not created the draft's Git tag yet.
+            raise RuntimeError('controlled_github_draft_tag_lookup_404')
+
+        def run_candidate(metadata):
+            def command(arguments, **kwargs):
+                if arguments[:3] == ['gh', 'release', 'create']:
+                    return ''
+                if arguments[:3] == ['gh', 'release', 'view']:
+                    return json.dumps(metadata)
+                raise AssertionError('unexpected_command')
+            with patch.object(github, 'assert_lock'), \
+                    patch.object(github, 'api', side_effect=api), \
+                    patch('tools.channel_release.command', side_effect=command) as commands:
+                github.create_candidate(plan)
+            return [call.args[0] for call in commands.call_args_list]
+
+        calls = run_candidate(draft)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][calls[0].index('--target') + 1], SHA)
+        for flag in ('--draft', '--prerelease', '--latest=false'):
+            self.assertIn(flag, calls[0])
+        self.assertEqual(calls[1][:4], ['gh', 'release', 'view', plan['tag']])
+        for field, value in (('isDraft', False), ('isPrerelease', False),
+                             ('targetCommitish', 'main'), ('tagName', 'foreign')):
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'exact_candidate_draft'):
+                run_candidate(dict(draft, **{field: value}))
+        with patch.object(github, 'assert_lock'), patch.object(github, 'api',
+                return_value=[{'ref': 'refs/tags/' + plan['tag']}]), \
+                patch('tools.channel_release.command') as command:
+            with self.assertRaisesRegex(ValueError, 'already_reserved'):
+                github.create_candidate(plan)
+            command.assert_not_called()
+
     def test_repository_lock_is_exclusive_and_never_removes_another_owners_lock(self):
         github = ChannelGitHub()
         calls = []

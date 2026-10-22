@@ -878,6 +878,17 @@ matching rewritten checksum still fail signature verification. Interrupted
 promotion can be explicitly resumed only after its requirements are checked
 again. Candidate/prerelease feed publication must not move public latest.
 
+The first local signed Dev attempt on October 22 passed its 76-test focused
+gate and credential preflight, then stopped after creating draft build 8. GitHub's
+release-by-tag REST endpoint returned 404 for that unpublished draft; the
+draft-aware `gh release view` returned the expected metadata. Candidate creation
+now uses the draft-aware lookup and checks the exact tag, source, draft and
+prerelease flags. The regression first reproduces the 404, then rejects foreign
+targets/tags, published releases, missing prerelease flags and reserved tags.
+Build 8 remains reserved and unpublished, with no assets; the next attempt must
+use a higher build and fresh clean-source gate. This failure did not build or
+install a package, change a channel feed, or move Stable.
+
 Shareable diagnostics add bounded update_channel and experimental_channels enums and typed reasons;
 an update ready state is not repository readiness or confirmed cloud upload.
 Live channel publication, Apple services and installed channel/permission

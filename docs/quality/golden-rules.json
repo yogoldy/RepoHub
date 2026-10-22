@@ -605,6 +605,7 @@
         "test_update_channels.UpdateChannelTests.test_channel_diagnostics_are_bounded_and_cannot_establish_backup_success",
         "test_update_channels.UpdateChannelTests.test_experimental_policy_diagnostics_reject_disagreement_and_export_bounded_values",
         "test_channel_release.ChannelReleaseTests.test_candidate_publication_compares_download_before_feed_without_moving_stable",
+        "test_channel_release.ChannelReleaseTests.test_candidate_checks_draft_metadata_without_requiring_a_published_tag",
         "test_channel_release.ChannelReleaseTests.test_dev_gate_cannot_be_missing_skipped_stale_dirty_or_full_gate_substitute",
         "test_channel_release.ChannelReleaseTests.test_testing_requires_exact_successful_nonfork_push_and_real_contract",
         "test_channel_release.ChannelReleaseTests.test_full_gate_requires_executed_rules_and_native_package_workflow_commands",
