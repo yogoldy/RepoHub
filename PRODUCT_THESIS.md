@@ -50,24 +50,25 @@ it. This establishes initial consent, not permission continuity across a future
 signed update. The helper listed all 15 configured sources without permission
 errors; content verification and the broader native acceptance remain separate.
 The Pro's local experimental opt-in is enabled; after the explicit Settings save,
-native evidence reports Dev and Sparkle reports no newer update. The Testing feed,
-subsequent Sparkle update, Air acceptance and Stable promotion remain pending.
+native evidence reports Dev; the earlier no-newer-update check preceded build 10.
+The Testing feed, subsequent installed Sparkle update, Air acceptance and Stable
+promotion remain pending.
 
-**Immediate work, before another Dev publication:** the local Keychain publishing
-wrapper is implemented with one-time hidden input, signed helper verification,
-existing-key continuity checks and credential-free focused tests before release.
-It reuses the staged Dev publisher and needs no per-release pasted secrets.
-Leo completed real provisioning on October 22. Two subsequent Keychain retrieval
-and Apple/signing preflights passed without pasted-secret prompts. The corrected
-code at `e633268` passed the complete clean macOS gate (353 tests, no skips).
-Keychain authorization prompts may still occur. The app/helper signing-identity
-guard is also implemented and matches installed build 9; a subsequent signed
-Sparkle update must still prove permission continuity. See
-[local Dev publishing](docs/LOCAL_DEV_PUBLISHING.md) for setup, guards and limits.
-The immediate remaining acceptance step is a separately authorized Dev release
-and Sparkle update on the Pro, preserving configuration and testing source access
-without resetting or regranting Desktop permission. Nothing was published or
-installed by the provisioning/validation work.
+**Immediate acceptance: install the next signed Dev update on the Pro.** The
+repeatable Keychain publisher is provisioned and published
+[0.1.0 / build 10](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.1.0-b10)
+from `6710337166496913814ddad4a887afa39829620b` on October 22 without pasted
+credentials. Its fresh focused gate passed 92 tests with zero skips and a native
+build. The downloaded archive, independent Sparkle signature, notarization,
+stapling and exact Dev feed verified. App/helper designated requirements match
+installed build 9; this does not establish retained Desktop permission.
+The corrected publisher code at `e633268` also passed the complete clean macOS
+gate (353 tests, no skips); build 10 adds only the provisioning checkpoint to it.
+See [local Dev publishing](docs/LOCAL_DEV_PUBLISHING.md) for guards and limits.
+Leo will install through Sparkle and report any permission prompt. The agent has
+not installed build 10. Compare protected configuration and helper-observed
+source access afterward without resetting or regranting permissions. Stable
+remains build 7; Testing, the Air and Stable promotion were not changed.
 
 The installed Dev candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
 a backup deferred by actively changing source files no longer leaves a generic
@@ -87,8 +88,8 @@ remains evidence within its original limits; installed acceptance is separate.
    stable feed or public latest download. Record source identity, monotonic build
    numbering and channel-switch behavior. The updater, local publisher, Testing
    workflow, diagnostics and policy are implemented together in the current local
-   branch candidate. The Dev feed is live and build 9 is installed on the Pro; the
-   Testing feed and subsequent updater acceptance remain pending. See the
+   branch candidate. The Dev feed offers build 10 and build 9 is installed on the Pro;
+   the Testing feed and subsequent updater acceptance remain pending. See the
    [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
    Existing protected-main requirements remain in force.
    **Ordinary-user offer isolation:** ordinary installations follow Stable and
@@ -100,7 +101,8 @@ remains evidence within its original limits; installed acceptance is separate.
    exact-channel update offers, diagnostic agreement and byte-identical Stable
    promotion. The clarified UI/enablement behavior is implemented locally with
    isolated native/controller/diagnostic regressions. The Pro opt-in is enabled;
-   its guarded saved Dev selection and a no-newer-update check are observed.
+   its guarded saved Dev selection and the earlier no-newer-update check were
+   observed before build 10 publication.
    Subsequent update acceptance and Air enablement/acceptance remain pending.
 2. **Configure consistent Developer ID signing and notarization.** Use a
    consistent app/helper identity across channels; verify signed components,

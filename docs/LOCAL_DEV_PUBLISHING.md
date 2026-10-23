@@ -7,6 +7,16 @@ Apple-authentication preflights passed without pasted-secret entry. This confirm
 repeat retrieval; no new release or app installation occurred in those checks.
 Signed-to-signed Desktop permission retention remains pending installed acceptance.
 
+The first routine Keychain publication then delivered
+[0.1.0 / build 10](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.1.0-b10)
+from `6710337166496913814ddad4a887afa39829620b` on October 22. It required no pasted
+credentials. The fresh focused gate passed 92 tests, zero skips and a native
+build. The downloaded archive and Dev pointer, independent Sparkle signature,
+strict signatures, Gatekeeper notarized assessment and stapled ticket verified.
+App/helper identities match installed build 9. Installation is left to Leo;
+permission retention, configuration continuity and post-update source access
+remain pending. Stable/public latest is unchanged at build 7.
+
 This developer-only workflow replaces the October 22 temporary handoff scripts.
 It does not change the app's backup rules, reset macOS permissions, install an
 update, promote Testing/Stable or configure the Air.
@@ -90,9 +100,8 @@ requirements for the app, Python interpreter and cloud helper. A foreign team,
 renamed helper or hash-bound requirement fails before delivery. These checks do
 not read or edit the TCC database and do not establish that permission persisted.
 
-After provisioning, authorize a new Dev delivery and install it through Sparkle
-on the Pro. Record exact old/new app/helper identities, protected configuration
-hashes, whether macOS asked again, helper-observed source reads and the actual
+Build 10 is available for Leo's manual Sparkle update on the Pro. Record exact
+old/new app/helper identities, protected configuration hashes, whether macOS asked again, helper-observed source reads and the actual
 backup result. A reset/regrant cannot count as retained permission. Leave Air,
 Testing and Stable acceptance pending until exercised separately.
 

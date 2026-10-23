@@ -45,8 +45,27 @@ implemented locally with a signed Keychain helper and synthetic/disposable-
 Keychain coverage. Leo completed real provisioning, and two retrieval/signing/
 Apple-authentication preflights passed without pasted-secret prompts. The full
 clean macOS gate passed on corrected code `e633268` (353 tests, zero skips).
-A subsequent signed Sparkle update remains pending; provisioning published and
-installed nothing and did not reset daily permissions.
+Provisioning itself published and installed nothing and did not reset daily
+permissions. The subsequent authorized publication is recorded below.
+
+### Routine Keychain Dev publication — build 10
+
+- Published [0.1.0 / build 10](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.1.0-b10)
+  from `6710337166496913814ddad4a887afa39829620b` on October 22 using stored
+  Keychain credentials, without pasted keys or passwords. Its fresh focused gate
+  passed 92 tests with zero skips, a native build and unchanged source.
+- Downloaded all four public assets and verified the receipt/source, Dev stage,
+  archive size/hash, independent Sparkle signature and exact pointer appcast.
+  The 28,703,227-byte archive has SHA-256
+  `29de397cf113d6194cec98b583415425705e296bb64ebce6e9f75b6aadc351dd`.
+- The extracted app passed strict code-signature verification, Gatekeeper's
+  notarized Developer ID assessment and stapled-ticket validation. App, Python
+  helper and cloud-helper designated requirements match installed build 9.
+- Stable/public latest remains `repohub-v0.0.7-b7`. No main merge, Testing/Stable
+  promotion, Air change or app installation occurred. Leo will install manually
+  through Sparkle on the Pro and report any Desktop permission prompt. A private
+  pre-update baseline records installed version/identities, six configuration
+  hashes and native preferences; installed acceptance remains pending.
 
 ## Experimental offers and open-source distribution
 
@@ -172,7 +191,8 @@ opening them. The October 22 user-operated hidden-input session verified the
 original Sparkle key, certificate import and Apple authentication and published
 the first signed Dev package. Credentials were confined to the signing process;
 no reusable local credential environment was provisioned. That temporary handoff
-is not the finished repeatable Dev workflow; Keychain provisioning remains pending.
+was superseded by the provisioned Keychain workflow and build 10 publication
+recorded above.
 
 Once credentials and publication are authorized, rerun the focused clean-source
 gate immediately before publication; a prior receipt is not a standing approval
@@ -321,10 +341,11 @@ tests through the full gate. Tests simulate GitHub mutations and use synthetic
 archives/public RFC signature material; they never publish fixtures.
 
 The branch gate and unpublished GitHub Developer ID/notarization test passed on
-the source recorded above. Live feed creation, hosted promotion/mutable-release
-behavior and actual channel/update behavior on Pro/Air still require separately
-authorized delivery. Signed-package validation does not establish installed-Mac
-permission continuity or native acceptance.
+the source recorded above. The Dev feed and routine Keychain publication are
+verified through build 10. Hosted Testing/Stable promotion and actual subsequent
+update behavior on Pro/Air still require separate acceptance. Signed-package
+validation does not establish installed-Mac permission continuity or native
+acceptance.
 
 References: [Sparkle channels and feeds](https://sparkle-project.org/documentation/publishing/),
 [updater cycle reset](https://sparkle-project.org/documentation/programmatic-setup/),
