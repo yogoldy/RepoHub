@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-time Keychain setup and repeatable, explicitly authorized local Dev release.
 
-Never installs an app or promotes Testing/Stable. Secrets travel only through
+Never installs an app, qualifies GitHub checks or promotes Stable. Secrets travel only through
 private subprocess pipes/environments and the existing disposable signing files.
 The helper is developer tooling and is never included in the shipped app.
 """

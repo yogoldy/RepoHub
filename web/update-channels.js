@@ -2,7 +2,7 @@
 (function(root) {
   const $ = id => document.getElementById(id);
   const bridge = root.webkit?.messageHandlers?.repoHub;
-  const channels = new Set(['stable', 'testing', 'dev']);
+  const channels = new Set(['stable', 'dev']);
   const requests = new Map();
   let saved = 'stable';
   let revision = 'initial';
@@ -66,8 +66,7 @@
     $('check-updates').disabled = !bridge || !policyLoaded || loading || saving;
     const descriptions = {
       stable: 'Public releases promoted after automated checks and installed-Mac acceptance.',
-      testing: 'Candidates that passed the full automated checks; installed-Mac testing may still be in progress.',
-      dev: 'Experimental builds with focused checks. May contain unfinished behavior.',
+      dev: 'Experimental builds. Release notes record local checks, GitHub checks and installed acceptance.',
     };
     $('update-channel-description').textContent = loading ? ''
       : !policyLoaded ? 'Update settings are unavailable. Reopen this page to try again.'

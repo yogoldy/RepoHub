@@ -15,7 +15,7 @@ def update_evidence(value, release):
     optional = {'update_channel', 'experimental_channels'}
     if not fields.issubset(value) or not set(value).issubset(fields | optional):
         return None
-    if 'update_channel' in value and value['update_channel'] not in ('stable', 'testing', 'dev'):
+    if 'update_channel' in value and value['update_channel'] not in ('stable', 'dev'):
         return None
     if 'experimental_channels' in value:
         if value['experimental_channels'] not in ('enabled', 'disabled') or 'update_channel' not in value:

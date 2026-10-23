@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish local Dev, gated Testing, or explicitly promote an unchanged package.
+"""Publish Dev, record GitHub qualification, or explicitly promote unchanged bytes to Stable.
 
 All mutations require --publish and REPOHUB_RELEASE_ENABLED=true. This command
 never installs an app, changes a Mac's channel, or configures signing credentials.
@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.channel_policy import (
     channel_plan, feed_url, require_acceptance, require_focused_gate, require_full_gate,
-    require_promotion, require_testing_run, validate_channel_receipt,
+    require_promotion, require_github_run, require_qualification, validation_record, validate_channel_receipt,
 )
 from tools.package_app import sha256
 from tools.publish_release import (
@@ -42,7 +42,7 @@ def feed_stage(raw):
     if len(items) != 1:
         raise ValueError('single_channel_item_required')
     stage = items[0].findtext('{' + SPARKLE + '}channel') or 'stable'
-    if stage not in ('dev', 'testing', 'stable'):
+    if stage not in ('dev', 'stable'):
         raise ValueError('unsupported_update_channel')
     return stage, items[0]
 
@@ -80,18 +80,31 @@ def verify_package(folder, expected_stage=None):
                    for key in ('source_revision', 'build', 'archive_sha256'))
             or stage != 'dev' and (type(proof.get('run_id')) is not int or proof['run_id'] <= 0)):
         raise ValueError('channel_proof_mismatch')
+    if 'github_run_id' in proof and (type(proof['github_run_id']) is not int
+            or proof['github_run_id'] <= 0):
+        raise ValueError('positive_github_run_required')
+    if 'validation' in proof:
+        expected = validation_record(bool(proof.get('github_run_id')), stage == 'stable')
+        if proof['validation'] != expected:
+            raise ValueError('candidate_validation_mismatch')
+    if stage == 'stable' and ('validation' not in proof
+            or type(proof.get('github_run_id')) is not int or proof['github_run_id'] <= 0):
+        raise ValueError('qualified_stable_proof_required')
     return receipt, proof
 
 
-def write_proof(folder, receipt, stage, run_id=None, acceptance=None, testing_run_id=None):
+def write_proof(folder, receipt, stage, run_id=None, acceptance=None, github_run_id=None,
+                validation=None):
+    if github_run_id is not None and (type(github_run_id) is not int or github_run_id <= 0):
+        raise ValueError('positive_github_run_required')
     proof = {key: receipt[key] for key in ('source_revision', 'build', 'archive_sha256')}
-    proof.update(schema=1, channel=stage)
+    proof.update(schema=1, channel=stage, validation=validation or validation_record())
     if run_id is not None:
         proof['run_id'] = run_id
     if acceptance is not None:
         proof['acceptance_sha256'] = hashlib.sha256(acceptance).hexdigest()
-    if testing_run_id is not None:
-        proof['testing_run_id'] = testing_run_id
+    if github_run_id is not None:
+        proof['github_run_id'] = github_run_id
     origin = folder / 'channel-proof.json'
     if not origin.exists():
         origin.write_text(json.dumps(proof, indent=2) + '\n')
@@ -99,6 +112,12 @@ def write_proof(folder, receipt, stage, run_id=None, acceptance=None, testing_ru
     item = root.find('channel/item')
     if item is None:
         raise ValueError('single_channel_item_required')
+    description = item.find('description')
+    if description is None:
+        description = ET.SubElement(item, 'description')
+    description.text = '\n'.join(label + ': ' + proof['validation'][key] for key, label in (
+        ('local_checks', 'Local checks'), ('github_checks', 'GitHub checks'),
+        ('installed_acceptance', 'Installed acceptance')))
     previous = item.find('{' + PROOF_NAMESPACE + '}publication')
     if previous is not None:
         item.remove(previous)
@@ -159,7 +178,7 @@ class ChannelGitHub(GitHub):
             # before exposing its feed. Never introduce a broader admin token.
             latest = self.latest()
             pointers = [item for item in self.releases()
-                        if item.get('tag_name') in ('repohub-channel-dev', 'repohub-channel-testing')]
+                        if item.get('tag_name') in ('repohub-channel-dev',)]
             if latest.get('immutable') is not False or any(item.get('immutable') is not False for item in pointers):
                 raise ValueError('mutable_channel_release_metadata_required')
         else:
@@ -206,11 +225,11 @@ class ChannelGitHub(GitHub):
         if not self.lock_sha or self.api('git/ref/' + LOCK_REF)['object']['sha'] != self.lock_sha:
             raise ValueError('exclusive_channel_publisher_lock_required')
 
-    def testing_run(self, run_id, revision):
+    def github_run(self, run_id, revision):
         run = self.api(f'actions/runs/{run_id}')
         pages = json.loads(command(['gh', 'api', '--paginate', '--slurp',
             f'repos/{REPOSITORY}/actions/runs/{run_id}/jobs?filter=latest&per_page=100']))
-        require_testing_run(run, [job for page in pages for job in page['jobs']], revision)
+        require_github_run(run, [job for page in pages for job in page['jobs']], revision)
 
     def stable_source(self, run_id, revision):
         main = self.api('git/ref/heads/main')['object']['sha']
@@ -278,12 +297,12 @@ class ChannelGitHub(GitHub):
         self.confirm_source_tag(receipt)
         return receipt, proof
 
-    def publish_feed(self, stage, receipt, folder):
+    def publish_feed(self, stage, receipt, folder, refresh=False):
         self.assert_lock()
         if stage == 'stable':
             command(['gh', 'release', 'edit', receipt['tag'], '--repo', REPOSITORY,
                      '--prerelease=false', '--latest', '--title', 'RepoHub ' + receipt['version'],
-                     '--notes', 'Promoted unchanged from Testing after automated checks and '
+                     '--notes', 'Promoted unchanged from Dev after local and GitHub checks and '
                      'recorded Pro/Air acceptance.\nSource: ' + receipt['source_revision']
                      + '\nBuild: ' + receipt['build']])
             if self.latest()['tag_name'] != receipt['tag']:
@@ -305,7 +324,15 @@ class ChannelGitHub(GitHub):
             previous_build = int(old.findtext('{' + SPARKLE + '}version', '0'))
             if previous_build == int(receipt['build']) and previous_raw == (folder / 'appcast.xml').read_bytes():
                 return  # Retry an interrupted confirmation without changing the feed.
-            if old_stage != stage or previous_build >= int(receipt['build']):
+            if refresh and old_stage == stage and previous_build > int(receipt['build']):
+                return  # Qualifying an older candidate must not replace a newer Dev offer.
+            same_candidate = False
+            if refresh and previous_build == int(receipt['build']) and old_stage == stage:
+                old_proof = json.loads(old.findtext('{' + PROOF_NAMESPACE + '}publication', '{}'))
+                same_candidate = (old.find('enclosure').get('url') == receipt['archive_url']
+                    and all(old_proof.get(key) == receipt[key]
+                            for key in ('source_revision', 'build', 'archive_sha256')))
+            if old_stage != stage or previous_build >= int(receipt['build']) and not same_candidate:
                 raise ValueError('channel_pointer_must_advance')
         else:
             command(['gh', 'release', 'create', tag, '--repo', REPOSITORY,
@@ -349,52 +376,78 @@ def publish_candidate(github, plan, folder, recheck):
     return {'published': plan['tag'], 'channel': plan['channel'], 'feed_url': feed_url(plan['channel'])}
 
 
+def qualify(github, folder, receipt, proof, gate, run_id):
+    verify_package(folder, 'dev')
+    require_full_gate(gate, receipt['source_revision'])
+    github.github_run(run_id, receipt['source_revision'])
+    latest = github.latest()['tag_name']
+    write_proof(folder, receipt, 'dev', github_run_id=run_id,
+                validation=validation_record(True))
+    verify_package(folder, 'dev')
+    github.replace_promotion_metadata(receipt['tag'], folder)
+    confirm_uploaded(github, receipt, folder, 'dev')
+    github.github_run(run_id, receipt['source_revision'])
+    github.publish_feed('dev', receipt, folder, refresh=True)
+    if github.latest()['tag_name'] != latest:
+        raise ValueError('stable_changed_during_dev_qualification')
+    return {'qualified': receipt['tag'], 'channel': 'dev',
+            'validation': validation_record(True), 'archive_unchanged': True}
+
+
+def matching_candidate(github, revision):
+    candidates = sorted((item for item in github.releases()
+                         if release_number(item) and not item.get('draft')
+                         and item.get('prerelease') is True),
+                        key=release_number, reverse=True)
+    for item in candidates:
+        if github.api('commits/' + item['tag_name'])['sha'] == revision:
+            return item['tag_name']
+    return None
+
+
 def promote(github, folder, receipt, proof, target, gate, run_id, acceptance=None, approve=None, resume=False):
     current = proof['channel']
     if not (resume and current == target):
         require_promotion(current, target)
+    if target != 'stable':
+        raise ValueError('stable_is_only_promotion_target')
     verify_package(folder, current)
-    if target == 'testing':
-        require_full_gate(gate, receipt['source_revision'])
-        github.testing_run(run_id, receipt['source_revision'])
-    else:
-        if approve != receipt['tag']:
-            raise ValueError('explicit_exact_tag_stable_approval_required')
-        raw = acceptance.read_bytes() if acceptance else b''
-        require_acceptance(json.loads(raw), receipt)
-        testing_run_id = proof.get('testing_run_id', proof['run_id'])
-        github.testing_run(testing_run_id, receipt['source_revision'])
-        main = github.stable_source(run_id, receipt['source_revision'])
-        require_full_gate(gate, main)
-    latest = github.latest()['tag_name']
-    if target == 'stable':
-        current_build = release_number({'tag_name': latest})
-        if current_build is None or int(receipt['build']) < current_build:
-            raise ValueError('stable_build_must_not_regress')
-    change_feed_stage(folder, target)
-    write_proof(folder, receipt, target, run_id, raw if target == 'stable' else None,
-                testing_run_id if target == 'stable' else None)
-    verify_package(folder, target)
-    # No archive generation/signing or upload occurs on this path.
+    if approve != receipt['tag']:
+        raise ValueError('explicit_exact_tag_stable_approval_required')
+    raw = acceptance.read_bytes() if acceptance else b''
+    require_acceptance(json.loads(raw), receipt)
+    qualified_proof = dict(proof)
+    if resume and current == 'stable':
+        qualified_proof['validation'] = validation_record(True)
+    github_run_id = require_qualification(qualified_proof)
+    github.github_run(github_run_id, receipt['source_revision'])
+    main = github.stable_source(run_id, receipt['source_revision'])
+    require_full_gate(gate, main)
+    current_build = release_number({'tag_name': github.latest()['tag_name']})
+    if current_build is None or int(receipt['build']) < current_build:
+        raise ValueError('stable_build_must_not_regress')
+    change_feed_stage(folder, 'stable')
+    write_proof(folder, receipt, 'stable', run_id, raw, github_run_id,
+                validation_record(True, True))
+    verify_package(folder, 'stable')
+    # Promotion only changes evidence/feed metadata; archive bytes are retained.
     github.replace_promotion_metadata(receipt['tag'], folder)
-    confirm_uploaded(github, receipt, folder, target)
-    if target == 'stable':
-        github.stable_source(run_id, receipt['source_revision'])
-    else:
-        github.testing_run(run_id, receipt['source_revision'])
-    github.publish_feed(target, receipt, folder)
-    if target != 'stable' and github.latest()['tag_name'] != latest:
-        raise ValueError('stable_changed_during_experimental_promotion')
-    return {'published': receipt['tag'], 'channel': target, 'archive_unchanged': True}
+    confirm_uploaded(github, receipt, folder, 'stable')
+    github.github_run(github_run_id, receipt['source_revision'])
+    github.stable_source(run_id, receipt['source_revision'])
+    github.publish_feed('stable', receipt, folder)
+    return {'published': receipt['tag'], 'channel': 'stable',
+            'validation': validation_record(True, True), 'archive_unchanged': True}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation', choices=['dev', 'testing', 'promote'])
+    parser.add_argument('operation', choices=['dev', 'qualify', 'promote'])
     parser.add_argument('--gate-receipt', type=Path, required=True)
     parser.add_argument('--run-id', type=int)
     parser.add_argument('--tag')
-    parser.add_argument('--to', choices=['testing', 'stable'])
+    parser.add_argument('--auto', action='store_true', help='Qualify the newest existing exact-source Dev candidate')
+    parser.add_argument('--to', choices=['stable'])
     parser.add_argument('--acceptance', type=Path)
     parser.add_argument('--approve-stable')
     parser.add_argument('--publish', action='store_true')
@@ -408,7 +461,7 @@ def main():
         raise ValueError('clean_committed_source_required')
     gate = json.loads(args.gate_receipt.read_text())
     github = ChannelGitHub()
-    if args.operation in ('dev', 'testing'):
+    if args.operation == 'dev':
         mode = selected_mode()
         require_publication_environment(mode)
     if args.operation == 'dev':
@@ -418,20 +471,30 @@ def main():
         if gate['source_digest'] != source_fingerprint(ROOT):
             raise ValueError('focused_gate_source_digest_mismatch')
         github.expose_dev_source(revision)
-    elif args.operation == 'testing':
+    elif args.operation == 'qualify':
         require_full_gate(gate, revision)
-        # Automated publication is exact accepted main only, never a PR/fork artifact.
-        github.assert_source(args.run_id, revision)
-    elif not args.tag or not args.to or not args.run_id:
+        github.github_run(args.run_id, revision)
+        if args.auto:
+            args.tag = matching_candidate(github, revision)
+            if args.tag is None:
+                print(json.dumps({'qualified': None, 'reason': 'no_matching_dev_candidate',
+                                  'source_revision': revision}))
+                return
+        if not args.tag:
+            raise ValueError('qualification_candidate_tag_required')
+    elif not args.tag or args.to != 'stable' or not args.run_id:
         raise ValueError('promotion_tag_channel_and_run_required')
     github.require_mutable_repository(hosted=os.environ.get('GITHUB_ACTIONS') == 'true')
     with github.locked(revision), tempfile.TemporaryDirectory(prefix='repohub-channel-') as temporary:
         work = Path(temporary)
-        if args.operation == 'promote':
+        if args.operation in ('qualify', 'promote'):
             folder = work / 'candidate'
             folder.mkdir()
             receipt, proof = github.candidate(args.tag, folder, args.resume and args.to == 'stable')
             verify_archive_signature(folder)
+            if args.operation == 'qualify':
+                print(json.dumps(qualify(github, folder, receipt, proof, gate, args.run_id)))
+                return
             print(json.dumps(promote(github, folder, receipt, proof, args.to, gate,
                                    args.run_id, args.acceptance, args.approve_stable, args.resume)))
             return
@@ -448,9 +511,7 @@ def main():
         def recheck():
             if command(['git', 'rev-parse', 'HEAD'], cwd=ROOT).strip() != revision or command(['git', 'status', '--porcelain'], cwd=ROOT).strip():
                 raise ValueError('source_changed_during_packaging')
-            if args.operation == 'testing':
-                github.assert_source(args.run_id, revision)
-            elif source_fingerprint(ROOT) != gate['source_digest']:
+            if source_fingerprint(ROOT) != gate['source_digest']:
                 raise ValueError('source_changed_during_packaging')
         print(json.dumps(publish_candidate(github, receipt, artifacts, recheck)))
 

@@ -83,11 +83,14 @@ const change = value => { get('update-channel').value = value; get('update-chann
   assert.equal(get('update-channel').value, 'dev');
   assert(get('update-channel-save').disabled);
   assert.match(get('update-channel-note').textContent, /does not downgrade/);
+  assert(!fs.readFileSync('web/menu.html', 'utf8').includes('value="testing"'));
+  change('testing');
+  assert(get('update-channel-save').disabled);
   change('foreign');
   assert(get('update-channel-save').disabled);
   // Unknown, missing and internally inconsistent native policy replies fail closed.
   for (badReply of [
-    {experimental_channels: undefined}, {experimental_channels: true},
+    {experimental_channels: 'enabled', channel: 'testing'}, {experimental_channels: undefined}, {experimental_channels: true},
     {experimental_channels: 'outside'}, {experimental_channels: 'disabled', channel: 'dev'},
   ]) {
     await page.open();

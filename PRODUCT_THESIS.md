@@ -11,7 +11,7 @@ not a separate redesign or an instruction to add unnecessary infrastructure.
 The repository is public. License selection remains an owner decision: GitHub
 reported no detected license and no project license file was found on October 20.
 
-## Scope and status — updated October 20, 2026
+## Scope and status — updated October 22, 2026
 
 This is the current reference for Leo's unfinished product requests. It supersedes
 the previous tiered roadmap at source
@@ -36,6 +36,13 @@ Complete approved work in scoped commits with proportionate tests and evidence.
 
 ## Next delivery sequence
 
+**October 22 update:** Dev and Stable are the only channels. The former Testing
+channel is superseded by per-candidate qualification metadata: local checks →
+full GitHub checks → installed use-case acceptance and explicit Stable approval.
+GitHub qualification and Stable promotion retain the exact signed archive. This
+local change needs a later app update to remove Testing from installed controls;
+it does not rebuild or republish build 10. See the [channel contract](docs/UPDATE_CHANNELS.md).
+
 The first signed Dev release, `0.0.9` / build 9, was published and installed on
 the Pro on October 22 from `a9b3895f36a4c76ac68882863baf1ffae26a4d43`.
 Its 77-test focused Dev gate, native build, Apple notarization, stapling,
@@ -51,7 +58,7 @@ signed update. The helper listed all 15 configured sources without permission
 errors; content verification and the broader native acceptance remain separate.
 The Pro's local experimental opt-in is enabled; after the explicit Settings save,
 native evidence reports Dev; the earlier no-newer-update check preceded build 10.
-The Testing feed, broader installed acceptance, Air acceptance and Stable
+GitHub qualification, broader installed acceptance, Air acceptance and Stable
 promotion remain pending.
 
 **Pro signed-update checkpoint passed.** The
@@ -71,7 +78,7 @@ result or the broader two-Mac acceptance matrix.
 The corrected publisher code at `e633268` also passed the complete clean macOS
 gate (353 tests, no skips); build 10 adds only the provisioning checkpoint to it.
 See [local Dev publishing](docs/LOCAL_DEV_PUBLISHING.md) for guards and limits.
-Stable remains build 7; Testing, the Air and Stable promotion were not changed.
+Stable remains build 7; the Air and Stable promotion were not changed.
 
 The installed Dev candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
 a backup deferred by actively changing source files no longer leaves a generic
@@ -84,21 +91,21 @@ prerequisite or a numbered development stage. This sequence replaces the old
 interaction-testing plan. Existing controller, API, native and release coverage
 remains evidence within its original limits; installed acceptance is separate.
 
-1. **Implement Dev → Testing → Stable channels.** Dev provides quick delivery
+1. **Implement Dev and Stable with candidate validation records.** Dev provides quick delivery
    to opted-in Macs after focused tests, a native build and package/signature
-   checks. Testing requires the full automated gate; Stable requires installed
+   checks. GitHub qualification requires the full automated gate; Stable requires installed
    acceptance and Leo's explicit promotion approval. Dev must not replace the
    stable feed or public latest download. Record source identity, monotonic build
-   numbering and channel-switch behavior. The updater, local publisher, Testing
-   workflow, diagnostics and policy are implemented together in the current local
+   numbering and channel-switch behavior. The updater, local publisher,
+   qualification workflow, diagnostics and policy are implemented together in the current local
    branch candidate. Build 10 is offered on Dev and installed on the Pro. The
-   signed update retained Desktop permission; Testing and broader updater
+   signed update retained Desktop permission; GitHub qualification and broader updater
    acceptance remain pending. See the
    [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
    Existing protected-main requirements remain in force.
    **Ordinary-user offer isolation:** ordinary installations follow Stable and
    keep experimental controls out of their normal settings flow. Deliberately
-   enable Dev/Testing locally on Leo's Pro and Air. Public feeds/packages and
+   enable Dev locally on Leo's Pro and Air. Public feeds/packages and
    deliberate advanced access by others are acceptable; do not add private
    repositories, authentication services or hardware restrictions. Validate
    Stable defaults, explicit test enablement, persisted preference behavior,
@@ -134,7 +141,7 @@ remains evidence within its original limits; installed acceptance is separate.
    destination denial and volume disappearance/substitution/remount. Preserve
    configuration, IDs, schedules and previous verified archives; compare native
    display, helper observations and diagnostics. Never reset daily permissions.
-5. **Save useful visual regressions and run the full Testing gate.** Add checks
+5. **Save useful visual regressions and record full GitHub qualification.** Add checks
    for concrete gaps alongside existing controller/API/native coverage. Use
    synthetic data and isolated settings; select tools for the needed behavior,
    rather than making a particular browser MCP installation a prerequisite.
@@ -152,7 +159,7 @@ remains evidence within its original limits; installed acceptance is separate.
    complete CI/distribution/install/update loop, with explicit evidence for each
    host and cleanup of owned test services. A fix creates a new candidate whose
    affected acceptance checks must be rerun.
-8. **Promote the accepted package to Stable.** Require the Testing gate, recorded
+8. **Promote the accepted package to Stable.** Require the full gate and exact GitHub qualification, recorded
    installed results and Leo's approval. Promote the tested package without an
    untested rebuild; follow protected-main checks and record source/package
    identity, version and recovery options.
@@ -357,7 +364,7 @@ Scheduled AI triage or automatic implementation is not enabled by this request.
 
 **Status: Requested; low priority.** Evaluate TestFlight as an optional additional
 distribution route with screenshot feedback and crash reporting. This does not
-replace the planned Sparkle Dev/Testing/Stable channels or block their delivery.
+replace the planned Sparkle Dev/Stable channels or block their delivery.
 Assess distribution requirements and reporting consent before adopting it; no
 TestFlight integration or App Store submission is authorized by this entry.
 
@@ -374,7 +381,7 @@ complete merely because code was merged:
   stapling, Gatekeeper acceptance and independent archive signature verification.
   Dev publication, the initial signed transition and Pro build 9 → 10 update
   are now observed; Desktop permission retention was reported, and identities
-  and configuration match. Testing/Stable and Air acceptance remain pending.
+  and configuration match. GitHub qualification, Stable promotion and Air acceptance remain pending.
   The public Stable release and release-mode variable remain unchanged; see the
   [signing validation record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
 - **Installed-Mac reliability:** track actual folder permissions, native picker,
@@ -388,7 +395,7 @@ complete merely because code was merged:
   events with displayed status in the [timing acceptance record](docs/BACKUP_TIMING_ACCEPTANCE_2026-10-16.md).
   Automated agreement is not a substitute for that personal walkthrough.
 
-Protected main plus the full Golden Gate may publish to Testing before installed
+Successful full GitHub checks may qualify an existing Dev package before installed
 acceptance. Stable requires explicit approval and recorded Pro/Air results.
 Follow the [current delivery policy](docs/RELEASE_DELIVERY.md); do not apply the
 superseded automatic-Stable policy from historical records.

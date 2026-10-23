@@ -43,7 +43,7 @@ enum MenuBridge {
                   id.range(of: "^[a-f0-9]{24}$", options: .regularExpression) != nil else { return nil }
             if action == .saveUpdateChannel {
                 guard let channel = payload["channel"] as? String,
-                      ["stable", "testing", "dev"].contains(channel),
+                      ["stable", "dev"].contains(channel),
                       let revision = payload["revision"] as? String,
                       revision == "initial" || UUID(uuidString: revision) != nil else { return nil }
             }

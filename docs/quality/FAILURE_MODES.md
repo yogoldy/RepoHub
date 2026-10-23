@@ -902,8 +902,8 @@ foreign identifier. This regression uses no real signing key or daily app.
 
 
 A single GitHub latest feed made every accepted main release visible to every
-installation. The staged-channel contract separates local Dev, full-gate Testing
-and explicitly promoted Stable. Stable remains the default on each Mac. Native
+installation. The two-channel contract separates Dev and Stable; exact-package metadata records
+local checks, full GitHub qualification and installed acceptance in that order. Stable remains the default on each Mac. Native
 actions accept only fixed channel names and exact owned menu-page requests;
 revision conflicts and an active update/backup prevent an ambiguous save.
 

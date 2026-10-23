@@ -16,7 +16,7 @@ import Foundation
         precondition(UpdateChannelSettings.selected(in: defaults) == .stable)
         precondition(UpdateChannelSettings.settings(in: defaults)["revision"] == "initial")
         precondition(UpdateChannelSettings.settings(in: defaults)["experimental_channels"] == "disabled")
-        for channel in ["dev", "testing"] {
+        for channel in ["dev"] {
             precondition(UpdateChannelSettings.save(channel: channel, revision: "initial", in: defaults)
                 == "experimental_disabled")
         }
@@ -30,7 +30,6 @@ import Foundation
         for channel in UpdateChannel.allCases {
             let expected = [
                 "stable": "https://github.com/yogoldy/RepoHub/releases/latest/download/appcast.xml",
-                "testing": "https://github.com/yogoldy/RepoHub/releases/download/repohub-channel-testing/appcast.xml",
                 "dev": "https://github.com/yogoldy/RepoHub/releases/download/repohub-channel-dev/appcast.xml",
             ]
             precondition(channel.feedURL == expected[channel.rawValue])
@@ -42,6 +41,14 @@ import Foundation
                 precondition(channel.accepts(item) == expected)
             }
         }
+        // A retired Testing preference fails closed without rewriting daily data.
+        let retired = ["channel": "testing", "revision": UUID().uuidString]
+        defaults.set(retired, forKey: UpdateChannelSettings.key)
+        precondition(UpdateChannelSettings.selected(in: defaults) == .stable)
+        precondition(defaults.dictionary(forKey: UpdateChannelSettings.key) as? [String: String] == retired)
+        precondition(UpdateChannelSettings.save(channel: "testing", revision: "initial", in: defaults) == "invalid")
+        defaults.removeObject(forKey: UpdateChannelSettings.key)
+        precondition(UpdateChannel.allCases.map(\.rawValue) == ["stable", "dev"])
         let original = UpdateChannelSettings.settings(in: defaults)
         precondition(UpdateChannelSettings.save(channel: "dev", revision: original["revision"]!, in: defaults) == "saved")
         let dev = UpdateChannelSettings.settings(in: defaults)
@@ -53,7 +60,7 @@ import Foundation
         do { try reader.run() } catch { preconditionFailure("Cannot launch isolated preference reader") }
         reader.waitUntilExit()
         precondition(reader.terminationStatus == 0)
-        precondition(UpdateChannelSettings.save(channel: "testing", revision: "initial", in: defaults) == "conflict")
+        precondition(UpdateChannelSettings.save(channel: "stable", revision: "initial", in: defaults) == "conflict")
         precondition(UpdateChannelSettings.save(channel: "outside", revision: dev["revision"]!, in: defaults) == "invalid")
         precondition(UpdateChannelSettings.settings(in: defaults) == dev)
 
@@ -63,7 +70,7 @@ import Foundation
         defaults.removeObject(forKey: UpdateChannelSettings.experimentalKey)
         precondition(UpdateChannelSettings.selected(in: defaults) == .stable)
         precondition(UpdateChannelSettings.settings(in: defaults)["experimental_channels"] == "disabled")
-        precondition(UpdateChannelSettings.save(channel: "testing", revision: dev["revision"]!,
+        precondition(UpdateChannelSettings.save(channel: "dev", revision: dev["revision"]!,
             in: defaults) == "experimental_disabled")
         precondition((defaults.dictionary(forKey: UpdateChannelSettings.key)?["channel"] as? String) == "dev")
         precondition(defaults.synchronize())

@@ -4,7 +4,7 @@ import Sparkle
 #endif
 
 enum UpdateChannel: String, CaseIterable {
-    case stable, testing, dev
+    case stable, dev
 
     var feedURL: String {
         let base = "https://github.com/yogoldy/RepoHub/releases/"

@@ -12,11 +12,11 @@ from types import SimpleNamespace
 
 from tools.channel_policy import (
     ACCEPTANCE_CASES, DEV_CHECKS, channel_plan, feed_url, require_acceptance,
-    require_focused_gate, require_full_gate, require_promotion, require_testing_run, validate_channel_receipt,
+    require_focused_gate, require_full_gate, require_promotion, require_github_run, validate_channel_receipt,
 )
 from tools.channel_release import (
     ChannelGitHub, LOCK_REF, confirm_uploaded, feed_stage, promote,
-    publish_candidate, verify_archive_signature, verify_package, write_proof,
+    publish_candidate, qualify, matching_candidate, verify_archive_signature, verify_package, write_proof,
 )
 from tools.package_app import sha256
 from tools.release_policy import release_number, release_plan
@@ -38,7 +38,7 @@ def fixture(folder, stage='dev', distribution='developer_id', build=8):
             'CFBundleShortVersionString': plan['version'], 'LSMinimumSystemVersion': '13.0'}
     (folder / 'appcast.xml').write_bytes(appcast(info, plan['archive_url'],
         base64.b64encode(b's' * 64).decode(), receipt['archive_bytes'], stage))
-    write_proof(folder, receipt, stage, 123 if stage == 'testing' else None)
+    write_proof(folder, receipt, stage)
     return receipt
 
 
@@ -95,13 +95,13 @@ class FakeChannelGitHub:
     def confirm_source_tag(self, receipt):
         self.event('source-tag')
 
-    def publish_feed(self, stage, receipt, folder):
+    def publish_feed(self, stage, receipt, folder, refresh=False):
         self.event('feed-' + stage)
         if stage == 'stable':
             self.latest_tag = receipt['tag']
 
-    def testing_run(self, run_id, revision):
-        self.event('testing-run')
+    def github_run(self, run_id, revision):
+        self.event('github-run')
 
     def stable_source(self, run_id, revision):
         self.event('protected-main')
@@ -114,9 +114,12 @@ class FakeChannelGitHub:
 
 
 class ChannelReleaseTests(unittest.TestCase):
-    def test_workflow_targets_testing_and_legacy_stable_entry_is_disabled(self):
+    def test_workflow_qualifies_existing_dev_without_building_or_publishing_stable(self):
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/publish-update.yml').read_text()
-        self.assertIn('tools/channel_release.py testing --publish', workflow)
+        self.assertIn('tools/channel_release.py qualify --auto --publish', workflow)
+        self.assertNotIn('secrets.', workflow)
+        self.assertNotIn('build_artifacts', workflow)
+        self.assertIn("branches: [main, 'codex/**']", workflow)
         self.assertIn('release_gate.py --require-clean', workflow)
         self.assertIn('ref: ${{ github.event.workflow_run.head_sha }}', workflow)
         self.assertNotIn('--to stable', workflow)
@@ -144,36 +147,36 @@ class ChannelReleaseTests(unittest.TestCase):
                 'draft': False, 'prerelease': True, 'immutable': True}), \
                 patch('tools.channel_release.command'):
             with self.assertRaisesRegex(ValueError, 'no_feed_change'):
-                github.publish_candidate(channel_plan(8, SHA, 'testing'))
+                github.publish_candidate(channel_plan(8, SHA, 'dev'))
 
     def test_fixed_feeds_global_build_numbers_and_failed_draft_reservations(self):
-        self.assertNotEqual(feed_url('dev'), feed_url('testing'))
+        self.assertNotEqual(feed_url('dev'), feed_url('stable'))
         self.assertIn('/latest/', feed_url('stable'))
         history = [{'tag_name': channel_plan(8, SHA, 'dev')['tag'], 'draft': True},
                    {'tag_name': 'repohub-channel-dev'}]
         self.assertEqual(release_plan(history, SHA)['build'], '9')
         self.assertIsNone(release_number(history[1]))
-        for wrong in ('beta', '', None, []):
+        for wrong in ('testing', 'beta', '', None, []):
             with self.assertRaises(ValueError):
                 feed_url(wrong)
         with self.assertRaises(ValueError):
             channel_plan(9, SHA, 'stable')
 
-    def test_testing_requires_exact_successful_nonfork_push_and_real_contract(self):
+    def test_github_qualification_requires_exact_successful_nonfork_push_and_real_contract(self):
         run = {'head_branch': 'codex/feature', 'event': 'push', 'status': 'completed',
                'conclusion': 'success', 'path': '.github/workflows/golden-rules.yml',
                'repository': {'full_name': 'yogoldy/RepoHub'},
                'head_repository': {'full_name': 'yogoldy/RepoHub'}, 'head_sha': SHA}
         jobs = [{'name': 'automated-contract', 'status': 'completed', 'conclusion': 'success'}]
-        require_testing_run(run, jobs, SHA)
+        require_github_run(run, jobs, SHA)
         for field, value in [('head_sha', 'b' * 40), ('event', 'pull_request'),
                              ('head_branch', 'foreign'), ('conclusion', 'failure'),
                              ('head_repository', {'full_name': 'fork/RepoHub'})]:
             with self.subTest(field=field), self.assertRaises(ValueError):
-                require_testing_run(dict(run, **{field: value}), jobs, SHA)
+                require_github_run(dict(run, **{field: value}), jobs, SHA)
         for invalid in ([], jobs * 2, [dict(jobs[0], conclusion='skipped')]):
             with self.assertRaises(ValueError):
-                require_testing_run(run, invalid, SHA)
+                require_github_run(run, invalid, SHA)
 
     def test_dev_gate_cannot_be_missing_skipped_stale_dirty_or_full_gate_substitute(self):
         value = {'profile': 'dev', 'result': 'passed', 'source_commit': SHA,
@@ -239,27 +242,42 @@ class ChannelReleaseTests(unittest.TestCase):
                     publish_candidate(github, receipt, folder, lambda: None)
                 self.assertNotIn('feed-dev', github.events)
 
-    def test_promotions_are_sequential_and_testing_preserves_archive_bytes(self):
+    def test_qualification_keeps_dev_feed_and_archive_and_records_ordered_checks(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
             receipt = fixture(folder)
             proof = verify_package(folder)[1]
+            self.assertEqual(proof['validation'], {'local_checks': 'passed',
+                'github_checks': 'pending', 'installed_acceptance': 'pending'})
             github = FakeChannelGitHub(folder)
             original = (folder / receipt['archive']).read_bytes()
-            promote(github, folder, receipt, proof, 'testing', gate(), 123)
+            result = qualify(github, folder, receipt, proof, gate(), 123)
             self.assertEqual(original, (folder / receipt['archive']).read_bytes())
             self.assertEqual(github.remote[receipt['archive']], original)
-            self.assertEqual(feed_stage((folder / 'appcast.xml').read_bytes())[0], 'testing')
+            current = verify_package(folder, 'dev')[1]
+            self.assertEqual(current['github_run_id'], 123)
+            self.assertEqual(current['validation'], {'local_checks': 'passed',
+                'github_checks': 'passed', 'installed_acceptance': 'pending'})
+            self.assertEqual(result['channel'], 'dev')
             self.assertNotIn('upload', github.events)
-            self.assertIn('feed-testing', github.events)
-        for current, target in [('dev', 'stable'), ('stable', 'dev'), ('testing', 'dev')]:
+            self.assertIn('feed-dev', github.events)
+            self.assertEqual(github.latest_tag, 'repohub-v0.0.7-b7')
+            for bad_gate in (gate('b' * 40), dict(gate(), result='failed')):
+                failed = FakeChannelGitHub(folder)
+                with self.assertRaises(ValueError):
+                    qualify(failed, folder, receipt, current, bad_gate, 123)
+                self.assertNotIn('metadata', failed.events)
+        require_promotion('dev', 'stable')
+        for current, target in [('dev', 'testing'), ('stable', 'dev'), ('testing', 'stable')]:
             with self.assertRaises(ValueError):
                 require_promotion(current, target)
 
     def test_stable_requires_exact_approval_both_hosts_notarization_and_protected_main(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
-            receipt = fixture(folder, 'testing')
+            receipt = fixture(folder)
+            proof = verify_package(folder)[1]
+            qualify(FakeChannelGitHub(folder), folder, receipt, proof, gate(), 123)
             proof = verify_package(folder)[1]
             path = folder.parent / (folder.name + '-acceptance.json')
             try:
@@ -301,16 +319,65 @@ class ChannelReleaseTests(unittest.TestCase):
             folder = Path(temporary)
             receipt = fixture(folder)
             proof = verify_package(folder)[1]
-            github = FakeChannelGitHub(folder, 'feed-testing')
+            path = folder.parent / (folder.name + '-acceptance.json')
+            try:
+                path.write_text(json.dumps(acceptance(receipt)))
+                unqualified = FakeChannelGitHub(folder)
+                with self.assertRaisesRegex(ValueError, 'qualification'):
+                    promote(unqualified, folder, receipt, proof, 'stable', gate(), 124, path, receipt['tag'])
+                self.assertNotIn('metadata', unqualified.events)
+                qualify(FakeChannelGitHub(folder), folder, receipt, proof, gate(), 123)
+                proof = verify_package(folder)[1]
+                github = FakeChannelGitHub(folder, 'feed-stable')
+                with self.assertRaises(ValueError):
+                    promote(github, folder, receipt, proof, 'stable', gate(), 124, path, receipt['tag'])
+                current = verify_package(folder)[1]
+                with self.assertRaises(ValueError):
+                    promote(github, folder, receipt, current, 'stable', gate(), 124, path, receipt['tag'])
+                github.fail = ''
+                promote(github, folder, receipt, current, 'stable', gate(), 124, path, receipt['tag'], resume=True)
+                self.assertGreaterEqual(github.events.count('github-run'), 4)
+                self.assertEqual(github.remote[receipt['archive']], (folder / receipt['archive']).read_bytes())
+                self.assertEqual(verify_package(folder, 'stable')[1]['validation'],
+                    {'local_checks': 'passed', 'github_checks': 'passed', 'installed_acceptance': 'passed'})
+            finally:
+                path.unlink(missing_ok=True)
+
+    def test_validation_record_rejects_missing_skipped_and_out_of_order_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            receipt = fixture(folder)
+            for run in (True, 0, -1, '123'):
+                with self.assertRaisesRegex(ValueError, 'positive_github_run'):
+                    write_proof(folder, receipt, 'dev', github_run_id=run)
+            write_proof(folder, receipt, 'dev', validation={
+                'local_checks': 'passed', 'github_checks': 'passed',
+                'installed_acceptance': 'pending'})
+            with self.assertRaisesRegex(ValueError, 'validation_mismatch'):
+                verify_package(folder)
+            write_proof(folder, receipt, 'dev', github_run_id=123, validation={
+                'local_checks': 'passed', 'github_checks': 'passed',
+                'installed_acceptance': 'passed'})
+            with self.assertRaisesRegex(ValueError, 'validation_mismatch'):
+                verify_package(folder)
+            write_proof(folder, receipt, 'dev')
+            before = (folder / 'appcast.xml').read_bytes()
+            github = FakeChannelGitHub(folder, 'github-run')
             with self.assertRaises(ValueError):
-                promote(github, folder, receipt, proof, 'testing', gate(), 123)
-            current = verify_package(folder)[1]
-            with self.assertRaises(ValueError):
-                promote(github, folder, receipt, current, 'testing', gate(), 123)
-            github.fail = ''
-            promote(github, folder, receipt, current, 'testing', gate(), 123, resume=True)
-            self.assertGreaterEqual(github.events.count('testing-run'), 4)
-            self.assertEqual(github.remote[receipt['archive']], (folder / receipt['archive']).read_bytes())
+                qualify(github, folder, receipt, verify_package(folder)[1], gate(), 123)
+            self.assertEqual((folder / 'appcast.xml').read_bytes(), before)
+            self.assertNotIn('metadata', github.events)
+
+    def test_auto_qualification_selects_only_existing_exact_source_candidate(self):
+        github = ChannelGitHub()
+        candidates = [dict(channel_plan(8, SHA, 'dev'), draft=False, prerelease=True),
+                      dict(channel_plan(9, SHA, 'dev'), draft=True, prerelease=True)]
+        for item in candidates:
+            item['tag_name'] = item['tag']
+        with patch.object(github, 'releases', return_value=candidates), \
+                patch.object(github, 'api', return_value={'sha': SHA}):
+            self.assertEqual(matching_candidate(github, SHA), candidates[0]['tag'])
+            self.assertIsNone(matching_candidate(github, 'b' * 40))
 
     def test_wrong_channel_or_changed_archive_and_extra_assets_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -415,6 +482,26 @@ class ChannelReleaseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     github.publish_feed('dev', newer, folder)
             self.assertFalse(any(call[:3] == ['gh', 'release', 'upload'] for call in calls))
+            original_raw = raw
+            write_proof(folder, receipt, 'dev', github_run_id=123,
+                        validation={'local_checks': 'passed', 'github_checks': 'passed',
+                                    'installed_acceptance': 'pending'})
+            qualified_raw = (folder / 'appcast.xml').read_bytes()
+            def refresh_command(arguments, **kwargs):
+                calls.append(arguments)
+                if arguments[:3] == ['gh', 'release', 'download']:
+                    output = Path(arguments[arguments.index('--dir') + 1])
+                    content = qualified_raw if any(call[:3] == ['gh', 'release', 'upload'] for call in calls) else original_raw
+                    (output / 'appcast.xml').write_bytes(content)
+                return ''
+            calls.clear()
+            with patch.object(github, 'assert_lock'), patch.object(github, 'releases', return_value=[pointer]), \
+                    patch('tools.channel_release.command', side_effect=refresh_command):
+                github.publish_feed('dev', receipt, folder, refresh=True)
+                self.assertTrue(any(call[:3] == ['gh', 'release', 'upload'] for call in calls))
+                calls.clear()
+                github.publish_feed('dev', dict(receipt, build='7'), folder, refresh=True)
+                self.assertFalse(any(call[:3] == ['gh', 'release', 'upload'] for call in calls))
             calls.clear()
             with patch.object(github, 'assert_lock'), patch.object(github, 'latest', return_value={'tag_name': receipt['tag']}), \
                     patch('tools.channel_release.command', side_effect=command):

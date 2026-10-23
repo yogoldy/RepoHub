@@ -38,7 +38,7 @@ class UpdateChannelTests(unittest.TestCase):
             self.assertEqual(evidence['update_channel'], 'stable')
             self.assertEqual(evidence['experimental_channels'], 'disabled')
         source = (ROOT / 'native/AppUpdates.swift').read_text()
-        for channel in ('dev', 'testing'):
+        for channel in ('dev',):
             self.assertEqual(feed_url(channel), f'https://github.com/yogoldy/RepoHub/releases/download/repohub-channel-{channel}/appcast.xml')
         self.assertIn('resetUpdateCycleAfterShortDelay()', source)
 
@@ -47,7 +47,7 @@ class UpdateChannelTests(unittest.TestCase):
         native = dict(release, update_phase='ready', update_reason='channel_changed', update_channel='dev')
         result = update_evidence(native, release)
         self.assertEqual(result, {'update_phase': 'ready', 'update_reason': 'channel_changed', 'update_channel': 'dev'})
-        for wrong in ('outside', '/private/secret', [], None):
+        for wrong in ('testing', 'outside', '/private/secret', [], None):
             self.assertIsNone(update_evidence(dict(native, update_channel=wrong), release))
         self.assertIsNone(update_evidence(dict(native, build='11'), release))
         with tempfile.TemporaryDirectory() as folder:
@@ -68,13 +68,13 @@ class UpdateChannelTests(unittest.TestCase):
         base = dict(release, update_phase='ready', update_reason='check_finished')
         rows = []
         for enabled, channel in [('disabled', 'stable'), ('enabled', 'stable'),
-                                 ('enabled', 'dev'), ('enabled', 'testing')]:
+                                 ('enabled', 'dev')]:
             result = update_evidence(dict(base, experimental_channels=enabled, update_channel=channel), release)
             self.assertEqual(result, {'update_phase': 'ready', 'update_reason': 'check_finished',
                                      'update_channel': channel, 'experimental_channels': enabled})
             self.assertNotIn('backup_required', result)
             rows.append(result)
-        for channel in ('dev', 'testing'):
+        for channel in ('dev',):
             self.assertIsNone(update_evidence(dict(base, experimental_channels='disabled',
                                                   update_channel=channel), release))
         for value in (True, False, [], None, 'outside', '/private/token'):

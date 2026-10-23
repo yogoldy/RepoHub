@@ -20,7 +20,7 @@ BOOLEANS = frozenset("after_edits archive_dataless copying has_error has_backup 
 ENUMS = {
     'update_phase': UPDATE_PHASES,
     'update_reason': UPDATE_REASONS,
-    'update_channel': {'stable', 'testing', 'dev'},
+    'update_channel': {'stable', 'dev'},
     'experimental_channels': {'enabled', 'disabled'},
     'schedule_state': TIMING_STATES,
     'timing_reason': TIMING_REASONS,

@@ -23,7 +23,7 @@ result and broader two-Mac acceptance are separate. Stable remains build 7.
 
 This developer-only workflow replaces the October 22 temporary handoff scripts.
 It does not change the app's backup rules, reset macOS permissions, install an
-update, promote Testing/Stable or configure the Air.
+update, qualify GitHub checks, promote Stable or configure the Air.
 
 ## One-time provisioning
 
@@ -109,7 +109,7 @@ permission. Post-update app/helper version/source, strict signature, signing
 identities, six configuration hashes, three native preferences and source count
 were checked against the private baseline. No reset/regrant was performed.
 A new backup's verification/upload result was not established by these checks.
-Leave Air, Testing and Stable acceptance pending until exercised separately.
+Leave Air, GitHub qualification and Stable acceptance pending until exercised separately.
 
 ## Verification limits
 

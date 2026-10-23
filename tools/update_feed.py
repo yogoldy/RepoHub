@@ -29,7 +29,7 @@ def validate_key_file(path):
 
 
 def appcast(info, archive_url, signature, length, update_channel='stable'):
-    if update_channel not in ('stable', 'testing', 'dev'):
+    if update_channel not in ('stable', 'dev'):
         raise ValueError('unsupported_update_channel')
     parsed = urlparse(archive_url)
     test = info.get('RepoHubTestMode') is True

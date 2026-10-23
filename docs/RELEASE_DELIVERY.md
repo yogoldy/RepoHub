@@ -1,49 +1,30 @@
 # RepoHub update delivery
 
-## Current staged policy — October 20, 2026
+## Current policy — October 22, 2026
 
-Leo approved Dev → Testing → Stable and explicitly approved local workflow edits
-that route checked main builds to Testing and disable the former direct-Stable
-command. The branch was subsequently pushed with explicit authorization for the
-unpublished signing test below. It has not been merged to main. No live
-repository variable, channel feed, published release or installed Mac was changed.
-
+Leo approved **Dev and Stable**, replacing the earlier three-channel proposal.
 The complete operational contract is [Update channels](UPDATE_CHANNELS.md).
 
-- **Dev:** build/publish locally on the Pro from clean committed source, after
-  the fixed focused gate and native/package/signature checks. Push only the exact
-  source tag for provenance; branch-based Actions validation is not required.
-  This narrow exception cannot publish Stable or relax protected-main checks.
-- **Testing:** full clean macOS Golden Gate and exact successful GitHub contract
-  run. The existing main workflow retains checkout by triggering SHA, gate rerun,
-  signing isolation and uploaded-byte verification, but targets a prerelease
-  Testing feed. An existing Dev archive can also be promoted after full checks
-  on its exact source. Missing/skipped/failed checks stop delivery.
-- **Stable:** promote an existing Testing package only after explicit approval
-  of its exact tag, recorded Pro/Air acceptance, current accepted protected main
-  with matching source tree, and Developer ID signing/notarization. Promotion
-  changes feed metadata, not archive bytes. No automatic main-to-Stable path
-  remains in this source; the old `tools/publish_release.py` CLI fails closed.
+- **Dev:** build/publish locally after focused clean-source checks, a native build
+  and signature/notarization checks. Keychain provisioning is complete on Pro.
+- **GitHub qualification:** the full gate and exact successful canonical push run
+  are recorded on an existing Dev candidate. It remains on Dev. No package is
+  built, resigned or replaced; CI uses only its public verification key.
+- **Stable:** promote the exact qualified archive after recorded Pro/Air use cases,
+  explicit exact-tag approval and current protected-main/full-gate requirements.
+  No automatic main-to-Stable publisher exists. Missing evidence fails closed.
 
-Public latest remains the existing Stable URL. Dev and Testing use separate
-prerelease feeds and never become latest. Leo clarified that only his deliberately
-enabled Pro/Air installations should be offered experimental updates; public
-experimental downloads are acceptable. Follow the
-[ordinary-user offer policy](UPDATE_CHANNELS.md#experimental-offers-and-open-source-distribution):
-keep normal installations on Stable and experimental controls out of the ordinary
-flow. The local test-enablement/UI distinction is implemented on the branch;
-enabling and accepting it on installed Macs remain pending. Private hosting and
-device authentication are outside this requirement. Channel changes are explicitly saved per
-Mac and do not downgrade an already-installed newer build. Use the same signing
-identity across channels when Apple credentials are configured in roadmap step 2.
-Personal ad-hoc Dev/Testing is honestly marked; new Stable promotion rejects it.
+Candidate metadata denotes local checks → GitHub checks → installed acceptance.
+Ordinary installs stay Stable; deliberate experimental opt-in exposes Dev. Testing
+is no longer a channel. The existing public Stable URL is retained. Dev stays a
+prerelease and never moves public latest. No private hosting or hardware access
+control is needed. Changing channel never downgrades an installed build.
 
-Publishing and installation remain separate actions. This step authorizes local
-implementation and validation only, not publication or installation. Keep
-untested Apple services, real feeds, permissions and native UI behavior explicit.
-The staged publisher temporarily performs no package pruning because the old
-four-package rule could delete an archive still referenced by another channel.
-No backup/archive data or unrelated release is deleted by this change.
+The two-channel changes are local pending delivery. Earlier authorized Dev builds
+9 and 10 are live; Pro build 9 → 10 retained Desktop permission per Leo, with exact
+installed source/identity and configuration independently verified. Air, broader
+native acceptance and Stable promotion remain pending. Publication and installation
+are separately authorized actions. No old archive/release is automatically deleted.
 
 ## Unpublished signing validation — October 20, 2026
 

@@ -2,7 +2,7 @@
 import re
 from tools.release_policy import REPOSITORY, FEED_URL, plan_for_build, SHA
 
-CHANNELS = ('stable', 'testing', 'dev')
+CHANNELS = ('stable', 'dev')
 DEV_CHECKS = (
     'test_hub.py', 'test_scoped_backups.py', 'test_setup_api.py',
     'test_setup_service.py', 'test_setup_ui.py', 'test_update_channels.py',
@@ -54,7 +54,7 @@ def validate_channel_receipt(receipt):
     return receipt
 
 
-def require_testing_run(run, jobs, revision):
+def require_github_run(run, jobs, revision):
     branch = run.get('head_branch', '')
     if (not isinstance(branch, str) or not (branch == 'main' or branch.startswith('codex/'))
             or run.get('event') != 'push' or run.get('status') != 'completed'
@@ -63,11 +63,11 @@ def require_testing_run(run, jobs, revision):
             or run.get('repository', {}).get('full_name') != REPOSITORY
             or run.get('head_repository', {}).get('full_name') != REPOSITORY
             or run.get('head_sha') != revision or not SHA.fullmatch(revision)):
-        raise ValueError('exact_successful_testing_run_required')
+        raise ValueError('exact_successful_github_run_required')
     contracts = [job for job in jobs if job.get('name') == 'automated-contract']
     if (len(contracts) != 1 or contracts[0].get('conclusion') != 'success'
             or contracts[0].get('status') != 'completed'):
-        raise ValueError('exact_successful_testing_run_required')
+        raise ValueError('exact_successful_github_run_required')
 
 
 def require_focused_gate(gate, revision):
@@ -125,5 +125,20 @@ def require_acceptance(value, receipt):
 def require_promotion(current, target):
     require_channel(current)
     require_channel(target)
-    if (current, target) not in (('dev', 'testing'), ('testing', 'stable')):
+    if (current, target) != ('dev', 'stable'):
         raise ValueError('sequential_channel_promotion_required')
+
+
+def validation_record(github_passed=False, installed_passed=False):
+    if installed_passed and not github_passed:
+        raise ValueError('github_checks_required_before_installed_acceptance')
+    return {'local_checks': 'passed',
+            'github_checks': 'passed' if github_passed else 'pending',
+            'installed_acceptance': 'passed' if installed_passed else 'pending'}
+
+
+def require_qualification(proof):
+    if (proof.get('validation') != validation_record(True)
+            or type(proof.get('github_run_id')) is not int or proof['github_run_id'] <= 0):
+        raise ValueError('exact_candidate_github_qualification_required')
+    return proof['github_run_id']
