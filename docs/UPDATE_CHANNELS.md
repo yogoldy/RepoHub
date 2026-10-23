@@ -42,8 +42,11 @@ subsequent Sparkle-update acceptance and Stable promotion remain pending.
 
 The repeatable [local Dev publishing workflow](LOCAL_DEV_PUBLISHING.md) is now
 implemented locally with a signed Keychain helper and synthetic/disposable-
-Keychain coverage. Real credential provisioning and a subsequent signed Sparkle
-update remain pending; neither is implied by implementation tests.
+Keychain coverage. Leo completed real provisioning, and two retrieval/signing/
+Apple-authentication preflights passed without pasted-secret prompts. The full
+clean macOS gate passed on corrected code `e633268` (353 tests, zero skips).
+A subsequent signed Sparkle update remains pending; provisioning published and
+installed nothing and did not reset daily permissions.
 
 ## Experimental offers and open-source distribution
 

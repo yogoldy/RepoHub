@@ -57,11 +57,17 @@ subsequent Sparkle update, Air acceptance and Stable promotion remain pending.
 wrapper is implemented with one-time hidden input, signed helper verification,
 existing-key continuity checks and credential-free focused tests before release.
 It reuses the staged Dev publisher and needs no per-release pasted secrets.
-Provisioning with real credentials still needs Leo's secure Terminal entry.
+Leo completed real provisioning on October 22. Two subsequent Keychain retrieval
+and Apple/signing preflights passed without pasted-secret prompts. The corrected
+code at `e633268` passed the complete clean macOS gate (353 tests, no skips).
 Keychain authorization prompts may still occur. The app/helper signing-identity
 guard is also implemented and matches installed build 9; a subsequent signed
 Sparkle update must still prove permission continuity. See
 [local Dev publishing](docs/LOCAL_DEV_PUBLISHING.md) for setup, guards and limits.
+The immediate remaining acceptance step is a separately authorized Dev release
+and Sparkle update on the Pro, preserving configuration and testing source access
+without resetting or regranting Desktop permission. Nothing was published or
+installed by the provisioning/validation work.
 
 The installed Dev candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
 a backup deferred by actively changing source files no longer leaves a generic

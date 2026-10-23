@@ -1,5 +1,12 @@
 # Local Dev publishing
 
+Validated October 22, 2026: code `e633268` passed the full clean-source macOS
+Golden Gate with 353 tests and zero skips. The Developer-ID-signed helper was
+prepared, Leo completed real provisioning, and two subsequent credential/signing/
+Apple-authentication preflights passed without pasted-secret entry. This confirms
+repeat retrieval; no new release or app installation occurred in those checks.
+Signed-to-signed Desktop permission retention remains pending installed acceptance.
+
 This developer-only workflow replaces the October 22 temporary handoff scripts.
 It does not change the app's backup rules, reset macOS permissions, install an
 update, promote Testing/Stable or configure the Air.
