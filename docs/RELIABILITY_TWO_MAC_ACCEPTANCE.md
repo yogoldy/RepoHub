@@ -472,3 +472,16 @@ on this payload and the identical Pro matrix remain required. Read-only checking
 found no isolated Pro test account yet; real Pro privacy tests therefore also
 need account preparation. No merge or daily deployment occurred. This checkpoint
 changes documentation only; the accepted application payload is unchanged.
+
+
+## Pro signed Dev update checkpoint — 2026-10-22
+
+Leo manually installed 0.1.0/build 10 through Sparkle over Developer-ID-signed
+build 9 and reported stable permissions. Read-only checks confirm app/helper
+build/source `6710337166496913814ddad4a887afa39829620b`, valid installed strict
+signature, unchanged app/Python/cloud signing identities, all six protected
+configuration hashes, three native preferences and 15 configured sources.
+No daily permission reset or regrant was performed. This passes this Pro update's
+Desktop permission continuity; it does not complete the isolated fault matrix,
+a new backup/upload observation, Air acceptance or Testing/Stable promotion.
+See the [channel checkpoint](UPDATE_CHANNELS.md#pro-signed-to-signed-update-acceptance--october-22-2026).

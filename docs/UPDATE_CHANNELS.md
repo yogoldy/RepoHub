@@ -3,8 +3,9 @@
 Implemented and branch-validated for roadmap step 1, October 20, 2026. The
 unpublished GitHub Apple-signing validation also passed; see the
 [exact-source record](RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
-The first live Dev package and its Pro bootstrap are recorded below. Testing,
-subsequent Sparkle-update acceptance and Stable promotion remain pending.
+The live Dev packages and Pro update are recorded below. Basic signed Sparkle
+update and Desktop permission continuity passed on Pro; Testing, broader two-Mac
+acceptance and Stable promotion remain pending.
 
 ## Live Dev checkpoint — October 22, 2026
 
@@ -20,8 +21,8 @@ subsequent Sparkle-update acceptance and Stable promotion remain pending.
   `a80d1f046769ac5144b940295fd204edd361b0f3d097dda4ad65a5d93079e1e1`.
   Its receipt/source, independent Sparkle signature, strict code signature,
   Gatekeeper notarized Developer ID assessment and stapled ticket verified.
-- The Pro now runs that exact app/helper build. The previous app is preserved
-  locally for rollback; all six protected configuration-file hashes match their
+- At this bootstrap checkpoint, the Pro ran that exact app/helper build. The
+  previous app is preserved locally for rollback; all six protected configuration-file hashes match their
   pre-install snapshot. No source selection, backup destination, schedule or
   existing archive was changed by installation. The Air was not changed.
 - macOS requested Desktop consent when moving from the old ad-hoc identity
@@ -62,10 +63,28 @@ permissions. The subsequent authorized publication is recorded below.
   notarized Developer ID assessment and stapled-ticket validation. App, Python
   helper and cloud-helper designated requirements match installed build 9.
 - Stable/public latest remains `repohub-v0.0.7-b7`. No main merge, Testing/Stable
-  promotion, Air change or app installation occurred. Leo will install manually
-  through Sparkle on the Pro and report any Desktop permission prompt. A private
-  pre-update baseline records installed version/identities, six configuration
-  hashes and native preferences; installed acceptance remains pending.
+  promotion or Air change occurred. At publication, installation was left to Leo
+  and remained pending. The private pre-update baseline records installed
+  version/identities, six configuration hashes and native preferences. The later
+  installed result is recorded below.
+
+### Pro signed-to-signed update acceptance — October 22, 2026
+
+Leo installed build 10 manually through Sparkle and reported “permissions
+stable.” This passes Desktop permission continuity for the Pro's Developer-ID-
+signed build 9 → 10 update. No daily permission reset or regrant was performed.
+
+Read-only checks independently confirmed installed version 0.1.0/build 10,
+matching helper build/source `6710337166496913814ddad4a887afa39829620b`, a valid
+strict installed code signature, and unchanged app/Python/cloud designated
+requirements. All six protected configuration hashes and the three checked
+native preferences match the pre-update baseline; Dev remains selected and all
+15 configured sources are listed. Private post-update evidence was saved.
+
+This completes the immediate Pro update and permission-retention check, alongside
+routine publication without pasted credentials. A new archive's verification or
+confirmed cloud upload, broader failure/recovery cases, Air acceptance and
+Testing/Stable promotion are not established by this checkpoint.
 
 ## Experimental offers and open-source distribution
 

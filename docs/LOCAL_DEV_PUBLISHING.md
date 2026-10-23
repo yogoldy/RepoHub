@@ -5,7 +5,8 @@ Golden Gate with 353 tests and zero skips. The Developer-ID-signed helper was
 prepared, Leo completed real provisioning, and two subsequent credential/signing/
 Apple-authentication preflights passed without pasted-secret entry. This confirms
 repeat retrieval; no new release or app installation occurred in those checks.
-Signed-to-signed Desktop permission retention remains pending installed acceptance.
+The later build 9 → 10 Pro update retained Desktop permission, as reported by
+Leo and recorded below; that result is separate from these preflights.
 
 The first routine Keychain publication then delivered
 [0.1.0 / build 10](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.1.0-b10)
@@ -13,9 +14,12 @@ from `6710337166496913814ddad4a887afa39829620b` on October 22. It required no pa
 credentials. The fresh focused gate passed 92 tests, zero skips and a native
 build. The downloaded archive and Dev pointer, independent Sparkle signature,
 strict signatures, Gatekeeper notarized assessment and stapled ticket verified.
-App/helper identities match installed build 9. Installation is left to Leo;
-permission retention, configuration continuity and post-update source access
-remain pending. Stable/public latest is unchanged at build 7.
+Leo subsequently installed through Sparkle and reported stable permissions.
+Read-only checks confirm installed app/helper build 10 and its exact source,
+matching build 9 signing identities, all six configuration hashes, three checked
+native preferences and 15 configured sources. The installed signature verifies.
+This passes Pro Desktop permission continuity for this update; a new backup/upload
+result and broader two-Mac acceptance are separate. Stable remains build 7.
 
 This developer-only workflow replaces the October 22 temporary handoff scripts.
 It does not change the app's backup rules, reset macOS permissions, install an
@@ -100,10 +104,12 @@ requirements for the app, Python interpreter and cloud helper. A foreign team,
 renamed helper or hash-bound requirement fails before delivery. These checks do
 not read or edit the TCC database and do not establish that permission persisted.
 
-Build 10 is available for Leo's manual Sparkle update on the Pro. Record exact
-old/new app/helper identities, protected configuration hashes, whether macOS asked again, helper-observed source reads and the actual
-backup result. A reset/regrant cannot count as retained permission. Leave Air,
-Testing and Stable acceptance pending until exercised separately.
+Leo's manual Sparkle update from signed build 9 to build 10 retained Desktop
+permission. Post-update app/helper version/source, strict signature, signing
+identities, six configuration hashes, three native preferences and source count
+were checked against the private baseline. No reset/regrant was performed.
+A new backup's verification/upload result was not established by these checks.
+Leave Air, Testing and Stable acceptance pending until exercised separately.
 
 ## Verification limits
 
