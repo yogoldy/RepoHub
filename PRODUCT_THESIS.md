@@ -36,6 +36,11 @@ Complete approved work in scoped commits with proportionate tests and evidence.
 
 ## Next delivery sequence
 
+**October 26 one-time exception:** Leo approved Stable promotion for this delivery
+after full GitHub checks and Pro acceptance while the Air is unavailable. Default
+two-Mac acceptance remains in force for other releases. Bind the exception to the
+exact candidate and disclose the untested Air; no Pro check is waived.
+
 **October 22 update:** Dev and Stable are the only channels. The former Testing
 channel is superseded by per-candidate qualification metadata: local checks →
 full GitHub checks → installed use-case acceptance and explicit Stable approval.
