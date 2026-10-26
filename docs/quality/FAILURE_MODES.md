@@ -863,6 +863,13 @@ the gate if absent, skipped or unsuccessful.
 
 ## GR26 — Staged updates preserve Stable and package identity
 
+The October 26 owner-approved Pro-only exception requires an exact candidate
+acceptance record and a separate exact-tag CLI flag. Default promotion still
+requires Air; every Pro check, GitHub qualification, protected-main check and
+archive/signature requirement remains. Public proof and notes disclose the
+exception instead of inventing Air results. Counterexamples reject another tag,
+a missing exception, pending Pro cases and absent Air results without the flag.
+
 ### Repeatable local Dev credentials
 
 The first signed Dev handoff deliberately discarded its hidden inputs, but it

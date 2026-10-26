@@ -87,6 +87,8 @@ def verify_package(folder, expected_stage=None):
         expected = validation_record(bool(proof.get('github_run_id')), stage == 'stable')
         if proof['validation'] != expected:
             raise ValueError('candidate_validation_mismatch')
+    if stage == 'stable' and proof.get('acceptance_scope') not in ('pro_and_air', 'pro_only_exception'):
+        raise ValueError('explicit_installed_acceptance_scope_required')
     if stage == 'stable' and ('validation' not in proof
             or type(proof.get('github_run_id')) is not int or proof['github_run_id'] <= 0):
         raise ValueError('qualified_stable_proof_required')
@@ -94,13 +96,17 @@ def verify_package(folder, expected_stage=None):
 
 
 def write_proof(folder, receipt, stage, run_id=None, acceptance=None, github_run_id=None,
-                validation=None):
+                validation=None, acceptance_scope=None):
     if github_run_id is not None and (type(github_run_id) is not int or github_run_id <= 0):
         raise ValueError('positive_github_run_required')
     proof = {key: receipt[key] for key in ('source_revision', 'build', 'archive_sha256')}
     proof.update(schema=1, channel=stage, validation=validation or validation_record())
     if run_id is not None:
         proof['run_id'] = run_id
+    if acceptance_scope is not None:
+        if stage != 'stable' or acceptance_scope not in ('pro_and_air', 'pro_only_exception'):
+            raise ValueError('invalid_installed_acceptance_scope')
+        proof['acceptance_scope'] = acceptance_scope
     if acceptance is not None:
         proof['acceptance_sha256'] = hashlib.sha256(acceptance).hexdigest()
     if github_run_id is not None:
@@ -118,6 +124,8 @@ def write_proof(folder, receipt, stage, run_id=None, acceptance=None, github_run
     description.text = '\n'.join(label + ': ' + proof['validation'][key] for key, label in (
         ('local_checks', 'Local checks'), ('github_checks', 'GitHub checks'),
         ('installed_acceptance', 'Installed acceptance')))
+    if acceptance_scope == 'pro_only_exception':
+        description.text += '\nAcceptance scope: Pro only; Air waived by a one-time owner approval.'
     previous = item.find('{' + PROOF_NAMESPACE + '}publication')
     if previous is not None:
         item.remove(previous)
@@ -300,10 +308,14 @@ class ChannelGitHub(GitHub):
     def publish_feed(self, stage, receipt, folder, refresh=False):
         self.assert_lock()
         if stage == 'stable':
+            _, proof = verify_package(folder, 'stable')
+            acceptance_note = ('recorded Pro acceptance; one-time owner-approved Air exception.'
+                               if proof['acceptance_scope'] == 'pro_only_exception'
+                               else 'recorded Pro/Air acceptance.')
             command(['gh', 'release', 'edit', receipt['tag'], '--repo', REPOSITORY,
                      '--prerelease=false', '--latest', '--title', 'RepoHub ' + receipt['version'],
                      '--notes', 'Promoted unchanged from Dev after local and GitHub checks and '
-                     'recorded Pro/Air acceptance.\nSource: ' + receipt['source_revision']
+                     + acceptance_note + '\nSource: ' + receipt['source_revision']
                      + '\nBuild: ' + receipt['build']])
             if self.latest()['tag_name'] != receipt['tag']:
                 raise ValueError('stable_publication_unconfirmed')
@@ -405,7 +417,8 @@ def matching_candidate(github, revision):
     return None
 
 
-def promote(github, folder, receipt, proof, target, gate, run_id, acceptance=None, approve=None, resume=False):
+def promote(github, folder, receipt, proof, target, gate, run_id, acceptance=None, approve=None,
+            resume=False, pro_only_exception=None):
     current = proof['channel']
     if not (resume and current == target):
         require_promotion(current, target)
@@ -415,7 +428,9 @@ def promote(github, folder, receipt, proof, target, gate, run_id, acceptance=Non
     if approve != receipt['tag']:
         raise ValueError('explicit_exact_tag_stable_approval_required')
     raw = acceptance.read_bytes() if acceptance else b''
-    require_acceptance(json.loads(raw), receipt)
+    acceptance_scope = require_acceptance(json.loads(raw), receipt, pro_only_exception)
+    if current == 'stable' and proof.get('acceptance_scope') != acceptance_scope:
+        raise ValueError('resume_acceptance_scope_changed')
     qualified_proof = dict(proof)
     if resume and current == 'stable':
         qualified_proof['validation'] = validation_record(True)
@@ -428,7 +443,7 @@ def promote(github, folder, receipt, proof, target, gate, run_id, acceptance=Non
         raise ValueError('stable_build_must_not_regress')
     change_feed_stage(folder, 'stable')
     write_proof(folder, receipt, 'stable', run_id, raw, github_run_id,
-                validation_record(True, True))
+                validation_record(True, True), acceptance_scope)
     verify_package(folder, 'stable')
     # Promotion only changes evidence/feed metadata; archive bytes are retained.
     github.replace_promotion_metadata(receipt['tag'], folder)
@@ -450,6 +465,8 @@ def main():
     parser.add_argument('--to', choices=['stable'])
     parser.add_argument('--acceptance', type=Path)
     parser.add_argument('--approve-stable')
+    parser.add_argument('--pro-only-exception', metavar='EXACT_TAG',
+                        help='Explicit owner-approved, exact-release Pro-only acceptance exception')
     parser.add_argument('--publish', action='store_true')
     parser.add_argument('--resume', action='store_true', help='Recheck requirements and finish an interrupted promotion')
     args = parser.parse_args()
@@ -496,7 +513,8 @@ def main():
                 print(json.dumps(qualify(github, folder, receipt, proof, gate, args.run_id)))
                 return
             print(json.dumps(promote(github, folder, receipt, proof, args.to, gate,
-                                   args.run_id, args.acceptance, args.approve_stable, args.resume)))
+                                   args.run_id, args.acceptance, args.approve_stable, args.resume,
+                                   args.pro_only_exception)))
             return
         history = github.releases()
         build_number = max((release_number(item) or 0 for item in history), default=0) + 1

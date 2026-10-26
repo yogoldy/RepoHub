@@ -102,14 +102,22 @@ def require_full_gate(gate, revision):
         raise ValueError('complete_executed_macos_gate_required')
 
 
-def require_acceptance(value, receipt):
+def require_acceptance(value, receipt, pro_only_exception=None):
     validate_channel_receipt(receipt)
     if (not isinstance(value, dict) or value.get('schema') != 1
             or value.get('source_revision') != receipt['source_revision']
             or value.get('build') != receipt['build']
             or value.get('archive_sha256') != receipt['archive_sha256']):
         raise ValueError('exact_package_native_acceptance_required')
-    for host in ('pro', 'air'):
+    scope = 'pro_and_air'
+    required_hosts = ('pro', 'air')
+    if pro_only_exception is not None:
+        expected = {'kind': 'pro_only_once', 'tag': receipt['tag']}
+        if pro_only_exception != receipt['tag'] or value.get('exception') != expected:
+            raise ValueError('explicit_exact_release_pro_only_exception_required')
+        scope = 'pro_only_exception'
+        required_hosts = ('pro',)
+    for host in required_hosts:
         hosts = value.get('hosts')
         if not isinstance(hosts, dict):
             raise ValueError('both_macs_native_acceptance_required')
@@ -120,6 +128,7 @@ def require_acceptance(value, receipt):
             raise ValueError('both_macs_native_acceptance_required')
     if receipt['distribution'] != 'developer_id' or receipt['notarized'] is not True:
         raise ValueError('stable_requires_notarized_developer_id')
+    return scope
 
 
 def require_promotion(current, target):

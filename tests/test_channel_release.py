@@ -314,6 +314,45 @@ class ChannelReleaseTests(unittest.TestCase):
             finally:
                 path.unlink(missing_ok=True)
 
+    def test_pro_only_exception_is_explicit_exact_release_scoped_and_preserves_default_air_gate(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            receipt = fixture(folder)
+            value = acceptance(receipt)
+            value['hosts'].pop('air')
+            value['exception'] = {'kind': 'pro_only_once', 'tag': receipt['tag']}
+            with self.assertRaises(ValueError):
+                require_acceptance(value, receipt)
+            for flag in ('foreign-tag', ''):
+                with self.assertRaises(ValueError):
+                    require_acceptance(value, receipt, flag)
+            missing_approval = dict(value, exception={})
+            with self.assertRaises(ValueError):
+                require_acceptance(missing_approval, receipt, receipt['tag'])
+            for case in ACCEPTANCE_CASES:
+                invalid = copy.deepcopy(value)
+                invalid['hosts']['pro'][case] = 'pending'
+                with self.assertRaises(ValueError):
+                    require_acceptance(invalid, receipt, receipt['tag'])
+            self.assertEqual(require_acceptance(value, receipt, receipt['tag']), 'pro_only_exception')
+            proof = verify_package(folder)[1]
+            qualify(FakeChannelGitHub(folder), folder, receipt, proof, gate(), 123)
+            proof = verify_package(folder)[1]
+            path = folder.parent / (folder.name + '-pro-only.json')
+            try:
+                path.write_text(json.dumps(value))
+                github = FakeChannelGitHub(folder)
+                original = (folder / receipt['archive']).read_bytes()
+                promote(github, folder, receipt, proof, 'stable', gate(), 124,
+                        path, receipt['tag'], pro_only_exception=receipt['tag'])
+                current = verify_package(folder, 'stable')[1]
+                self.assertEqual(current['acceptance_scope'], 'pro_only_exception')
+                self.assertIn('Air waived by a one-time owner approval', (folder / 'appcast.xml').read_text())
+                self.assertEqual((folder / receipt['archive']).read_bytes(), original)
+                self.assertNotIn('upload', github.events)
+            finally:
+                path.unlink(missing_ok=True)
+
     def test_interrupted_promotion_needs_explicit_resume_and_rechecks_requirements(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
@@ -503,12 +542,19 @@ class ChannelReleaseTests(unittest.TestCase):
                 github.publish_feed('dev', dict(receipt, build='7'), folder, refresh=True)
                 self.assertFalse(any(call[:3] == ['gh', 'release', 'upload'] for call in calls))
             calls.clear()
+            from tools.channel_release import change_feed_stage
+            change_feed_stage(folder, 'stable')
+            write_proof(folder, receipt, 'stable', 124, b'controlled acceptance', 123,
+                        {'local_checks': 'passed', 'github_checks': 'passed',
+                         'installed_acceptance': 'passed'}, 'pro_only_exception')
             with patch.object(github, 'assert_lock'), patch.object(github, 'latest', return_value={'tag_name': receipt['tag']}), \
                     patch('tools.channel_release.command', side_effect=command):
                 github.publish_feed('stable', receipt, folder)
             self.assertEqual(len(calls), 1)
             self.assertIn('--prerelease=false', calls[0])
             self.assertIn('--latest', calls[0])
+            self.assertIn('one-time owner-approved Air exception', calls[0][calls[0].index('--notes') + 1])
+            self.assertNotIn('recorded Pro/Air acceptance', calls[0][calls[0].index('--notes') + 1])
             self.assertEqual(calls[0][calls[0].index('--title') + 1], 'RepoHub ' + receipt['version'])
 
     def test_stable_requires_main_ancestry_and_identical_tree_and_never_regresses(self):

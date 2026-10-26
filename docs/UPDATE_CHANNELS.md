@@ -116,6 +116,20 @@ record must match source/build/archive hash. Both `pro` and `air` must pass
 `permissions`, `configuration`, `install_update`, `backup` and `channels`; Air
 also requires `onboarding`. Never create passing attestations to unblock a command.
 
+### One-time Pro-only exception — approved October 26, 2026
+
+Leo explicitly approved the current two-channel delivery to reach Stable after
+GitHub checks and Pro acceptance, with the Air unavailable. The default remains
+both Macs. This exception must be recorded on the exact candidate's private
+acceptance JSON with `exception: {"kind": "pro_only_once", "tag": "<exact tag>"}`
+and enabled separately with `--pro-only-exception <exact tag>`. The outer acceptance
+still binds source/build/archive hash and every Pro case must pass. Another tag,
+missing exception record, failed Pro case or missing GitHub/main/signature check
+fails closed. Resume requires the same scope and evidence again. Public proof
+records `acceptance_scope=pro_only_exception`, and Stable notes explicitly disclose
+the waived Air check. No Air result may be marked passed by this exception.
+The release tag and observed Pro results will be bound after packaging/testing.
+
 Promotion rechecks the GitHub qualification and current main, authenticates the
 archive and retains its original download URL/bytes. Only feed/proof metadata and
 release visibility change. Stable proof records all three passed stages and the
