@@ -41,6 +41,35 @@ never tooltip prose. GR06 and GR22 register the regression tests. Browser previe
 cannot save native preferences. Actual installed menu-bar layout and restart
 acceptance remain required when this local candidate is delivered.
 
+### Source-change recovery through Rescan now — issue #14, October 22, 2026
+
+An installed build recorded `SourceChanged` as both `verification_deferred` and
+`repo_backup_failed`. Rescan now refreshed verification, but the old backup
+error still took precedence in the shared presentation and problem tracker.
+This produced a persistent “Needs attention — failure” for retryable source
+activity. Local evidence confirmed ongoing writes too; a scan cannot make an
+actively written source stable or replace a backup.
+
+The typed exception now records `backup.deferred` and a `verification_deferred`
+event linked to the attempt's run/repo/archive. An otherwise successful run ends
+as `deferred`; mixed genuine errors still end as `failed`. The current verification
+becomes `changing`, which the existing shared renderer, diagnostics and menu-bar
+aggregation already understand. No new readiness classifier, message matching,
+source exclusions, schedule change or immediate backup retry is introduced.
+The previous archive/index stay intact. The deferred attempt remains historical
+when a later successful scan replaces the live verification state.
+
+The isolated regression first failed on the original persistent error. It now
+exercises the guarded `/api/scan` route through ongoing writes, matched contents
+and newly detected edits, confirming no backup call or archive/index change.
+Synthetic exact-archive upload evidence is explicit; it is not a real iCloud
+observation. A second case retains a genuine permission failure beside a
+source-change deferral after rescan, including the menu warning. Typed export
+keeps the deferred reason and attempt history. Both tests are registered in GR02
+and discovered by the existing GitHub workflow/full gate and focused Dev suite.
+Installed/native acceptance of this local fix remains pending delivery; the
+running installed helper is unchanged.
+
 ### GR01 — Preserve complete contained workspace bytes
 
 **Susceptible boundary:** Hidden, ignored and uncommitted files silently omitted; archive member handling loses directories or modes.
@@ -643,6 +672,27 @@ Wildcard binding is rejected. This is an application change, so prior native
 updater acceptance is historical until repeated for the new candidate.
 
 
+### Permission identity across signed updates (GR20)
+
+The October 22 transition from ad-hoc build 7 to Developer ID build 9 requested
+Desktop consent again; Leo selected Allow. The preserved ad-hoc app's designated
+requirement was a binary hash with no Team ID. Build 9 instead has the persistent
+Developer ID requirement for Team `LJM5FKB7DY`. This is evidence of a signing-identity
+transition, not a reproduced signed-to-signed permission failure.
+
+`tools/signing_identity.py` records the observed app, Python helper and cloud tool
+identifiers/requirements from build 9. Both Developer ID packaging and archive
+preparation reject another team, changed helper identity, custom/hash-only
+requirements and escaping component links. Counterexamples include a valid
+signature with an incompatible declared requirement; notarization is insufficient
+for this contract. The installed build 9 passes this read-only check. No daily
+privacy setting is reset or edited. A subsequent signed Sparkle update must still
+demonstrate retained consent and helper-observed source access independently.
+
+Apple documents designated requirements and privacy-resource sharing in
+[TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+
+
 ## GR21 — accepted source and atomic release availability
 
 A passing feature-branch or PR gate is not an accepted main release. Publication
@@ -810,3 +860,104 @@ remaining native permission, iCloud and installed-update checks. The macOS PR,
 main and publication workflows all execute the same complete Golden Gate; new
 Python/JS wrappers are discovered automatically, with registered test IDs failing
 the gate if absent, skipped or unsuccessful.
+
+## GR26 — Staged updates preserve Stable and package identity
+
+### Repeatable local Dev credentials
+
+The first signed Dev handoff deliberately discarded its hidden inputs, but it
+was incorrectly described as a finished one-time workflow. A failed draft lookup
+also consumed the one-use launcher and required a replacement script. This was
+developer publishing friction, not a requirement for normal update recipients.
+
+`tools/local_dev.py` now separates one-time secure setup from repeatable explicit
+Dev publication. Setup checks the original public key against repository
+configuration, verifies private/public continuity and Apple credentials, and
+saves the existing material in Keychain only after success. The Developer-ID-
+signed helper trusts its own code identity; no allow-all ACL or silent credential
+replacement is used. Bounded pipe input is read completely rather than assuming
+one read returns the entire credential bundle. No signer is shipped to app users.
+
+The gate runs without signing credentials; source drift or a failed gate prevents
+loading them. Missing/locked/cancelled Keychain access and an untrusted helper
+stop before release mutation. A failure records its actual stage and permits a
+new run of the same command. Child signing output is not persisted or echoed;
+errors expose typed reasons only. These developer run records are private, not
+backup readiness evidence or shareable application diagnostics.
+
+Fixtures exercise two publications without secret prompts, gate/source failure,
+locked access, publisher failure/retry, existing-item refusal, configured-key
+mismatch, secret-free errors, unsigned-helper refusal and a disposable Keychain
+roundtrip without changing the user's search list. Fixture UI is explicitly
+disabled so a locked-item test cannot wait for a consent dialog. Real Keychain
+provisioning still needs the owner's secure entry; a subsequent signed Sparkle
+update and retained Desktop permission remain separate acceptance work.
+
+The first real signed-helper preparation caught an inline-requirement syntax
+error missed by the mocked command fixture: `codesign -R` interpreted bare text
+as a filename. Prefix the predicate with `=`; the Security framework's string
+API still takes bare text. A real ad-hoc-signed temporary binary now reproduces
+the pre-fix rejection, passes the corrected expected identifier and fails a
+foreign identifier. This regression uses no real signing key or daily app.
+
+
+A single GitHub latest feed made every accepted main release visible to every
+installation. The two-channel contract separates Dev and Stable; exact-package metadata records
+local checks, full GitHub qualification and installed acceptance in that order. Stable remains the default on each Mac. Native
+actions accept only fixed channel names and exact owned menu-page requests;
+revision conflicts and an active update/backup prevent an ambiguous save.
+
+A saved Dev preference previously worked without a separate deliberate opt-in,
+and every installation showed experimental choices. An explicit Boolean local
+preference now enables those choices only after restarting the app. Missing,
+false or malformed enablement forces effective Stable selection even when a Dev
+preference remains on disk. Native saves reject experimental channels without
+that opt-in; page messages cannot enable it. The launch-time policy snapshot
+prevents an external preference change from switching policy midway through an
+update session. Tests use disposable preference domains and a second process to
+check persistence and revocation without touching either daily installation.
+The shipped controller hides choices until a valid native response enables them;
+forged DOM selection or contradictory replies cannot enable saving. The page
+must not imply confirmed Stable settings when loading failed: it shows
+settings as unavailable and disables its update action until a valid reply loads.
+Diagnostics preserve the effective channel and a bounded enabled/disabled policy, rejecting
+contradictory disabled/experimental combinations independently of the UI.
+The read-only browser check also reproduced shared flex-row styling overriding
+the action container's `hidden` attribute. Scoped hidden selectors now force
+both experimental containers to `display: none`; the October 21 browser readback
+confirmed this computed style and the absence of channel Save/Cancel controls.
+That preview has no native bridge and does not count as installed channel acceptance.
+
+Counterexamples cover wrong channels, missing/skipped/stale checks, corrupt
+archives, uploaded-byte mismatches, foreign/failing GitHub runs, incomplete
+Pro/Air acceptance, missing Stable approval and a substituted publisher lock.
+Promotion changes feed/proof metadata while preserving the signed archive. A
+public-key RFC fixture passes cryptographic verification; altered bytes with a
+matching rewritten checksum still fail signature verification. Interrupted
+promotion can be explicitly resumed only after its requirements are checked
+again. Candidate/prerelease feed publication must not move public latest.
+
+The first local signed Dev attempt on October 22 passed its 76-test focused
+gate and credential preflight, then stopped after creating draft build 8. GitHub's
+release-by-tag REST endpoint returned 404 for that unpublished draft; the
+draft-aware `gh release view` returned the expected metadata. Candidate creation
+now uses the draft-aware lookup and checks the exact tag, source, draft and
+prerelease flags. The regression first reproduces the 404, then rejects foreign
+targets/tags, published releases, missing prerelease flags and reserved tags.
+Build 8 remains reserved and unpublished, with no assets; the next attempt must
+use a higher build and fresh clean-source gate. This failure did not build or
+install a package, change a channel feed, or move Stable.
+
+Shareable diagnostics add bounded update_channel and experimental_channels enums and typed reasons;
+an update ready state is not repository readiness or confirmed cloud upload.
+Live channel publication, Apple services and installed channel/permission
+continuity remain separate acceptance evidence, not implied by these fixtures.
+
+The optional manual `validate_signing` workflow input exercises real Apple
+credentials only after the complete clean-source gate. Counterexamples reject
+push/PR/fork invocation, stale or skipped gate evidence, a changed source digest,
+corrupt artifacts and failed independent archive signatures. Validation packages
+use a deliberately non-promotable receipt. The workflow has read-only repository
+permissions, never publishes or installs, and records bounded failure evidence
+while cleaning temporary packages and signing material. Apple service acceptance
+still requires an actual successful run; these counterexamples do not imply it.

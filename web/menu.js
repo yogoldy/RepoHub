@@ -404,6 +404,7 @@ function showSettingsPage(page) {
     $('#updates-note').textContent = native
       ? 'Your backup folders and settings stay separate.'
       : 'Check for Updates is available in the installed Mac app.';
+    void window.RepoHubUpdateChannels?.open();
   }
 }
 
@@ -496,6 +497,9 @@ async function closeSettings() {
 }
 
 async function leaveSettingsPage() {
+  if (activeSettingsPage === 'updates') {
+    return await window.RepoHubUpdateChannels?.leave() ?? true;
+  }
   if (activeSettingsPage === 'appearance') {
     return await window.RepoHubMenuAppearance?.leave() ?? true;
   }

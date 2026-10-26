@@ -4,12 +4,18 @@ on:
     branches: [main, 'codex/**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      validate_signing:
+        description: Validate an unpublished Developer ID package using repository secrets
+        type: boolean
+        required: false
+        default: false
 permissions:
   contents: read
 jobs:
   automated-contract:
     runs-on: macos-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -17,6 +23,34 @@ jobs:
           fetch-depth: 0
       - name: Run RepoHub's golden rules including first-run setup and discovery
         run: python3 tools/release_gate.py --require-clean --output "$RUNNER_TEMP/repohub-golden-rules.json"
+      - name: Validate an unpublished Apple-signed package when explicitly requested
+        if: github.event_name == 'workflow_dispatch' && inputs.validate_signing && github.repository == 'yogoldy/RepoHub'
+        env:
+          REPOHUB_UPDATE_PUBLIC_KEY: ${{ vars.REPOHUB_UPDATE_PUBLIC_KEY }}
+          REPOHUB_SPARKLE_PRIVATE_KEY: ${{ secrets.REPOHUB_SPARKLE_PRIVATE_KEY }}
+          REPOHUB_CERTIFICATE_P12: ${{ secrets.REPOHUB_CERTIFICATE_P12 }}
+          REPOHUB_CERTIFICATE_PASSWORD: ${{ secrets.REPOHUB_CERTIFICATE_PASSWORD }}
+          REPOHUB_SIGNING_IDENTITY: ${{ secrets.REPOHUB_SIGNING_IDENTITY }}
+          REPOHUB_NOTARY_KEY: ${{ secrets.REPOHUB_NOTARY_KEY }}
+          REPOHUB_NOTARY_KEY_ID: ${{ secrets.REPOHUB_NOTARY_KEY_ID }}
+          REPOHUB_NOTARY_ISSUER: ${{ secrets.REPOHUB_NOTARY_ISSUER }}
+        run: python3 tools/validate_signing.py --gate-receipt "$RUNNER_TEMP/repohub-golden-rules.json" --output "$RUNNER_TEMP/repohub-signing-validation.json"
+      - name: Record bounded signing-validation evidence
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.validate_signing && github.repository == 'yogoldy/RepoHub'
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          path = Path(os.environ['RUNNER_TEMP']) / 'repohub-signing-validation.json'
+          if not path.exists():
+              print('Signing validation did not execute; inspect the prerequisite gate result.')
+          else:
+              report = json.loads(path.read_text())
+              print(json.dumps(report, sort_keys=True))
+              with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+                  summary.write('## Unpublished signing validation\n\n```json\n')
+                  summary.write(json.dumps(report, indent=2) + '\n```\n')
+          PYTHON
       - name: Explain failed synthetic checks
         if: failure()
         run: |

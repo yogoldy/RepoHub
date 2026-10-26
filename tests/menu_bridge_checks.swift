@@ -4,6 +4,32 @@ import Foundation
     static func main() {
         let url = URL(string: "http://127.0.0.1:8767/menu.html")!
         let setup = URL(string: "http://127.0.0.1:8767/setup.html")!
+        let channelSave: [String: Any] = ["action": "saveUpdateChannel", "channel": "dev",
+            "revision": "initial", "request_id": String(repeating: "a", count: 24)]
+        precondition(MenuBridge.action(body: channelSave, frameURL: url, isMainFrame: true) == .saveUpdateChannel)
+        precondition(MenuBridge.action(body: channelSave, frameURL: setup, isMainFrame: true,
+                                      expectedPage: "/setup.html") == nil)
+        precondition(MenuBridge.action(body: channelSave, frameURL: url, isMainFrame: false) == nil)
+        for bad in ["foreign", "https://outside.invalid/feed.xml", ""] {
+            var message = channelSave
+            message["channel"] = bad
+            precondition(MenuBridge.action(body: message, frameURL: url, isMainFrame: true) == nil)
+        }
+        var extra = channelSave
+        extra["feed"] = "https://outside.invalid/feed.xml"
+        precondition(MenuBridge.action(body: extra, frameURL: url, isMainFrame: true) == nil)
+        for field in ["experimental_channels", "experimentalUpdateChannelsEnabled", "enabled"] {
+            var message = channelSave
+            message[field] = true
+            precondition(MenuBridge.action(body: message, frameURL: url, isMainFrame: true) == nil)
+        }
+        precondition(MenuBridge.action(body: ["action": "enableExperimentalChannels"],
+            frameURL: url, isMainFrame: true) == nil)
+        for field in ["request_id", "revision"] {
+            var message = channelSave
+            message[field] = "untrusted"
+            precondition(MenuBridge.action(body: message, frameURL: url, isMainFrame: true) == nil)
+        }
         for action in ["chooseBackupDestination", "chooseDiscoveryParent", "chooseRepoFolders"] {
             let body = ["action": action, "request_id": String(repeating: "b", count: 24)]
             precondition(MenuBridge.action(body: body, frameURL: setup, isMainFrame: true) == nil)

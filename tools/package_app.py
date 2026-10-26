@@ -17,6 +17,11 @@ import tempfile
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
+try:
+    from tools.signing_identity import verify_identity
+except ModuleNotFoundError:
+    from signing_identity import verify_identity
+
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = ROOT / 'tools/update-dependencies.json'
 NATIVE = ('RepoHub.swift', 'HelperLaunch.swift', 'BackupReadiness.swift',
@@ -29,6 +34,7 @@ WEB_ASSETS = (
     'diagnostics-client.js',
     'index.html',
     'menu-appearance.js',
+    'update-channels.js',
     'menu.css',
     'menu.html',
     'menu.js',
@@ -258,6 +264,8 @@ def build(output, cache, version, build_number, identifier, feed, public_key,
         (resources / 'release.json').write_text(json.dumps(manifest, sort_keys=True) + '\n')
         run('/usr/bin/codesign', '--force', '--sign', identity, *options, app)
         run('/usr/bin/codesign', '--verify', '--deep', '--strict', app)
+        if mode == 'developer_id':
+            verify_identity(app)
         verify(resources)
         app.rename(output)
     return {'app': str(output), 'source_revision': revision, 'build': build_number,

@@ -1,6 +1,12 @@
 # RepoHub golden-rule release gate
 
-For Leo’s personal Sparkle channel, the [October 17 delivery policy](../RELEASE_DELIVERY.md) allows publication after an exact-main automated pass, with native checks following delivery. Keep missing native evidence open; do not block personal update availability on a circular pre-install test requirement. Other deployment boundaries below remain.
+The [October 20 staged delivery policy](../RELEASE_DELIVERY.md) distinguishes
+local Dev, full-gate Testing and explicitly accepted Stable. This full gate is
+required for Testing and Stable. Dev alone uses the fixed focused
+`tools/dev_gate.py` receipt plus native/package/signature checks; it cannot move
+public latest or bypass main protection. Missing native evidence remains open
+and blocks Stable, not the intended Dev/Testing acceptance builds. Historical
+release-order statements below do not override this staged policy.
 
 This is our executable product contract. It checks backup safety, diagnostic evidence, privacy, scoped APIs, restore behavior and source/package consistency. It is not a claim of mathematical correctness or an exhaustive end-to-end test.
 

@@ -1,6 +1,69 @@
-# Personal RepoHub update delivery
+# RepoHub update delivery
 
-## Agreed policy — October 17, 2026
+## Current policy — October 22, 2026
+
+Leo approved **Dev and Stable**, replacing the earlier three-channel proposal.
+The complete operational contract is [Update channels](UPDATE_CHANNELS.md).
+
+- **Dev:** build/publish locally after focused clean-source checks, a native build
+  and signature/notarization checks. Keychain provisioning is complete on Pro.
+- **GitHub qualification:** the full gate and exact successful canonical push run
+  are recorded on an existing Dev candidate. It remains on Dev. No package is
+  built, resigned or replaced; CI uses only its public verification key.
+- **Stable:** promote the exact qualified archive after recorded Pro/Air use cases,
+  explicit exact-tag approval and current protected-main/full-gate requirements.
+  No automatic main-to-Stable publisher exists. Missing evidence fails closed.
+
+Candidate metadata denotes local checks → GitHub checks → installed acceptance.
+Ordinary installs stay Stable; deliberate experimental opt-in exposes Dev. Testing
+is no longer a channel. The existing public Stable URL is retained. Dev stays a
+prerelease and never moves public latest. No private hosting or hardware access
+control is needed. Changing channel never downgrades an installed build.
+
+The two-channel changes are local pending delivery. Earlier authorized Dev builds
+9 and 10 are live; Pro build 9 → 10 retained Desktop permission per Leo, with exact
+installed source/identity and configuration independently verified. Air, broader
+native acceptance and Stable promotion remain pending. Publication and installation
+are separately authorized actions. No old archive/release is automatically deleted.
+
+## Unpublished signing validation — October 20, 2026
+
+Leo authorized a branch-only push and manual signing test, without main merge,
+release publication, feed changes or installation. Both the local clean macOS
+gate and the [GitHub branch gate](https://github.com/yogoldy/RepoHub/actions/runs/39531738911)
+passed on `49462f18482093ea380ccbaafe5a686db5d75ac7`. The local gate ran 334
+Python tests with zero skips, all 26 registered rules and all 31 build/tool checks.
+
+The [manual signing run](https://github.com/yogoldy/RepoHub/actions/runs/39531752665)
+repeated the full gate, then successfully used the saved GitHub credentials to
+decrypt/import the P12 in a disposable keychain, sign the coordinated Developer
+ID app/helper, obtain Apple's Accepted notarization result, staple/validate the
+ticket, pass Gatekeeper assessment, and prepare and independently authenticate
+the Sparkle-signed archive. No credential values were recorded in source or the
+bounded receipt. The job's failure-explanation step was intentionally skipped
+because its prerequisite checks passed; it is not a skipped regression test.
+
+The validation-only version `0.0.0`, build `1`, and non-release tag cannot pass the
+managed release/promotion contract; no global release number was reserved.
+Archive: 28,704,263 bytes, SHA-256
+`57f66caa875a78a83af9df3985782238470c32b13dc814554612bf155f7f6c36`.
+Its receipt records `result=passed`, unchanged source, `published=false` and
+`installed=false`. Temporary package/archive/signing files were cleaned; the
+bounded JSON remains in the Actions log and summary.
+
+After the test, main remained `77ad73b6ebd5f52b2f92ce437abf59506827457a`, public
+latest remained `repohub-v0.0.7-b7`, and `REPOHUB_RELEASE_MODE` remained
+`personal_adhoc`. The existing main publisher has not yet received the branch's
+Testing-only changes. The test does not enable Developer ID release mode or
+claim live channel delivery, installed acceptance, permission continuity or Air
+coverage. Those remain subsequent roadmap actions with their own authorization.
+
+## Historical personal delivery record — October 17, 2026
+
+The following records the earlier single-feed implementation and its credential
+setup. Its automatic-publication, retention and pre-Apple Stable policy is
+superseded by the staged policy above. Preserve its dated evidence limits; do
+not treat the old release versions or Air state as a fresh observation.
 
 Leo approved easy delivery to his own Macs: a protected main merge with a passing automated Golden Gate may publish an update; installed-Mac testing follows delivery. It is not a claim that every native interaction has been validated. Keep the outstanding native reliability matrix and signing/permission evidence visible. Do not add an unstated native approval prerequisite to personal delivery. This supersedes the earlier pre-delivery native acceptance requirement for this personal updater channel only; it does not authorize bypassing main protection, publishing failed checks or silently installing daily apps.
 

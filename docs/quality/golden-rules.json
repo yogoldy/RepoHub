@@ -27,10 +27,11 @@
         "repo_checked",
         "archive_stage",
         "repo_backup_failed",
+        "verification_deferred",
         "scan_retry_requested"
       ],
-      "cause_and_solution": "Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members.",
-      "required_behavior": "Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits.",
+      "cause_and_solution": "Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members. A typed SourceChanged during a backup is a deferred attempt, not a persistent generic error that shadows later manual scans. Preserve attempt history separately from live verification and retain ordinary I/O/corruption failures.",
+      "required_behavior": "Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits. Manual Rescan now must recover a deferred source-change display without starting a backup or erasing its diagnostic history. Continued writes stay Checking again; a stable comparison may become backed up only with matching upload evidence, or backup pending when edits remain. Real failures remain visible after rescanning.",
       "test_ids": [
         "test_hub.HubTests.test_same_size_same_mtime_edit_is_detected_and_replaced",
         "test_hub.HubTests.test_timestamp_only_changes_match_hashes_and_do_not_replace_backup",
@@ -39,6 +40,8 @@
         "test_hub.HubTests.test_source_mutation_is_transient_and_retry_is_scoped",
         "test_hub.HubTests.test_archive_mutation_is_not_source_mutation",
         "test_hub.HubTests.test_retry_api_requires_trusted_explicit_repo_and_never_uploads",
+        "test_scoped_backups.ScopedBackupTests.test_source_changed_backup_defers_and_manual_scan_recovers_without_backup",
+        "test_scoped_backups.ScopedBackupTests.test_source_change_deferral_does_not_hide_real_failure_after_rescan",
         "test_change_evidence.EvidenceTests.test_changing_source_has_explainable_icon_and_manual_retry_trail"
       ],
       "remaining_gap": "Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided."
@@ -458,7 +461,7 @@
         "update_checkpoint"
       ],
       "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, copy web resources from an explicit allowlist covering served routes, verify resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
-      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Unlisted web files never ship; missing or linked required web assets fail packaging. Test apps cannot use the daily identity or port.",
+      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Developer ID packages retain build 9's app/interpreter/cloud-helper Team IDs, code identifiers and designated requirements; a different or code-hash-only identity stops packaging and archive preparation. Unlisted web files never ship; missing or linked required web assets fail packaging. Test apps cannot use the daily identity or port.",
       "test_ids": [
         "test_app_package.AppPackageTests.test_bundle_web_allowlist_excludes_unlisted_files_and_directories",
         "test_app_package.AppPackageTests.test_bundle_web_allowlist_rejects_missing_or_linked_required_assets",
@@ -474,9 +477,12 @@
         "test_update_shutdown.UpdateShutdownTests.test_bundled_sigterm_waits_for_archive_publication_and_preserves_prior_copy",
         "test_update_feed.UpdateFeedTests.test_feed_uses_actual_build_signature_and_exact_length",
         "test_update_feed.UpdateFeedTests.test_key_file_must_be_private_regular_and_owned",
+        "test_signing_identity.SigningIdentityTests.test_changed_team_helper_identifier_or_hash_requirement_is_rejected",
+        "test_signing_identity.SigningIdentityTests.test_package_inspection_checks_all_access_components_and_rejects_escaping_helper",
+        "test_signing_identity.SigningIdentityTests.test_wrong_identity_stops_archive_before_notarization_or_signing_key_use",
         "test_update_shutdown.UpdateShutdownTests.test_loopback_startup_does_not_wait_for_hostname_resolution"
       ],
-      "remaining_gap": "Final native isolated acceptance on application source 985814d passed cancellation, signed replacement, invalid signature, truncated archive, equal-version refusal, busy-backup refusal and automatic rollback after injected helper failure, with unchanged synthetic archive/configuration hashes. Clean local gate: 233 tests, 20 rules, 25 commands; GitHub automated-contract passed that exact source. Production Developer ID/notarization, permission continuity, key/feed custody, first coordinated launchd migration and persistent recovery explanation remain open. Daily Macs unchanged."
+      "remaining_gap": "Historical isolated acceptance on 985814d passed cancellation, signed replacement, invalid signature, truncation, equal-version/busy refusal and injected-failure rollback with unchanged fixture data. October 22 Dev build 9 passed Developer ID/notarization and was installed on the Pro with unchanged protected configuration. Leo granted Desktop access after the ad-hoc-to-Developer-ID identity transition. Signed-to-signed privacy-grant continuity and a subsequent installed Sparkle update remain unverified; signature compatibility is necessary evidence, not proof of TCC consent retention. Air acceptance remains pending."
     },
     {
       "id": "GR21",
@@ -588,6 +594,51 @@
         "test_setup_ui.SetupUITests.test_actual_welcome_controller_requires_access_review_and_explicit_save"
       ],
       "remaining_gap": "Large real inventories and unusual Git layouts need observed runs. External Git storage is explicitly unsupported by discovery; no background auto-add is implemented."
+    },
+    {
+      "id": "GR26",
+      "title": "Experimental update channels cannot silently promote Stable",
+      "breakpoint": "A single latest-release feed exposed every successful main build publicly; channel changes or promotion could lose provenance, skip acceptance or rebuild a different archive.",
+      "diagnostic_events": ["application_update"],
+      "cause_and_solution": "Default each Mac to Stable; expose Dev only after an explicit Boolean local opt-in read at launch. Enforce the same policy in native selection, settings rendering and bounded diagnostics, including preexisting Dev preferences. Keep fixed feeds and guarded revision-checked saves. Publish Dev locally after focused clean-source checks, record exact successful full-gate GitHub qualification on that same Dev package, and require explicit approval plus both-host exact-package acceptance for notarized Stable promotion. Reserve global builds under a repository lock and verify uploaded bytes and archive signatures before changing feeds.",
+      "required_behavior": "Absent, false or malformed opt-in means Stable only; hidden controls cannot authorize experimental saves. Removing the opt-in suppresses saved Dev preferences on restart without changing unrelated settings or backup readiness. Malformed or contradictory UI/diagnostic policy evidence fails closed. Experimental publication preserves public latest. Local Dev provisioning verifies existing keys before saving in Keychain; repeated releases load credentials only after the clean-source gate, never request pasted secrets, never expose child signing output, and allow a fresh run after failure. Missing/locked credentials and an untrusted helper fail closed. Publisher keys/tools never ship in the app. Qualification and promotion change metadata only and retain archive bytes. Candidate validation records local checks, exact GitHub checks and both-host installed acceptance in that order; no Testing channel is accepted. Hosted qualification cannot build a package and leaves Stable unchanged. Skipped/stale gates, malformed or wrong-channel feeds, foreign sources and incomplete acceptance fail closed. Interrupted promotion requires explicit resume and rechecks. Channel diagnostics are bounded and never establish backup or upload success.",
+      "test_ids": [
+        "test_update_channels.UpdateChannelTests.test_shipped_channel_page_explicit_save_discard_and_conflicts",
+        "test_update_channels.UpdateChannelTests.test_native_default_feed_isolation_and_revision_checked_selection",
+        "test_update_channels.UpdateChannelTests.test_channel_diagnostics_are_bounded_and_cannot_establish_backup_success",
+        "test_update_channels.UpdateChannelTests.test_experimental_policy_diagnostics_reject_disagreement_and_export_bounded_values",
+        "test_channel_release.ChannelReleaseTests.test_candidate_publication_compares_download_before_feed_without_moving_stable",
+        "test_channel_release.ChannelReleaseTests.test_candidate_checks_draft_metadata_without_requiring_a_published_tag",
+        "test_channel_release.ChannelReleaseTests.test_dev_gate_cannot_be_missing_skipped_stale_dirty_or_full_gate_substitute",
+        "test_channel_release.ChannelReleaseTests.test_github_qualification_requires_exact_successful_nonfork_push_and_real_contract",
+        "test_channel_release.ChannelReleaseTests.test_full_gate_requires_executed_rules_and_native_package_workflow_commands",
+        "test_channel_release.ChannelReleaseTests.test_workflow_qualifies_existing_dev_without_building_or_publishing_stable",
+        "test_channel_release.ChannelReleaseTests.test_pointer_is_a_prerelease_never_latest_and_retries_only_identical_bytes",
+        "test_channel_release.ChannelReleaseTests.test_qualification_keeps_dev_feed_and_archive_and_records_ordered_checks",
+        "test_channel_release.ChannelReleaseTests.test_stable_requires_exact_approval_both_hosts_notarization_and_protected_main",
+        "test_channel_release.ChannelReleaseTests.test_interrupted_promotion_needs_explicit_resume_and_rechecks_requirements",
+        "test_channel_release.ChannelReleaseTests.test_auto_qualification_selects_only_existing_exact_source_candidate",
+        "test_channel_release.ChannelReleaseTests.test_validation_record_rejects_missing_skipped_and_out_of_order_evidence",
+        "test_channel_release.ChannelReleaseTests.test_repository_lock_is_exclusive_and_never_removes_another_owners_lock",
+        "test_channel_release.ChannelReleaseTests.test_promotion_authenticates_archive_using_public_key_without_private_key",
+        "test_local_dev.LocalDevTests.test_publication_requires_local_host_clean_source_and_explicit_action",
+        "test_local_dev.LocalDevTests.test_repeated_publications_use_keychain_after_gate_without_secret_prompts_or_logs",
+        "test_local_dev.LocalDevTests.test_failed_gate_or_source_change_never_loads_credentials",
+        "test_local_dev.LocalDevTests.test_locked_keychain_and_failed_publish_stop_safely_and_allow_fresh_retry",
+        "test_local_dev.LocalDevTests.test_untrusted_helper_invalid_credentials_and_unsafe_directory_are_rejected",
+        "test_local_dev.LocalDevTests.test_setup_verifies_before_storing_and_never_overwrites_an_existing_item",
+        "test_local_dev.LocalDevTests.test_cli_errors_never_echo_raw_exception_or_secret",
+        "test_local_dev.LocalDevTests.test_wrong_update_public_key_never_imports_credentials_or_signs",
+        "test_local_dev.LocalDevTests.test_native_disposable_keychain_roundtrip_and_unsigned_helper_refusal",
+        "test_local_dev.LocalDevTests.test_codesign_predicate_is_inline_and_checks_the_fixture_identifier",
+        "test_local_dev.LocalDevTests.test_local_signing_tool_and_secrets_never_ship_to_app_users",
+        "test_validate_signing.ValidateSigningTests.test_hosted_signing_requires_explicit_manual_request_and_exact_source",
+        "test_validate_signing.ValidateSigningTests.test_failed_stale_skipped_or_changed_gate_never_opens_signing_material",
+        "test_validate_signing.ValidateSigningTests.test_validation_package_cannot_be_promoted_as_a_managed_release",
+        "test_validate_signing.ValidateSigningTests.test_failure_or_source_change_cleans_package_and_never_leaks_error_text",
+        "test_validate_signing.ValidateSigningTests.test_workflow_keeps_signing_opt_in_read_only_and_after_full_gate"
+      ],
+      "remaining_gap": "Synthetic GitHub tests and public-key fixtures do not prove live prerelease/feed publication, Apple notarization, channel changes in the installed native app or Pro/Air update continuity. Those require separately authorized live delivery and native acceptance."
     }
   ]
 }

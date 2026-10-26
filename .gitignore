@@ -19,6 +19,7 @@ secrets/
 credentials/
 *.pem
 *.key
+*.p8
 *.p12
 *.pfx
 *.keychain

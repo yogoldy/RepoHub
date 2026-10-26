@@ -13,8 +13,10 @@ import xml.etree.ElementTree as ET
 
 try:
     from tools.package_app import dependency, extract, sha256, validate_options, verify
+    from tools.signing_identity import verify_identity
 except ModuleNotFoundError:
     from package_app import dependency, extract, sha256, validate_options, verify
+    from signing_identity import verify_identity
 
 SPARKLE = 'http://www.andymatuschak.org/xml-namespaces/sparkle'
 
@@ -26,7 +28,9 @@ def validate_key_file(path):
         raise ValueError('private_key_file_required')
 
 
-def appcast(info, archive_url, signature, length):
+def appcast(info, archive_url, signature, length, update_channel='stable'):
+    if update_channel not in ('stable', 'dev'):
+        raise ValueError('unsupported_update_channel')
     parsed = urlparse(archive_url)
     test = info.get('RepoHubTestMode') is True
     validate_options(info['CFBundleIdentifier'], archive_url, info['SUPublicEDKey'], test)
@@ -37,6 +41,8 @@ def appcast(info, archive_url, signature, length):
     channel = ET.SubElement(rss, 'channel')
     ET.SubElement(channel, 'title').text = info['CFBundleName']
     item = ET.SubElement(channel, 'item')
+    if update_channel != 'stable':
+        ET.SubElement(item, '{' + SPARKLE + '}channel').text = update_channel
     ET.SubElement(item, 'title').text = info['CFBundleName'] + ' ' + info['CFBundleShortVersionString']
     ET.SubElement(item, '{' + SPARKLE + '}version').text = info['CFBundleVersion']
     ET.SubElement(item, '{' + SPARKLE + '}shortVersionString').text = info['CFBundleShortVersionString']
@@ -59,7 +65,7 @@ def archive_distribution(info, manifest):
     return 'test' if test else 'developer_id'
 
 
-def prepare(app, output, archive_url, key_file, cache):
+def prepare(app, output, archive_url, key_file, cache, update_channel='stable'):
     validate_key_file(key_file)
     if output.exists() or output.is_symlink():
         raise ValueError('new_output_directory_required')
@@ -70,11 +76,12 @@ def prepare(app, output, archive_url, key_file, cache):
     subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(app)], check=True)
     mode = archive_distribution(info, manifest)
     if mode == 'developer_id':
+        verify_identity(app)
         # A locally signed build alone does not establish distribution readiness.
         subprocess.run(['/usr/bin/xcrun', 'stapler', 'validate', str(app)], check=True)
         subprocess.run(['/usr/sbin/spctl', '--assess', '--type', 'execute', str(app)], check=True)
     # Validate URL before creating an archive or invoking a signing key.
-    appcast(info, archive_url, '', 0)
+    appcast(info, archive_url, '', 0, update_channel)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='repohub-feed-', dir=output.parent) as folder:
         work = Path(folder)
@@ -93,7 +100,7 @@ def prepare(app, output, archive_url, key_file, cache):
         # The explicit file argument prevents a fallback to the daily login Keychain.
         signature = subprocess.check_output([str(signer), '-f', str(key_file), '-p', str(archive)], text=True).strip()
         subprocess.run([str(signer), '-f', str(key_file), '--verify', str(archive), signature], check=True)
-        (artifacts / 'appcast.xml').write_bytes(appcast(info, archive_url, signature, archive.stat().st_size))
+        (artifacts / 'appcast.xml').write_bytes(appcast(info, archive_url, signature, archive.stat().st_size, update_channel))
         receipt = {'source_revision': manifest['source_revision'], 'build': manifest['build'],
                    'archive_sha256': sha256(archive), 'archive_bytes': archive.stat().st_size,
                    'test_only': info.get('RepoHubTestMode') is True, 'distribution': mode,

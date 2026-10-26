@@ -887,6 +887,7 @@ class Hub:
             self.backup_lock.release()
             return False
         failures = []
+        deferred = []
         outcome = "complete"
         self.lifecycle.emit("backup_started", run_id=run_id, previous_run_id=self.status.get("backup", {}).get("run_id") or self.previous_backup_run,
                             reason=reason, mode="all" if keys is None else "selected")
@@ -935,9 +936,7 @@ class Hub:
                             observe("existing_verification")
                             verified = verify_current(root, previous)
                         except SourceChanged:
-                            self.lifecycle.emit("verification_deferred", key=key, run_id=run_id,
-                                                stage="existing_verification", reason="source_changed_during_verification", result="deferred")
-                            raise
+                            raise  # Handled as a typed deferral outside the archive-repair path.
                         except OSError as error:
                             # A cloud placeholder/read failure is not evidence of corruption.
                             # Keep the current backup and let the normal retry policy try again.
@@ -1000,6 +999,25 @@ class Hub:
                     self.retain_current(key, result)
                     self.lifecycle.emit("repo_backup_finished", key=key, current=result, result="created",
                                         bytes=result["archive_bytes"], duration_ms=(time.monotonic()-repo_started)*1000)
+                except SourceChanged:
+                    # A changing source cannot establish a consistent comparison.
+                    # Preserve the archive and the attempt history, without making
+                    # later successful scans inherit a permanent backup error.
+                    if outcome == "complete":
+                        outcome = "deferred"
+                    deferred.append({"repo": root.name, "repo_id": key,
+                                     "reason": "source_changed_during_verification"})
+                    verification = {"state": "changing", "checked_at": utc_now(),
+                                    "reason": "source_changed_during_verification"}
+                    with self.lock:
+                        self.verifications[key] = verification
+                        for row in self.status["repos"]:
+                            if row["id"] == key:
+                                row["verification"] = dict(verification)
+                                row["needs_backup"] = True
+                    self.lifecycle.emit("verification_deferred", key=key, run_id=run_id,
+                                        stage=stage, archive_ref=diagnostic_ref(current_archive),
+                                        reason="source_changed_during_verification", result="deferred")
                 except Exception as e:
                     outcome = "failed"
                     self.lifecycle.emit("repo_backup_failed", key=key, run_id=run_id, stage=stage, archive_ref=diagnostic_ref(current_archive),
@@ -1011,8 +1029,12 @@ class Hub:
                         failure["error"] = failure["access"]["detail"]
                     failures.append(failure)
             with self.lock:
-                self.status["backup"] = {"running": False, "finished_at": utc_now(), "run_id": run_id, "errors": failures,
-                                         "note": "Archives verified locally. macOS manages iCloud upload."}
+                note = ("Last backup attempt waited for changing files; previous archives were kept. "
+                        "macOS manages iCloud upload." if deferred else
+                        "Archives verified locally. macOS manages iCloud upload.")
+                self.status["backup"] = {"running": False, "finished_at": utc_now(), "run_id": run_id,
+                                         "errors": failures, "deferred": deferred,
+                                         "note": note}
                 self.persist_status()
         except Exception as e:
             outcome = "failed"
@@ -1122,6 +1144,7 @@ class Handler(BaseHTTPRequestHandler):
                       "/workspace-setup.js": "workspace-setup.js", "/workspace-setup.css": "workspace-setup.css",
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
                       "/menu-appearance.js": "menu-appearance.js",
+                      "/update-channels.js": "update-channels.js",
                       "/setup.html": "setup.html", "/setup.js": "setup.js", "/setup.css": "setup.css",
                       "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:

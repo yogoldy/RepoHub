@@ -11,7 +11,7 @@ from tools.package_app import build, extract, inventory, runtime_modules, valida
 
 
 EXPECTED_WEB_ASSETS = {
-    'app.js', 'diagnostics-client.js', 'index.html', 'menu-appearance.js',
+    'app.js', 'diagnostics-client.js', 'index.html', 'menu-appearance.js', 'update-channels.js',
     'menu.css', 'menu.html', 'menu.js', 'notes.html', 'readiness.css',
     'readiness.js', 'repo-status.js', 'report-preview.js', 'report.css',
     'style.css', 'view-client.js', 'workspace-setup.css', 'workspace-setup.js',

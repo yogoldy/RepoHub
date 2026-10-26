@@ -3,12 +3,24 @@
 RepoHub should make it easy to answer: **Are my chosen repos safely backed up,
 and what needs my attention?** The menu bar is the everyday view.
 
-## Scope and status — October 17, 2026
+The goal is an open-source application that other people can understand and use
+reliably. "Productizable" refers to usable setup, clear explanations, coherent
+UI, meaningful diagnostics, continuous integration and stable update delivery;
+it is not a monetization requirement. These are continuing product principles,
+not a separate redesign or an instruction to add unnecessary infrastructure.
+The repository is public. License selection remains an owner decision: GitHub
+reported no detected license and no project license file was found on October 20.
+
+## Scope and status — updated October 22, 2026
 
 This is the current reference for Leo's unfinished product requests. It supersedes
 the previous tiered roadmap at source
 `38d354d5ade1cc5664c43a15cb680bc31b0d0019`; Git retains that version and its
-implementation history. Leo approved the revised scope below on October 17.
+implementation history. Leo approved the revised scope below on October 17 and
+consolidation of the testing roadmap into this reference on October 20.
+Leo reconfirmed the eleven-step delivery proposal as the canonical roadmap;
+it retains his subsequent decision to put account-free reporting before other
+Finder sync-folder providers. Older proposals do not define a separate queue.
 
 - **Requested:** agreed product direction, with implementation still pending.
 - **Implemented:** code exists; this does not imply every installed-Mac condition
@@ -17,15 +29,161 @@ implementation history. Leo approved the revised scope below on October 17.
   than a new feature.
 - **Superseded:** removed from the active roadmap by Leo's revised direction.
 
-Roadmap entries do not by themselves start feature implementation, set an
-implementation order, authorize external submissions, or authorize a Git push.
+The sequence below records the current intended order. Roadmap entries do not
+by themselves start feature implementation, authorize external submissions,
+or authorize a Git push.
 Complete approved work in scoped commits with proportionate tests and evidence.
 
-## Current local update batch
+## Next delivery sequence
 
-Leo authorized the package-resource change below as the first implementation in
-this batch. The remaining requested features still need their own implementation
-scope; this batch stays local until promotion is authorized.
+**October 22 update:** Dev and Stable are the only channels. The former Testing
+channel is superseded by per-candidate qualification metadata: local checks →
+full GitHub checks → installed use-case acceptance and explicit Stable approval.
+GitHub qualification and Stable promotion retain the exact signed archive. This
+local change needs a later app update to remove Testing from installed controls;
+it does not rebuild or republish build 10. See the [channel contract](docs/UPDATE_CHANNELS.md).
+
+The first signed Dev release, `0.0.9` / build 9, was published and installed on
+the Pro on October 22 from `a9b3895f36a4c76ac68882863baf1ffae26a4d43`.
+Its 77-test focused Dev gate, native build, Apple notarization, stapling,
+Gatekeeper and independent downloaded-archive signature checks passed. The app
+and helper report that exact build/source; six protected configuration files
+retained their pre-install hashes. Stable remains build 7; the Air is untouched.
+See the [live Dev checkpoint](docs/UPDATE_CHANNELS.md#live-dev-checkpoint--october-22-2026)
+and earlier [unpublished signing record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
+
+The ad-hoc-to-Developer-ID transition requested Desktop access again; Leo granted
+it. This establishes initial consent, not permission continuity across a future
+signed update. The helper listed all 15 configured sources without permission
+errors; content verification and the broader native acceptance remain separate.
+The Pro's local experimental opt-in is enabled; after the explicit Settings save,
+native evidence reports Dev; the earlier no-newer-update check preceded build 10.
+GitHub qualification, broader installed acceptance, Air acceptance and Stable
+promotion remain pending.
+
+**Pro signed-update checkpoint passed.** The
+repeatable Keychain publisher is provisioned and published
+[0.1.0 / build 10](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.1.0-b10)
+from `6710337166496913814ddad4a887afa39829620b` on October 22 without pasted
+credentials. Its fresh focused gate passed 92 tests with zero skips and a native
+build. The downloaded archive, independent Sparkle signature, notarization,
+stapling and exact Dev feed verified. App/helper designated requirements match
+build 9. Leo installed through Sparkle and reported that permissions remained
+stable. Read-only post-update checks confirm app/helper build 10 and its exact
+source, matching signing identities, all six protected configuration hashes,
+all three checked native preferences and the 15-source list. No daily permission
+reset or regrant was performed. This establishes Pro signed-to-signed Desktop
+permission retention for build 9 → 10; it does not establish a new backup/upload
+result or the broader two-Mac acceptance matrix.
+The corrected publisher code at `e633268` also passed the complete clean macOS
+gate (353 tests, no skips); build 10 adds only the provisioning checkpoint to it.
+See [local Dev publishing](docs/LOCAL_DEV_PUBLISHING.md) for guards and limits.
+Stable remains build 7; the Air and Stable promotion were not changed.
+
+The installed Dev candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
+a backup deferred by actively changing source files no longer leaves a generic
+failure overriding later Rescan now results. Attempt history and genuine errors
+remain visible. GR02 covers manual-scan recovery and archive preservation; this
+fix still requires installed acceptance after delivery.
+
+Updating this roadmap is already handled here; it is not an additional
+prerequisite or a numbered development stage. This sequence replaces the old
+interaction-testing plan. Existing controller, API, native and release coverage
+remains evidence within its original limits; installed acceptance is separate.
+
+1. **Implement Dev and Stable with candidate validation records.** Dev provides quick delivery
+   to opted-in Macs after focused tests, a native build and package/signature
+   checks. GitHub qualification requires the full automated gate; Stable requires installed
+   acceptance and Leo's explicit promotion approval. Dev must not replace the
+   stable feed or public latest download. Record source identity, monotonic build
+   numbering and channel-switch behavior. The updater, local publisher,
+   qualification workflow, diagnostics and policy are implemented together in the current local
+   branch candidate. Build 10 is offered on Dev and installed on the Pro. The
+   signed update retained Desktop permission; GitHub qualification and broader updater
+   acceptance remain pending. See the
+   [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
+   Existing protected-main requirements remain in force.
+   **Ordinary-user offer isolation:** ordinary installations follow Stable and
+   keep experimental controls out of their normal settings flow. Deliberately
+   enable Dev locally on Leo's Pro and Air. Public feeds/packages and
+   deliberate advanced access by others are acceptable; do not add private
+   repositories, authentication services or hardware restrictions. Validate
+   Stable defaults, explicit test enablement, persisted preference behavior,
+   exact-channel update offers, diagnostic agreement and byte-identical Stable
+   promotion. The clarified UI/enablement behavior is implemented locally with
+   isolated native/controller/diagnostic regressions. The Pro opt-in is enabled;
+   its guarded saved Dev selection and the earlier no-newer-update check were
+   observed before build 10 publication.
+   Basic Pro update/permission continuity passed on build 9 → 10; broader update
+   cases and Air enablement/acceptance remain pending.
+2. **Configure consistent Developer ID signing and notarization.** Use a
+   consistent app/helper identity across channels; verify signed components,
+   hardened runtime, notarization and stapling. Test the existing ad-hoc app's
+   transition without claiming that signing grants folder access. Membership
+   is active per Leo. A valid Developer ID Application identity, the required
+   GitHub secret names and read-only notarization authentication are verified.
+   The unpublished GitHub signing/notarization package test passed on source
+   `49462f18482093ea380ccbaafe5a686db5d75ac7`. The first signed Dev bootstrap is
+   installed with renewed Desktop consent. The subsequent signed build 9 → 10
+   Sparkle update retained Desktop permission, per Leo, with matching identities
+   and protected configuration confirmed independently.
+3. **Deliver a Dev build to the Pro, including local commit `82b1a85`.** Confirm
+   setup stays inside the menu-bar panel, dismissal/reopening retains drafts,
+   and picker choose/cancel returns to the same step. Exercise repo selection,
+   navigation, Finder shortcuts, status explanations, default/per-repo settings
+   Save/Cancel, Back up now and Rescan now. Check the visible Show me folder
+   highlight, its reset, repeated/repo-switched activation, keyboard and reduced
+   motion, without opening Finder or modifying settings as a demo side effect.
+4. **Test permission and failure recovery on the Pro.** Use isolated fixtures
+   and an isolated identity/account for disruptive cases: actual folder-access
+   refusal/grant/revocation/restart, optional notification permission lifecycle,
+   helper interruption/reconnection, stale status, unreadable roots/nested files,
+   destination denial and volume disappearance/substitution/remount. Preserve
+   configuration, IDs, schedules and previous verified archives; compare native
+   display, helper observations and diagnostics. Never reset daily permissions.
+5. **Save useful visual regressions and record full GitHub qualification.** Add checks
+   for concrete gaps alongside existing controller/API/native coverage. Use
+   synthetic data and isolated settings; select tools for the needed behavior,
+   rather than making a particular browser MCP installation a prerequisite.
+   Controlled failures must fail the gate. Browser checks do not establish actual
+   macOS permission or Finder behavior.
+6. **Deliver another signed update to the Pro.** Verify permission/configuration
+   continuity across an update, app/helper versions, channel eligibility and
+   recovery. Pro build 9 → 10 passed the signed Sparkle update and reported
+   Desktop permission continuity, with app/helper source, configuration and
+   preferences verified. Broader channel/recovery cases remain open.
+7. **Test installation and a subsequent update on the Air.** Verify onboarding,
+   helper-observed access, native pickers, backup hashes and actual upload
+   observations on the same candidate package. Preserve the Air's own settings;
+   use an isolated account/identity for fresh-install conditions. Exercise the
+   complete CI/distribution/install/update loop, with explicit evidence for each
+   host and cleanup of owned test services. A fix creates a new candidate whose
+   affected acceptance checks must be rerun.
+8. **Promote the accepted package to Stable.** Require the full gate and exact GitHub qualification, recorded
+   installed results and Leo's approval. Promote the tested package without an
+   untested rebuild; follow protected-main checks and record source/package
+   identity, version and recovery options.
+9. **Implement account-free reporting and maintainer review (R6).** Users
+   preview and explicitly send sanitized diagnostics without a GitHub account;
+   a hosted service posts to Leo's tracker with server-held credentials. Establish
+   this feedback path before expanding provider-specific behavior.
+10. **Support other Finder sync-folder destinations (R2).** Test provider
+    placeholders, access, disappearance/recovery and preservation. Keep local
+    verification distinct from confirmed remote upload.
+11. **Evaluate TestFlight (R7; low priority).** Consider tester feedback and crash
+    reporting after the Sparkle workflow is established.
+
+Readability standards remain current. Broad cleanup and Leo's representative
+AI-teacher review are deferred and require separate scope approval; they do not
+block channels or signing. CloudKit, remote push notifications, Tailwind and
+TestSprite evaluation remain deferred. Update commands, links and coverage claims
+as each step lands; do not retain a competing release order in historical guides.
+
+## Implemented foundation and pending local follow-up
+
+The previous local update batch shipped through releases 0.0.5–0.0.7. The
+setup-panel follow-up `82b1a85` is committed locally, not pushed or installed;
+native opening/dismissal and picker-return acceptance remain in step 3 above.
 
 - [x] **Explicit packaged web assets:** the bundle builder copies a declared list
   rather than the whole `web` directory. Extra local files are excluded; missing
@@ -37,18 +195,20 @@ scope; this batch stays local until promotion is authorized.
   non-green readiness remain unchanged. A visible scan action uses the existing
   guarded scan API without creating a backup. Diagnostic policy 7 retains older
   wording for historical receipts; GR06 covers the waiting/recovery and request
-  boundaries. Installed-Mac delivery remains part of the next update.
+  boundaries. These controls were delivered in the first-run setup release batch.
 - [x] **Prominent scan and backup controls:** Back up now and Rescan now share
   equal-width gold buttons with distinct circular-arrow/scan icons. Repository
   Backups is a full-width navigation row with a folder icon, white label, trailing
   chevron and subtle hover fill, followed by notifications. The footer keeps only
   the last-check time and Quit. Scan requests preserve the icon through pending
   and failed requests. This is a local presentation change, not a new backup rule.
-- [x] **First-run setup candidate:** the approved five-step welcome window,
+- [x] **First-run setup:** the approved five-step welcome flow,
   one iCloud destination, readable folder layouts, reviewed Git discovery and
   recoverable configuration saves are integrated. The first protected release
-  passed the clean gate and installed migration; a draft-reload correction has
-  its own final delivery checks. See [the implementation record](docs/FIRST_RUN_SETUP.md).
+  passed the clean gate and installed migration; draft reload, discovery
+  cancellation and selected-destination Finder corrections shipped in 0.0.6 and
+  0.0.7. See [the implementation record](docs/FIRST_RUN_SETUP.md). The local panel
+  host change remains separately pending above.
 
 ## Existing foundation
 
@@ -66,7 +226,7 @@ The following are implemented and must not be rediscovered as unfinished feature
 
 ### R1 — Choose the backup destination
 
-**Status: Implemented candidate; awaiting acceptance.** This release selects one
+**Status: Implemented and installed on the Pro in the 0.0.5–0.0.7 release batch.** Selects one
 folder inside iCloud Drive; other providers and multiple destinations remain
 outside it. See [first-run setup](docs/FIRST_RUN_SETUP.md).
 
@@ -104,9 +264,11 @@ records remain evidence with their original limits.
 
 ### R3 — Replayable visual onboarding
 
-**Status: Implemented candidate; awaiting acceptance.** The five-step welcome
-window supports fresh setup and an existing user's prefilled review without
-changing configuration before explicit apply. See [first-run setup](docs/FIRST_RUN_SETUP.md).
+**Status: Setup implemented and installed; local panel follow-up awaits native
+acceptance.** The five-step welcome flow supports fresh setup and an existing
+user's prefilled review without changing configuration before explicit apply.
+This does not close the separate walkthrough/Show me interaction checks in
+step 3 above. See [first-run setup](docs/FIRST_RUN_SETUP.md).
 
 Explain sources, destination, schedules, manual backup, verification and upload
 status through a short visual walkthrough tied to actual controls. Offer Skip,
@@ -117,7 +279,7 @@ tutorial on every launch.
 
 ### R4 — Preserve repo names in backup folders
 
-**Status: Implemented candidate; awaiting acceptance.** Revised by Leo on October 18: one naming behavior,
+**Status: Implemented, with installed Pro migration/hash/upload evidence.** Revised by Leo on October 18: one naming behavior,
 without custom labels.
 
 - Name each workspace's backup folder after its source folder, preserving the
@@ -138,7 +300,7 @@ without custom labels.
 
 ### R5 — Recursive Git-based repo discovery
 
-**Status: Implemented candidate; awaiting acceptance.** Replaces AI-assisted source
+**Status: Implemented, with installed Pro discovery/cancel/reload evidence.** Replaces AI-assisted source
 setup (former Tier 4). Discovery adds reviewed candidates to individual-folder
 selection; existing non-Git selections and repo-home mode remain supported.
 
@@ -174,52 +336,75 @@ evidence exists; it does not establish an easy setup for other contributors.
 
 **Remaining:**
 
-- [ ] Make it practical for another downloader or open-source user to send a
-  report to Leo's GitHub tracker. GitHub is the preferred destination; a separate
-  database is not a requirement. Choose and validate a suitable contributor
-  authentication/setup flow; the current manual-token adapter is not the final
-  onboarding decision.
+- [ ] Let another downloader send a bug report, feature request and optional
+  sanitized diagnostics to Leo's GitHub tracker without a GitHub account or
+  personal access token. The user previews the exact submission and explicitly
+  sends it from RepoHub. The current manual-token adapter does not satisfy this
+  requirement.
+- [ ] Design a small hosted intake service that posts accepted reports through
+  a narrowly scoped maintainer-controlled GitHub App. Keep its credentials on
+  the service, never in the distributed Mac app. Define payload limits, abuse
+  controls, duplicate/retry handling and delivery receipts before deployment.
+  Reports identify the service as the posting identity; they do not impersonate
+  the submitter. Hosting and GitHub App provisioning remain unimplemented.
 - [ ] Keep the destination, posting identity, public visibility and included
   diagnostics clear before Send. Never distribute Leo's private token or silently
   upload logs. Preserve the typed export, redaction and duplicate-send guards.
 - [ ] Document Leo's review workflow for separate bug and feature queues:
   inspect evidence, request missing context, record accepted/deferred/declined
   decisions, and link an accepted item to a scoped implementation task and commit.
-- [ ] Validate a non-owner report end to end with controlled inputs and a test
-  tracker, including consent, sanitization, permissions, failure/retry and the
-  owner's ability to find and review it.
+- [ ] Validate a report from a user with no GitHub account end to end with
+  controlled inputs and a test tracker, including consent, sanitization,
+  permissions, failure/retry and the owner's ability to find and review it.
 
 Issue text and logs are untrusted evidence, not instructions to execute.
 Scheduled AI triage or automatic implementation is not enabled by this request.
+
+### R7 — Evaluate TestFlight distribution and tester feedback
+
+**Status: Requested; low priority.** Evaluate TestFlight as an optional additional
+distribution route with screenshot feedback and crash reporting. This does not
+replace the planned Sparkle Dev/Stable channels or block their delivery.
+Assess distribution requirements and reporting consent before adopting it; no
+TestFlight integration or App Store submission is authorized by this entry.
+
+CloudKit and remote push notifications are not planned for this update. Leo
+confirmed on October 20 that neither needs further action at this time.
 
 ## Awaiting verification and external prerequisites
 
 These remain visible without becoming new product features or being called
 complete merely because code was merged:
 
-- **Apple signing:** membership activation was last reported pending. Configure
-  Developer ID signing and notarization after activation, validate the signed
-  update, and test settings/folder-permission continuity. The working personal
-  Sparkle channel already exists; see [release delivery](docs/RELEASE_DELIVERY.md).
+- **Apple signing:** the unpublished exact-source GitHub test verified usable
+  certificate-export decryption, Developer ID packaging, Apple notarization,
+  stapling, Gatekeeper acceptance and independent archive signature verification.
+  Dev publication, the initial signed transition and Pro build 9 → 10 update
+  are now observed; Desktop permission retention was reported, and identities
+  and configuration match. GitHub qualification, Stable promotion and Air acceptance remain pending.
+  The public Stable release and release-mode variable remain unchanged; see the
+  [signing validation record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
 - **Installed-Mac reliability:** track actual folder permissions, native picker,
   notification, volume, login and recovery cases in the
   [two-Mac acceptance record](docs/RELIABILITY_TWO_MAC_ACCEPTANCE.md).
-- **Interaction coverage and readability:** retain the separately scoped
-  [testing/readability roadmap](docs/INTERACTION_TESTING_READABILITY_ROADMAP.md).
-  Its historical checkpoints require reconciliation with later work before
-  selecting another stage; this update does not authorize a broad refactor.
+- **Interaction coverage and readability:** interaction checks are integrated
+  into steps 3–7 above. The [readability standards](docs/READABILITY_STANDARDS.md)
+  remain current; representative teacher review and broad cleanup are deferred,
+  rather than prerequisites for this release sequence.
 - **Informed ownership:** retain Leo's requested hands-on comparison of backend
   events with displayed status in the [timing acceptance record](docs/BACKUP_TIMING_ACCEPTANCE_2026-10-16.md).
   Automated agreement is not a substitute for that personal walkthrough.
 
-For Leo's personal channel, protected main plus the automated Golden Gate can
-publish before installed-Mac testing. Follow the [current delivery policy](docs/RELEASE_DELIVERY.md);
-do not reinstate superseded pre-delivery restrictions from historical records.
+Successful full GitHub checks may qualify an existing Dev package before installed
+acceptance. Stable requires explicit approval and recorded Pro/Air results.
+Follow the [current delivery policy](docs/RELEASE_DELIVERY.md); do not apply the
+superseded automatic-Stable policy from historical records.
 
 ## Superseded scope
 
 | Previous plan | Current direction |
 | --- | --- |
+| Separate nine-stage interaction/testing roadmap | This document's delivery sequence incorporates its remaining interaction and recovery checks; readability standards remain current and broad cleanup is deferred. |
 | AI proposal import, assistant connections and AI-guided folder setup (Tier 4) | R5: local recursive discovery using Git, followed by user review. |
 | Custom backup-folder labels and an optional “Backup” suffix | R4: preserve the source folder name as the only naming behavior; keep IDs and hashes in metadata. |
 | Direct cloud-provider APIs/account connectors and a separate expanded independent-restore roadmap (Tier 5) | R1/R2: user-selected Finder destinations and evidence-based validation of those folders. Historical restore evidence and existing integrity safeguards remain. |
