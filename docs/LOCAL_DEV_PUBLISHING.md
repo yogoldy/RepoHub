@@ -109,7 +109,10 @@ permission. Post-update app/helper version/source, strict signature, signing
 identities, six configuration hashes, three native preferences and source count
 were checked against the private baseline. No reset/regrant was performed.
 A new backup's verification/upload result was not established by these checks.
-Leave Air, GitHub qualification and Stable acceptance pending until exercised separately.
+Build 11 subsequently passed exact-source GitHub qualification, Pro installed
+acceptance and unchanged-package Stable promotion under the October 26 Air
+exception; see [the delivery record](UPDATE_CHANNELS.md#stable-delivery-and-pro-acceptance--october-26-2026).
+Air remains untested.
 
 ## Verification limits
 
@@ -120,3 +123,15 @@ Dev-only dispatch. They do not read real secrets, publish a package, install an
 update or reset daily permissions. The full Golden Gate discovers these tests;
 the focused Dev suite includes the local-publisher and signing-identity modules.
 Existing GitHub triggers remain unchanged.
+
+## Installed-runtime fixture invocation
+
+Invoke the signed bundled interpreter with the normal native launcher's
+`-E -s -B` flags when testing against an isolated configuration. Omitting `-B`
+can add/replace bytecode caches inside the sealed bundle, invalidating its resource
+signature even though application source was unchanged. The October 26 private
+fixture caught this mistake; original resources were restored from the verified
+package without resigning, and the corrected test plus strict signature and full
+bundle comparison passed. Verify the installed signature after such tests. Keep
+test configuration/destinations separate from daily state and do not claim cloud
+upload from a local fixture.
