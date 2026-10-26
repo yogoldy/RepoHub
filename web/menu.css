@@ -290,6 +290,11 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   color: var(--green);
 }
 
+/* The heading is focused for context, but is not a keyboard control. */
+#settings-title:focus {
+  outline: none;
+}
+
 /* The toolbar stays outside the scrolling page content. */
 #settings-dialog {
   padding: 0;
