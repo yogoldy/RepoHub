@@ -159,6 +159,49 @@ class HealthTests(unittest.TestCase):
         annotate_health(status, {}, 5000)
         self.assertTrue(status['repos'][0]['health']['fresh'])
 
+    def test_completed_repo_check_is_independent_of_an_older_scan(self):
+        status = status_at(5000)
+        status['scanned_at'] = stamp(4800)
+        first = status['repos'][0]
+        first['scan_checked_at'] = stamp(4995)
+        other = copy.deepcopy(first)
+        other['scan_checked_at'] = stamp(4800)
+        status['repos'].append(other)
+        annotate_health(status, {}, 5000)
+        self.assertTrue(first['health']['fresh'])
+        self.assertFalse(other['health']['fresh'])
+        first['scan_checked_at'] = stamp(4800)
+        annotate_health(status, {}, 5000)
+        self.assertFalse(first['health']['fresh'])
+
+    def test_progressing_scan_defers_scan_only_alert_without_making_status_fresh(self):
+        status = status_at(5000)
+        status['scanned_at'] = stamp(4800)
+        status['full_scan_progress_at'] = stamp(4990)
+        annotate_health(status, {}, 5000)
+        self.assertFalse(status['repos'][0]['health']['fresh'])
+        tracker = ProblemTracker()
+        tracker.update(status, 5000)
+        self.assertEqual(tracker.update(status, 5121), [])
+        # A hung scan must eventually raise the ordinary stale alert.
+        tracker.update(status, 5301)
+        self.assertTrue(any(item['detail'] == 'Status outdated'
+                            for item in tracker.update(status, 5422)))
+        # Repeated progress cannot hide the same stale episode indefinitely.
+        tracker = ProblemTracker()
+        for now in (5000, 5200, 5400, 5599, 5601):
+            status['full_scan_progress_at'] = stamp(now)
+            issues = tracker.update(status, now)
+        self.assertTrue(any(item['detail'] == 'Status outdated' for item in issues))
+        # Other stale evidence is not concealed by unrelated scan progress.
+        status['full_scan_progress_at'] = stamp(5500)
+        status['repos'][0]['cloud']['checked_at'] = stamp(5300)
+        annotate_health(status, {}, 5500)
+        tracker = ProblemTracker()
+        tracker.update(status, 5500)
+        self.assertTrue(any(item['detail'] == 'Status outdated'
+                            for item in tracker.update(status, 5621)))
+
     def test_ignored_finder_receipt_also_requires_fresh_hash_check(self):
         status = status_at(5000)
         status['repos'][0]['verification'].update(state='different', ignored_finder_only=True, checked_at=stamp(3979))

@@ -36,6 +36,39 @@ class HubTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_scan_publishes_completed_repo_without_refreshing_pending_repo(self):
+        other = self.repos / "ZSlow"
+        other.mkdir()
+        (other / "work.txt").write_text("other")
+        self.hub.scan()
+        previous = {row['name']: row['scan_checked_at'] for row in self.hub.status['repos']}
+        entered, release = threading.Event(), threading.Event()
+        errors = []
+        def slow_tree(path):
+            if Path(path).resolve() == other.resolve():
+                entered.set()
+                if not release.wait(10):
+                    raise TimeoutError('test scan blocked')
+            return tree_entries(path)
+        def run_scan():
+            try:
+                self.hub.scan()
+            except Exception as error:
+                errors.append(error)
+        with patch('repohub.tree_entries', side_effect=slow_tree):
+            worker = threading.Thread(target=run_scan)
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(10), repr(errors))
+                current = {row['name']: row for row in self.hub.public_status()['repos']}
+                self.assertGreater(current['Example']['scan_checked_at'], previous['Example'])
+                self.assertEqual(current['ZSlow']['scan_checked_at'], previous['ZSlow'])
+            finally:
+                release.set()
+                worker.join(10)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(errors, [])
+
     def test_source_mutation_is_transient_and_retry_is_scoped(self):
         second = self.repos / "Other"
         second.mkdir()

@@ -379,6 +379,7 @@ class Hub:
         self.lifecycle = BackupLifecycle(self.diagnostics)
         self.lock = threading.RLock()
         self.scan_lock = threading.Lock()
+        self.full_scan_progress_at = None
         self.backup_lock = threading.Lock()
         self.csrf = secrets.token_urlsafe(32)
         self.readiness = None
@@ -550,6 +551,9 @@ class Hub:
             return
         scan_id, scan_started = secrets.token_hex(8), time.monotonic()
         scan_complete = False
+        if repo_id is None:
+            with self.lock:
+                self.full_scan_progress_at = utc_now()
         self.diagnostics.emit("scan_started", scan_id=scan_id, mode="content" if deep else "metadata", reason="forced" if force else "poll")
         try:
             previous_rows = {row["id"]: row for row in self.status["repos"]}
@@ -560,7 +564,8 @@ class Hub:
                     continue
                 repo_started = time.monotonic()
                 verification_performed = False
-                row = {"id": key, "name": root.name, "path": str(root)}
+                row = {"id": key, "name": root.name, "path": str(root),
+                       "scan_id": scan_id, "scan_checked_at": utc_now()}
                 try:
                     require_source(root, canonical_only=True)
                     if key != "repohub-data":self.registry.require_workspace(key, root)
@@ -630,6 +635,18 @@ class Hub:
                 row["cloud"] = self.cloud_for(key, current)
                 self.evidence.repo_checked(row, scan_id, (time.monotonic() - repo_started) * 1000, not verification_performed)
                 rows.append(row)
+                # Publish only completed checks; never refresh the timestamps of
+                # other folders while a slow source is still being examined.
+                with self.lock:
+                    if repo_id is None:
+                        self.full_scan_progress_at = utc_now()
+                    current_rows = self.status["repos"]
+                    for index, current_row in enumerate(current_rows):
+                        if current_row["id"] == key:
+                            current_rows[index] = row
+                            break
+                    else:
+                        current_rows.append(row)
             with self.lock:
                 self.scheduler.observe(rows, time.monotonic())
                 self.status.update({"scan_id": scan_id, "repos": rows,
@@ -646,6 +663,8 @@ class Hub:
                                   duration_ms=(time.monotonic() - scan_started) * 1000)
             with self.lock:
                 self.status["verifying"] = None
+                if repo_id is None:
+                    self.full_scan_progress_at = None
             self.scan_lock.release()
 
     def persist_status(self):
@@ -679,6 +698,7 @@ class Hub:
                                           build_id=diagnostic_ref(self.application_release["source_revision"]))
                     self.last_update_evidence = update
             result["power_source"] = self.power
+            result["full_scan_progress_at"] = self.full_scan_progress_at
             result["observed_at"] = utc_now()
             result["diagnostics"] = self.diagnostics.status()
             annotate_health(result, self.config, time.time())
