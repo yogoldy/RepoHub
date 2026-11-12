@@ -66,7 +66,15 @@ class ProblemTracker:
                 # A changing percentage is evidence of progress, even with 4355.
                 observed[key + ":upload"] = (name, "Upload has not shown progress for 30 minutes", 1800,
                                                (cloud.get("archive"), cloud.get("percent")))
+        active_ids = {row["id"] for row in status.get("repos", [])}
+        active_names = {row["name"] for row in status.get("repos", [])}
         for error in status.get("backup", {}).get("errors", []):
+            # Historical failures remain in the backup receipt, but a reviewed
+            # removal must also retire that source's active notification episode.
+            if "repo_id" in error and error["repo_id"] not in active_ids | {"repohub-data"}:
+                continue
+            if "repo_id" not in error and "repo" in error and error["repo"] not in active_names:
+                continue
             name = error.get("repo", "Repo Hub")
             observed["backup:" + error.get("repo_id", name)] = (name, "Backup failed; open Repo Hub for details", 120, None)
         backup = status.get("backup", {})

@@ -993,3 +993,8 @@ The legacy dashboard routes remain compatible; the menu uses explicit routes.
 Native installed acceptance and actual cloud upload remain separate from fixture
 and browser results. `test_selected_actions` supplies the scope/guard regressions;
 `tests/rescan.cjs` and `tests/menu-cards.cjs` exercise the real menu controller.
+
+Reviewed source removals retire their active notification episodes even when the
+last backup receipt still contains a historical error for that source. The error
+receipt is retained; global operation errors continue to notify. GR15 checks this
+through `test_removed_source_retires_alert_but_keeps_failure_history`.

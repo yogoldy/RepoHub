@@ -202,6 +202,24 @@ class HealthTests(unittest.TestCase):
         self.assertTrue(any(item['detail'] == 'Status outdated'
                             for item in tracker.update(status, 5621)))
 
+    def test_removed_source_retires_alert_but_keeps_failure_history(self):
+        status = status_at(5000)
+        row = status['repos'][0]
+        row['health'] = {'fresh': True}
+        failure = {'repo': row['name'], 'repo_id': row['id'], 'error':'fixture unavailable'}
+        status['backup']['errors'] = [failure]
+        tracker = ProblemTracker()
+        tracker.update(status, 5000)
+        self.assertTrue(tracker.update(status, 5121))
+        status['repos'] = []
+        status['health'] = {'fresh': True}
+        self.assertEqual(tracker.update(status, 5130), [])
+        self.assertEqual(status['backup']['errors'], [failure])
+        status['backup']['errors'].append({'error':'global fixture failure'})
+        status['backup']['errors'].append({'repo':'Saved app data', 'repo_id':'repohub-data', 'error':'fixture'})
+        tracker.update(status, 5140)
+        self.assertTrue(tracker.update(status, 5261))
+
     def test_ignored_finder_receipt_also_requires_fresh_hash_check(self):
         status = status_at(5000)
         status['repos'][0]['verification'].update(state='different', ignored_finder_only=True, checked_at=stamp(3979))

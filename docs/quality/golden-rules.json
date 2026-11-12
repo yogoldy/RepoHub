@@ -368,6 +368,7 @@
         "test_workspace_registry.WorkspaceTests.test_removing_and_readding_preserves_identity_backups_and_scoped_settings",
         "test_workspace_registry.WorkspaceTests.test_missing_folder_cannot_replace_archive_with_empty_backup",
         "test_workspace_registry.WorkspaceTests.test_reviewing_home_removes_missing_source_without_deleting_backup",
+        "test_policy_health.HealthTests.test_removed_source_retires_alert_but_keeps_failure_history",
         "test_workspace_registry.WorkspaceTests.test_dynamic_children_exclude_hidden_symlinks_and_keep_missing_identity",
         "test_workspace_registry.WorkspaceTests.test_deduplicated_alias_and_retargeted_source_never_change_identity",
         "test_workspace_registry.WorkspaceTests.test_invalid_overlap_missing_and_protected_sources_do_not_mutate_registry",
