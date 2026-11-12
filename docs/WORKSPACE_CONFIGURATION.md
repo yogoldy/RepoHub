@@ -108,8 +108,9 @@ repository. The overview opens a checkbox chooser with no default selections;
 all-repository selection is explicit. The helper accepts distinct current
 workspace IDs and a reviewed registry revision at `/api/actions/backup` or
 `/api/actions/scan`. Both paths retain Host/Origin/token checks and operation
-locks. A selected manual backup resets only its selected cadence clocks and
-rechecks only its selected sources. Legacy dashboard APIs remain compatible.
+locks. A selected manual backup resets only its selected cadence clocks. Its ordinary
+post-backup status refresh still observes other monitored sources so the overview
+can report their newer edits; only explicitly selected rescans restrict checking. Legacy dashboard APIs remain compatible.
 
 Unavailable sources remain visible and can be rescanned after reconnecting.
 Their detail panel links directly to monitored-folder review; home-mode review

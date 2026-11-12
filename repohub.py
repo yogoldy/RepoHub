@@ -1110,7 +1110,7 @@ class Hub:
         finally:
             self.lifecycle.emit("backup_finished", run_id=run_id, result=outcome, duration_ms=(time.monotonic()-started)*1000)
             self.backup_lock.release()
-            self.scan(repo_ids=list(keys)) if keys is not None else self.scan()
+            self.scan()
             if reason == "manual":
                 with self.lock:
                     self.scheduler.manual_completed(time.monotonic(), keys=keys)
