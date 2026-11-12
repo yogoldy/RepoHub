@@ -41,49 +41,27 @@ after full GitHub checks and Pro acceptance while the Air is unavailable. Defaul
 two-Mac acceptance remains in force for other releases. Bind the exception to the
 exact candidate and disclose the untested Air; no Pro check is waived.
 
-**October 22 update:** Dev and Stable are the only channels. The former Testing
-channel is superseded by per-candidate qualification metadata: local checks →
-full GitHub checks → installed use-case acceptance and explicit Stable approval.
-GitHub qualification and Stable promotion retain the exact signed archive. This
-local change needs a later app update to remove Testing from installed controls;
-it does not rebuild or republish build 10. See the [channel contract](docs/UPDATE_CHANNELS.md).
+**October 26 delivery completed:** [0.1.1 / build 11](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.1.1-b11)
+is public Stable from protected main `8162d3565682de476495430e41341fc1250fed04`.
+PRs #15/#16 and final main GitHub checks passed. The exact-main clean local gate
+passed 356 tests, zero skips, all 26 rules and 31 commands; the fresh focused Dev
+gate passed 95 tests and a native build. Qualification and promotion kept the
+signed archive unchanged. See the [delivery/acceptance record](docs/UPDATE_CHANNELS.md#stable-delivery-and-pro-acceptance--october-26-2026).
 
-The first signed Dev release, `0.0.9` / build 9, was published and installed on
-the Pro on October 22 from `a9b3895f36a4c76ac68882863baf1ffae26a4d43`.
-Its 77-test focused Dev gate, native build, Apple notarization, stapling,
-Gatekeeper and independent downloaded-archive signature checks passed. The app
-and helper report that exact build/source; six protected configuration files
-retained their pre-install hashes. Stable remains build 7; the Air is untouched.
-See the [live Dev checkpoint](docs/UPDATE_CHANNELS.md#live-dev-checkpoint--october-22-2026)
-and earlier [unpublished signing record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
+Leo manually updated the Pro from 0.1.0 to 0.1.1. Installed app/helper/source,
+signing identities, all six protected configuration hashes, optional preferences
+and the 17-source list verified. Native inspection observed only Dev and Stable;
+both saved correctly and Dev was restored. Helper access and isolated installed-
+runtime backup checks passed. The test method's bytecode-cache side effect was
+caught and corrected; final bundle contents/signatures match the verified package.
+No daily configuration, archive or privacy grant was reset. No new provider upload
+is claimed from those isolated local backup tests.
 
-The ad-hoc-to-Developer-ID transition requested Desktop access again; Leo granted
-it. This establishes initial consent, not permission continuity across a future
-signed update. The helper listed all 15 configured sources without permission
-errors; content verification and the broader native acceptance remain separate.
-The Pro's local experimental opt-in is enabled; after the explicit Settings save,
-native evidence reports Dev; the earlier no-newer-update check preceded build 10.
-GitHub qualification, broader installed acceptance, Air acceptance and Stable
-promotion remain pending.
-
-**Pro signed-update checkpoint passed.** The
-repeatable Keychain publisher is provisioned and published
-[0.1.0 / build 10](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.1.0-b10)
-from `6710337166496913814ddad4a887afa39829620b` on October 22 without pasted
-credentials. Its fresh focused gate passed 92 tests with zero skips and a native
-build. The downloaded archive, independent Sparkle signature, notarization,
-stapling and exact Dev feed verified. App/helper designated requirements match
-build 9. Leo installed through Sparkle and reported that permissions remained
-stable. Read-only post-update checks confirm app/helper build 10 and its exact
-source, matching signing identities, all six protected configuration hashes,
-all three checked native preferences and the 15-source list. No daily permission
-reset or regrant was performed. This establishes Pro signed-to-signed Desktop
-permission retention for build 9 → 10; it does not establish a new backup/upload
-result or the broader two-Mac acceptance matrix.
-The corrected publisher code at `e633268` also passed the complete clean macOS
-gate (353 tests, no skips); build 10 adds only the provisioning checkpoint to it.
-See [local Dev publishing](docs/LOCAL_DEV_PUBLISHING.md) for guards and limits.
-Stable remains build 7; the Air and Stable promotion were not changed.
+The one-time Pro-only exception was bound to this exact package and disclosed
+publicly. Air was not tested. Basic Dev delivery, GitHub qualification, signed Pro
+update, native two-channel selection and unchanged-package Stable promotion are
+now observed. Broader UI/fault/recovery and Air cases below remain open; future
+releases retain the default two-Mac policy unless explicitly changed.
 
 The installed Dev candidate also addresses [issue #14](https://github.com/yogoldy/RepoHub/issues/14):
 a backup deferred by actively changing source files no longer leaves a generic
@@ -102,10 +80,9 @@ remains evidence within its original limits; installed acceptance is separate.
    acceptance and Leo's explicit promotion approval. Dev must not replace the
    stable feed or public latest download. Record source identity, monotonic build
    numbering and channel-switch behavior. The updater, local publisher,
-   qualification workflow, diagnostics and policy are implemented together in the current local
-   branch candidate. Build 10 is offered on Dev and installed on the Pro. The
-   signed update retained Desktop permission; GitHub qualification and broader updater
-   acceptance remain pending. See the
+   qualification workflow, diagnostics and policy are implemented and delivered
+   in Stable build 11. Exact-source GitHub qualification and Pro channel/update
+   acceptance passed under the one-time exception; broader updater cases remain open. See the
    [channel contract](docs/UPDATE_CHANNELS.md) for commands and acceptance limits.
    Existing protected-main requirements remain in force.
    **Ordinary-user offer isolation:** ordinary installations follow Stable and
@@ -154,9 +131,9 @@ remains evidence within its original limits; installed acceptance is separate.
    macOS permission or Finder behavior.
 6. **Deliver another signed update to the Pro.** Verify permission/configuration
    continuity across an update, app/helper versions, channel eligibility and
-   recovery. Pro build 9 → 10 passed the signed Sparkle update and reported
-   Desktop permission continuity, with app/helper source, configuration and
-   preferences verified. Broader channel/recovery cases remain open.
+   recovery. Pro build 9 → 10 retained Desktop permission per Leo, and build 10 → 11
+   passed installed app/helper/source, identity, configuration and native channel
+   checks. Existing helper access remained functional. Broader channel/recovery cases remain open.
 7. **Test installation and a subsequent update on the Air.** Verify onboarding,
    helper-observed access, native pickers, backup hashes and actual upload
    observations on the same candidate package. Preserve the Air's own settings;
@@ -164,7 +141,9 @@ remains evidence within its original limits; installed acceptance is separate.
    complete CI/distribution/install/update loop, with explicit evidence for each
    host and cleanup of owned test services. A fix creates a new candidate whose
    affected acceptance checks must be rerun.
-8. **Promote the accepted package to Stable.** Require the full gate and exact GitHub qualification, recorded
+8. **Promote the accepted package to Stable.** Completed for build 11 under the
+   October 26 exact-package Pro-only exception. Future promotion still requires
+   the full gate and exact GitHub qualification, recorded
    installed results and Leo's approval. Promote the tested package without an
    untested rebuild; follow protected-main checks and record source/package
    identity, version and recovery options.
@@ -386,7 +365,8 @@ complete merely because code was merged:
   stapling, Gatekeeper acceptance and independent archive signature verification.
   Dev publication, the initial signed transition and Pro build 9 → 10 update
   are now observed; Desktop permission retention was reported, and identities
-  and configuration match. GitHub qualification, Stable promotion and Air acceptance remain pending.
+  and configuration match. GitHub qualification and first Stable promotion passed
+  on build 11 under the Pro-only exception; Air acceptance remains pending.
   The public Stable release and release-mode variable remain unchanged; see the
   [signing validation record](docs/RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
 - **Installed-Mac reliability:** track actual folder permissions, native picker,
@@ -418,3 +398,12 @@ superseded automatic-Stable policy from historical records.
 When an item is implemented, record its commit and actual verification evidence.
 Keep requested scope, implemented behavior, automated results and installed-Mac
 acceptance distinct.
+
+## Scoped backup and rescan patch in progress
+
+Local implementation moves backup/rescan actions into expanded repo details and
+adds an unchecked overview chooser for one, multiple or all repos. The helper
+requires explicit workspace identities and the reviewed selection revision.
+Missing-source details link to the existing review/removal flow; archives remain
+preserved. Long-scan per-repo freshness changes remain part of this patch.
+Installed acceptance, delivery and expanded Air recovery evidence are pending.

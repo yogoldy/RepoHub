@@ -379,6 +379,7 @@ class Hub:
         self.lifecycle = BackupLifecycle(self.diagnostics)
         self.lock = threading.RLock()
         self.scan_lock = threading.Lock()
+        self.full_scan_progress_at = None
         self.backup_lock = threading.Lock()
         self.csrf = secrets.token_urlsafe(32)
         self.readiness = None
@@ -528,6 +529,49 @@ class Hub:
         self.scan(deep=False)
         return result
 
+    def request_selected_action(self, action, payload):
+        """Admit an explicit reviewed selection before starting any worker."""
+        if action not in {"backup", "scan"} or set(payload) != {"repo_ids", "revision"}:
+            raise ValueError("Choose repositories and review the selection again")
+        keys = payload["repo_ids"]
+        if (not isinstance(keys, list) or not keys or len(keys) > 1000
+                or any(not isinstance(key, str) for key in keys)
+                or len(set(keys)) != len(keys)):
+            raise ValueError("Choose one or more distinct repositories")
+        if not self.configured or self.setup_recovery_required:
+            raise ValueError("Finish setup before starting this action")
+        if not self.backup_lock.acquire(blocking=False):
+            raise FileExistsError("A backup is running. Try after it finishes.")
+        scan_reserved = False
+        handed_off = False
+        try:
+            if not self.scan_lock.acquire(blocking=False):
+                raise FileExistsError("A scan is running. Try after it finishes.")
+            scan_reserved = True
+            current = self.registry.status()
+            if payload["revision"] != current["revision"]:
+                raise FileExistsError("Folder selection changed. Choose repositories again.")
+            sources = {row["id"]: Path(row["path"]) for row in
+                       current["configuration"]["workspaces"] if row["active"]}
+            for key in keys:
+                if key not in sources:
+                    raise ValueError("A selected repository is no longer monitored")
+                if action == "backup":
+                    require_source(sources[key], canonical_only=True)
+                    self.registry.require_workspace(key, sources[key])
+            options = {"keys": list(keys), "_lock_held": True} if action == "backup" else {
+                "repo_ids": list(keys), "force": True, "_lock_held": True}
+            worker = threading.Thread(target=self.backup if action == "backup" else self.scan,
+                                      kwargs=options, daemon=True)
+            worker.start()
+            handed_off = True
+        finally:
+            if scan_reserved and (action == "backup" or not handed_off):
+                self.scan_lock.release()
+            if action == "scan" or not handed_off:
+                self.backup_lock.release()
+        return {"accepted": True, "repo_ids": list(keys)}
+
     def retry_check(self, repo_id):
         if not isinstance(repo_id, str) or repo_id not in self.repositories():
             raise ValueError("Unknown repo")
@@ -541,26 +585,32 @@ class Hub:
             self.scan_lock.release()
             raise
 
-    def scan(self, deep=True, force=False, repo_id=None, _lock_held=False):
+    def scan(self, deep=True, force=False, repo_id=None, _lock_held=False, repo_ids=None):
         if self.setup_recovery_required:
             if _lock_held:
                 self.scan_lock.release()
             return
         if not _lock_held and not self.scan_lock.acquire(blocking=False):
             return
+        selected_keys = set(repo_ids) if repo_ids is not None else ({repo_id} if repo_id is not None else None)
         scan_id, scan_started = secrets.token_hex(8), time.monotonic()
         scan_complete = False
+        if selected_keys is None:
+            with self.lock:
+                self.full_scan_progress_at = utc_now()
         self.diagnostics.emit("scan_started", scan_id=scan_id, mode="content" if deep else "metadata", reason="forced" if force else "poll")
         try:
             previous_rows = {row["id"]: row for row in self.status["repos"]}
             rows = []
             for key, root in self.repositories().items():
-                if repo_id is not None and key != repo_id and key in previous_rows:
-                    rows.append(previous_rows[key])
+                if selected_keys is not None and key not in selected_keys:
+                    if key in previous_rows:
+                        rows.append(previous_rows[key])
                     continue
                 repo_started = time.monotonic()
                 verification_performed = False
-                row = {"id": key, "name": root.name, "path": str(root)}
+                row = {"id": key, "name": root.name, "path": str(root),
+                       "scan_id": scan_id, "scan_checked_at": utc_now()}
                 try:
                     require_source(root, canonical_only=True)
                     if key != "repohub-data":self.registry.require_workspace(key, root)
@@ -630,13 +680,25 @@ class Hub:
                 row["cloud"] = self.cloud_for(key, current)
                 self.evidence.repo_checked(row, scan_id, (time.monotonic() - repo_started) * 1000, not verification_performed)
                 rows.append(row)
+                # Publish only completed checks; never refresh the timestamps of
+                # other folders while a slow source is still being examined.
+                with self.lock:
+                    if selected_keys is None:
+                        self.full_scan_progress_at = utc_now()
+                    current_rows = self.status["repos"]
+                    for index, current_row in enumerate(current_rows):
+                        if current_row["id"] == key:
+                            current_rows[index] = row
+                            break
+                    else:
+                        current_rows.append(row)
             with self.lock:
                 self.scheduler.observe(rows, time.monotonic())
                 self.status.update({"scan_id": scan_id, "repos": rows,
                                     "source_mode": self.registry.value["source"]["mode"],
                                     "repos_root": self.registry.value["source"].get("home"),
                                     "workspace_sources": [{"id": row["id"], "path": row["path"]} for row in rows]})
-                if repo_id is None:
+                if selected_keys is None:
                     self.status["scanned_at"] = utc_now()
                 self.status["verifying"] = None
                 self.persist_status()
@@ -646,6 +708,8 @@ class Hub:
                                   duration_ms=(time.monotonic() - scan_started) * 1000)
             with self.lock:
                 self.status["verifying"] = None
+                if selected_keys is None:
+                    self.full_scan_progress_at = None
             self.scan_lock.release()
 
     def persist_status(self):
@@ -679,6 +743,7 @@ class Hub:
                                           build_id=diagnostic_ref(self.application_release["source_revision"]))
                     self.last_update_evidence = update
             result["power_source"] = self.power
+            result["full_scan_progress_at"] = self.full_scan_progress_at
             result["observed_at"] = utc_now()
             result["diagnostics"] = self.diagnostics.status()
             annotate_health(result, self.config, time.time())
@@ -863,7 +928,7 @@ class Hub:
             path.unlink()
             self.lifecycle.emit("prune_finished", key=key, current=current, previous_archive_ref=diagnostic_ref(str(path)), result="removed")
 
-    def backup(self, keys=None, reason="manual", expected_power=None, attempted_keys=None, run_id=None):
+    def backup(self, keys=None, reason="manual", expected_power=None, attempted_keys=None, run_id=None, _lock_held=False):
         if not self.configured or self.setup_recovery_required:
             raise ValueError('Finish setup or recover its interrupted save before starting backups')
         run_id = run_id or secrets.token_hex(12)
@@ -871,7 +936,7 @@ class Hub:
         if expected_power is not None and power_source() != expected_power:
             self.lifecycle.emit("backup_deferred", run_id=run_id, reason="power_changed", result="not_started")
             return False
-        if not self.backup_lock.acquire(blocking=False):
+        if not _lock_held and not self.backup_lock.acquire(blocking=False):
             self.lifecycle.emit("backup_deferred", run_id=run_id, reason="backup_busy", result="not_started")
             return False
         # Select sources under the same lock as configuration saves. Otherwise
@@ -1048,8 +1113,8 @@ class Hub:
             self.scan()
             if reason == "manual":
                 with self.lock:
-                    self.scheduler.manual_completed(time.monotonic())
-                    self.record_periodic_clock()
+                    self.scheduler.manual_completed(time.monotonic(), keys=keys)
+                    self.record_periodic_clock(keys)
         return True
 
     def data_path(self, key, name):
@@ -1275,6 +1340,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send({"reports":rows})
             if path == "/api/reports/preview":
                 return self.send(preview_report(self.hub.state_dir, self.hub.diagnostics.directory, payload), 201)
+            if path in {"/api/actions/backup", "/api/actions/scan"}:
+                try:
+                    result = self.hub.request_selected_action(path.rsplit("/", 1)[1], payload)
+                except FileExistsError as error:
+                    return self.send({"error": str(error)}, 409)
+                except OSError as error:
+                    return self.send({"error": access_failure(error, "source_read")["detail"]}, 400)
+                return self.send(result, 202)
             if path == "/api/backup":
                 threading.Thread(target=self.hub.backup, daemon=True).start()
                 return self.send({"accepted": True}, 202)

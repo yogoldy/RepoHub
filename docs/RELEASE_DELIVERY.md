@@ -20,10 +20,12 @@ is no longer a channel. The existing public Stable URL is retained. Dev stays a
 prerelease and never moves public latest. No private hosting or hardware access
 control is needed. Changing channel never downgrades an installed build.
 
-The two-channel changes are local pending delivery. Earlier authorized Dev builds
-9 and 10 are live; Pro build 9 → 10 retained Desktop permission per Leo, with exact
-installed source/identity and configuration independently verified. Air, broader
-native acceptance and Stable promotion remain pending. Publication and installation
+The two-channel changes are delivered in Stable build 11 from protected main
+`8162d3565682de476495430e41341fc1250fed04`. Dev publication, exact-source GitHub
+qualification, manual Pro update and unchanged-package Stable promotion passed.
+The owner-approved Pro-only exception applies only to this exact build; Air and
+broader native acceptance remain pending. See the [delivery record](UPDATE_CHANNELS.md#stable-delivery-and-pro-acceptance--october-26-2026).
+Publication and installation
 are separately authorized actions. No old archive/release is automatically deleted.
 
 ## Unpublished signing validation — October 20, 2026

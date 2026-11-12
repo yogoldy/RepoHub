@@ -1,6 +1,5 @@
 let observedMenuState=null,clientFreshness='current';
 let retryingRepo=null;
-let requestingRescan = false;
 let detailsAnimation = null;
 const technicalOpen = new Set();
 const diagnosticView=RepoDiagnostics.create('menu',{native:!!window.webkit?.messageHandlers?.repoHub});
@@ -180,6 +179,7 @@ function arrangeRepoCards(slots) {
 }
 
 function renderDetail(presentation) {
+  placeRepoActions();
   const repo = menuState.repos.find(row => row.id === selectedId);
   $('#repo-expansion').hidden = !repo;
   $('#detail').hidden = !repo;
@@ -212,6 +212,11 @@ function renderDetail(presentation) {
     <h2 class="status-headline" data-category="${state.category}">${escape(state.headline)}</h2>
     <p class="status-explanation" data-category="${state.category}">${escape(state.detail)}</p>
     ${progress}${retry}
+    ${sourceAvailable(repo) ? '' : `<div class="missing-source-guidance">
+      <p>This folder is unavailable. If you moved or deleted it, review your monitored folders.
+      Existing backups are retained. If its storage is disconnected, reconnect it and rescan.</p>
+      <button id="review-missing-source" type="button">Review monitored folders</button>
+    </div>`}
     <div id="backup-timing" class="backup-timing" data-receipt="${escape(JSON.stringify(timing.receipt))}">
       <dl class="backup-facts" aria-label="Latest backup">
         <dt>Where:</dt><dd>${escape(timing.locationLabel)}</dd>
@@ -258,6 +263,7 @@ function renderDetail(presentation) {
     else technicalOpen.delete(repo.id);
   };
   $('#repo-schedule').onclick = () => openSettings(repo.id);
+  if ($('#review-missing-source')) $('#review-missing-source').onclick = () => $('#workspace-open').click();
   $('#report-status').onclick = () => {
     if (window.RepoHubReports) void window.RepoHubReports.openStatus(state);
     else $('#notice').textContent = 'Reporting is not available yet. Please reload this view.';
@@ -346,28 +352,101 @@ $('#repo-expansion').addEventListener('keydown', event => {
 });
 function unreachable(message,reason='request_failed'){clientFreshness=reason;if(observedMenuState){menuState=RepoDiagnostics.displayState(observedMenuState,reason);render();}$('#backup').disabled=true;$('#notice').textContent=message;$('#checked').textContent='Waiting for fresh checks · reconnecting';}
 async function load(){if(loading)return;loading=true;try{observedMenuState=await api('/api/status');clientFreshness='current';menuState=observedMenuState;lastResponseAt=Date.now();render();}catch(e){unreachable('Waiting for the local helper. Retrying automatically.',e.name==='AbortError'?'response_timeout':'request_failed');}finally{loading=false;}}
-async function rescanNow() {
-  if (requestingRescan) return;
-  requestingRescan = true;
-  const button = $('#rescan');
-  const label = $('#rescan-label');
-  button.disabled = true;
-  label.textContent = 'Requesting scan…';
+// Capture the controls once: moving this group makes the action's scope visible.
+const repoActionControls = $('#repo-action-controls');
+let actionDraft = null;
+let actionPending = false;
+let actionChoosing = false;
+function sourceAvailable(repo) {
+  return !['unavailable', 'blocked', 'changed'].includes(repo.access?.state);
+}
+function placeRepoActions() {
+  const repo = menuState?.repos?.find(row => row.id === selectedId);
+  const target = repo ? $('#selected-repo-surface') : $('#repo-expansion').parentElement;
+  if (repoActionControls.parentElement !== target) {
+    if (repo) target.append(repoActionControls);
+    else target.insertBefore(repoActionControls, $('#repo-expansion').nextSibling);
+  }
+  $('#backup').lastElementChild.textContent = repo ? 'Back up ' + repo.name : 'Back up…';
+  $('#rescan-label').textContent = repo ? 'Rescan ' + repo.name : 'Rescan…';
+  $('#backup').disabled = actionPending || actionChoosing || !!menuState?.backup?.running || !!repo && !sourceAvailable(repo);
+  $('#rescan').disabled = actionPending || actionChoosing;
+}
+function renderActionSelection() {
+  const rows = actionDraft.rows;
+  $('#action-repos').innerHTML = rows.map(repo => `<label class="action-repo">
+    <input type="checkbox" value="${escape(repo.id)}" ${actionDraft.action === 'scan' || sourceAvailable(repo) ? '' : 'disabled'}>
+    <span><strong>${escape(repo.name)}</strong><small>${sourceAvailable(repo)
+      ? escape(RepoStatus.present(repo, menuState.backup).label) : 'Folder unavailable'}</small></span></label>`).join('');
+  const update = () => {
+    const count = $('#action-repos').querySelectorAll('input:checked').length;
+    $('#action-count').textContent = count + ' selected';
+    $('#action-submit').disabled = actionPending || count === 0;
+  };
+  $('#action-repos').onchange = update;
+  $('#action-all').onclick = () => {
+    for (const input of $('#action-repos').querySelectorAll('input:not(:disabled)')) input.checked = true;
+    update();
+  };
+  update();
+}
+async function sendSelectedAction(action, ids, revision) {
+  if (actionPending) return;
+  actionPending = true;
+  placeRepoActions();
+  $('#action-submit').disabled = true;
   try {
     sessionToken = (await api('/api/session')).token;
-    await api('/api/scan', {});
-    await load();
-    $('#notice').textContent = 'Scan requested. Status will update automatically.';
+    await api('/api/actions/' + action, {repo_ids: ids, revision});
+    $('#notice').textContent = (action === 'backup' ? 'Backup' : 'Scan') +
+      ' requested for ' + ids.length + (ids.length === 1 ? ' repo.' : ' repos.');
+    $('#action-dialog').close();
+    actionDraft = null;
+    setTimeout(load, 700);
   } catch (error) {
-    $('#notice').textContent = 'Scan could not be requested. ' + error.message;
+    $('#notice').textContent = error.message;
+    $('#action-error').textContent = error.message + ' Reopen the selection to review current folders.';
   } finally {
-    requestingRescan = false;
-    button.disabled = false;
-    label.textContent = 'Rescan now';
+    actionPending = false;
+    placeRepoActions();
+    if (actionDraft) $('#action-repos').onchange();
   }
 }
-$('#rescan').onclick = rescanNow;
-$('#backup').onclick=async()=>{try{sessionToken=(await api('/api/session')).token;$('#backup').disabled=true;await api('/api/backup',{});$('#notice').textContent='Backup requested.';setTimeout(load,700);}catch(e){$('#notice').textContent=e.message;$('#backup').disabled=false;}};
+async function chooseRepoAction(action) {
+  if (actionPending || actionChoosing) return;
+  actionChoosing = true;
+  placeRepoActions();
+  const selected = selectedId;
+  try {
+    const reviewed = await api('/api/workspaces');
+    if (selected) return await sendSelectedAction(action, [selected], reviewed.revision);
+    const active = new Set(reviewed.configuration.workspaces.filter(row => row.active).map(row => row.id));
+    actionDraft = {action, revision: reviewed.revision,
+      rows: menuState.repos.filter(row => active.has(row.id))};
+    $('#action-title').textContent = action === 'backup' ? 'Choose repos to back up' : 'Choose repos to rescan';
+    $('#action-submit').textContent = action === 'backup' ? 'Back up selected' : 'Rescan selected';
+    $('#action-all').textContent = action === 'backup' ? 'Select all available' : 'Select all repos';
+    $('#action-error').textContent = '';
+    renderActionSelection();
+    $('#action-dialog').showModal();
+  } catch (error) { $('#notice').textContent = error.message; }
+  finally { actionChoosing = false; placeRepoActions(); }
+}
+$('#backup').onclick = () => chooseRepoAction('backup');
+$('#rescan').onclick = () => chooseRepoAction('scan');
+for (const id of ['action-close', 'action-cancel']) $( '#' + id).onclick = () => {
+  if (!actionPending) { $('#action-dialog').close(); actionDraft = null; }
+};
+$('#action-dialog').addEventListener('cancel', event => {
+  if (actionPending) event.preventDefault();
+  else actionDraft = null;
+});
+$('#action-form').onsubmit = event => {
+  event.preventDefault();
+  if (!actionDraft || actionPending) return;
+  const ids = [...$('#action-repos').querySelectorAll('input:checked:not(:disabled)')].map(input => input.value);
+  if (ids.length) void sendSelectedAction(actionDraft.action, ids, actionDraft.revision);
+};
 $('#open-backups').onclick=()=>nativeAction('openBackups');$('#notifications').onclick=()=>{if(nativeAction('toggleNotifications'))setTimeout(load,500);};$('#quit').onclick=()=>nativeAction('quit');window.addEventListener('repoHubNotificationsChanged',load);
 const powerName = source => source === 'battery' ? 'On battery'
   : source === 'adapter' ? 'On power adapter' : 'Power source unavailable';

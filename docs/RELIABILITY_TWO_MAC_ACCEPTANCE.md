@@ -485,3 +485,21 @@ No daily permission reset or regrant was performed. This passes this Pro update'
 Desktop permission continuity; it does not complete the isolated fault matrix,
 a new backup/upload observation, Air acceptance or Testing/Stable promotion.
 See the [channel checkpoint](UPDATE_CHANNELS.md#pro-signed-to-signed-update-acceptance--october-22-2026).
+
+
+## Pro two-channel Stable checkpoint — 2026-10-26
+
+Stable 0.1.1/build 11 uses source `8162d3565682de476495430e41341fc1250fed04` and
+archive SHA-256 `531ce471bd6bbe49bd1f719605e1bee23a7362f573e66b92326cb2e53a85543f`.
+The exact-source GitHub and full local gates passed (356 tests, zero skips, 26
+rules and 31 commands). Leo manually installed through Dev. Installed app/helper,
+configuration, signatures, existing access, native Stable/Dev save/readback and
+isolated backup/archive-preservation checks passed. Final installed contents
+match the verified package after correcting the private fixture's omitted `-B`
+flag and restoring only generated/changed caches; no app resigning or new build.
+
+Leo explicitly waived the unavailable Air for this one exact release. Public
+proof/notes disclose Pro-only acceptance; no Air case is marked passed and this
+does not complete the older two-host fault matrix. No new actual iCloud upload
+was established by the isolated local fixture. Stable promotion preserved the
+Dev archive bytes. Details are in the [delivery record](UPDATE_CHANNELS.md#stable-delivery-and-pro-acceptance--october-26-2026).

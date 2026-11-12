@@ -98,6 +98,21 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(self.hub.index[key],before)
         self.assertTrue(Path(before['archive']).exists())
 
+    def test_reviewing_home_removes_missing_source_without_deleting_backup(self):
+        self.hub.backup()
+        key = workspace_id('Example')
+        before = copy.deepcopy(self.hub.index[key])
+        self.repo.rename(self.base / 'moved')
+        status = self.hub.workspace_status()
+        source = {'mode': 'home', 'home': str(self.home.resolve())}
+        review = self.hub.registry.review(source, status['revision'])
+        self.assertIn(key, [row['id'] for row in review['removed']])
+        self.hub.registry.save(source, status['revision'], review['review'])
+        self.assertNotIn(key, self.hub.repositories())
+        self.assertEqual(self.hub.index[key], before)
+        self.assertTrue(Path(before['archive']).is_file())
+        self.assertTrue((self.base / 'moved' / 'work.txt').is_file())
+
     def test_dynamic_children_exclude_hidden_symlinks_and_keep_missing_identity(self):
         new=self.folder('repos/New');self.folder('repos/.Hidden')
         (self.home/'Linked').symlink_to(self.base/'cloud',target_is_directory=True)

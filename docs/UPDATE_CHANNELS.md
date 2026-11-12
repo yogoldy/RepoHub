@@ -1,6 +1,6 @@
 # Dev and Stable updates
 
-## Current policy — October 22, 2026
+## Current policy — October 26, 2026
 
 Leo replaced Dev → Testing → Stable with **Dev and Stable**. Testing is retired.
 Validation is recorded on each exact candidate, in this order:
@@ -18,9 +18,12 @@ archive bytes. The package checksum, source revision and build identify the
 candidate through every stage. An installed app needs a new version to remove
 Testing from its selector; existing packages need no rebuild to qualify/promote.
 
-The local implementation does not publish, install or promote anything by
-itself. Build 10's live release remains as previously published until separately
-authorized qualification. Its Pro update/permission result is recorded below.
+**Live checkpoint:** [0.1.1 / build 11](https://github.com/yogoldy/RepoHub/releases/tag/repohub-v0.1.1-b11)
+is now public Stable, promoted from the same Dev archive after GitHub and Pro
+acceptance under the October 26 exact-release Air exception. The Pro already
+runs that package and remains opted into Dev for future updates. Publication and
+installation still require authorization; no background Stable promotion exists.
+The complete delivery record follows below.
 
 ## Ordinary-user offers and saved preferences
 
@@ -150,8 +153,9 @@ GR26 covers removed-channel rejection, controller/native/diagnostic agreement,
 qualification without an archive upload/build, wrong-source/skipped/forged checks,
 monotonic pointer refresh, explicit approval, Pro/Air acceptance, protected main,
 archive authentication and interrupted promotion. Fixtures use synthetic data;
-live qualification and Stable promotion remain pending. Installed backup/upload
-and Air acceptance are separate from automated test results.
+live qualification and Stable promotion passed for build 11 as recorded below.
+Air acceptance and a new real-provider upload observation remain untested; the
+installed backup fixture verified local bytes without asserting cloud upload.
 
 The original unpublished signing check remains documented in
 [release delivery](RELEASE_DELIVERY.md#unpublished-signing-validation--october-20-2026).
@@ -167,6 +171,56 @@ passed without weakening assertions. These are local results, not a GitHub run.
 No branch push, qualification, feed change, Stable promotion or installation was
 performed. The installed Pro remains build 10 on Dev. Live two-channel delivery
 and installed selector changes await a separately authorized update.
+
+## Stable delivery and Pro acceptance — October 26, 2026
+
+- [PR #15](https://github.com/yogoldy/RepoHub/pull/15) merged the channel/signing/setup
+  work after exact-head push and PR checks passed. [PR #16](https://github.com/yogoldy/RepoHub/pull/16)
+  added the explicit exact-release exception, with both exact-head checks passing.
+  Final protected main is `8162d3565682de476495430e41341fc1250fed04`.
+- The fresh complete local gate on that exact main passed 356 tests, zero skips,
+  all 26 rules and 31 build/tool checks on unchanged clean source. The
+  [main GitHub run](https://github.com/yogoldy/RepoHub/actions/runs/40408903924)
+  passed independently. Dev publication reran its focused 95-test/native-build gate.
+  Keychain credentials were reused without pasted secrets.
+- Published and independently downloaded 0.1.1/build 11, 28,703,156 bytes, SHA-256
+  `531ce471bd6bbe49bd1f719605e1bee23a7362f573e66b92326cb2e53a85543f`.
+  Receipt/source, independent Sparkle signature, strict code signature, Gatekeeper
+  notarized Developer ID assessment, stapled ticket and Dev pointer verified.
+- GitHub qualification recorded local/GitHub passed and installed acceptance
+  pending on the same Dev candidate. No archive rebuild, resign or replacement
+  occurred. Leo then reported a manual Dev update from 0.1.0 to 0.1.1.
+- Installed app/helper reported build 11 and the exact source. All six protected
+  configuration hashes, notification/opt-in preferences and 17 configured sources
+  were preserved. Native setup Access reported helper source-read/destination-write
+  success; no daily privacy reset or regrant was performed.
+- Native inspection observed only Stable and Dev in the actual selector. Stable
+  was saved through the guarded flow and independently read back with no downgrade
+  from build 11; Dev was then saved/read back again. Its saved revision intentionally
+  advanced during this round trip. Existing setup was continued without applying a
+  new configuration; all six protected hashes still matched afterward.
+- Two isolated backups using the installed signed Python/runtime verified known
+  file bytes, Git metadata, ignored/uncommitted content, a new second run and exact
+  preservation of the previous archive. No daily source/configuration/archive was
+  changed. Provider observations were disabled: this is local verification, not
+  a fresh confirmed iCloud upload.
+- The initial private fixture command omitted the normal launcher flags and wrote
+  Python bytecode into the signed bundle. Strict verification detected the added/
+  changed caches. Test-generated files were preserved privately; only those caches
+  were moved out and the three original cache files restored from the verified
+  download. The corrected test used `-E -s -B`, passed, and left the signature valid.
+  Final complete file/link/directory comparison matched the verified bundle;
+  Gatekeeper and strict signature passed. The app was not resigned or rebuilt.
+- The private exact-source/build/archive acceptance record contains all Pro cases
+  passed and the owner's exact-tag Pro-only exception. Air was not tested or marked
+  passed. Promotion rechecked qualification, protected main/tree, full gate,
+  notarization, approval and acceptance. The public proof records
+  `acceptance_scope=pro_only_exception`; Sparkle and release notes disclose it.
+- Public latest and the public Stable appcast now identify build 11. The final
+  downloaded Stable archive is byte-for-byte identical to the initial Dev archive;
+  public proof records all three validation stages passed and the matching private
+  acceptance digest. No second Pro installation was required. Future releases
+  retain the default two-Mac requirement unless separately approved otherwise.
 
 ## Prior delivery and installed evidence
 

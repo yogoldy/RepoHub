@@ -154,6 +154,10 @@ const context = vm.createContext({document, $: selector => document.querySelecto
   window: {matchMedia: () => ({matches: reducedMotion})}, openSettings() {},
 });
 const source = fs.readFileSync('web/menu.js', 'utf8');
+context.repoActionControls = get('repo-action-controls');
+context.actionPending = false;
+context.actionChoosing = false;
+vm.runInContext(source.slice(source.indexOf('function sourceAvailable('), source.indexOf('function renderActionSelection(')), context);
 vm.runInContext(source.slice(source.indexOf('function percentLabel('), source.indexOf('function unreachable(')), context);
 const render = () => vm.runInContext('render()', context);
 const cards = () => get('cards').querySelectorAll('.repo-card');

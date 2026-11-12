@@ -186,7 +186,18 @@ controller test covers fresh tokens, duplicate requests and failed requests; an
 isolated HTTP regression verifies origin/Host/token guards, a real forced scan,
 preserved archive bytes/index and no call to backup. Actual card/detail mutations
 and stale-to-fresh recovery remain subject to the independent diagnostic oracle.
-Private sleep/diagnostic case records remain outside Git.
+Private sleep/diagnostic case records remain outside Git. During a long scan,
+completed per-repository observations are published independently. Their scan
+freshness is measured from the start of each repository check, not the end of a
+long verification; a pending or expired check is never made fresh by another
+repository. A full scan that is making progress can delay scan-only alerts,
+but the existing episode persists and alerts after at most ten minutes; stalled
+scans and unrelated stale evidence retain the shorter alert delay. Missing sources
+remain selected until an explicit reviewed save;
+reviewing the existing home selection lists removals and preserves archives.
+See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
+`test_completed_repo_check_is_independent_of_an_older_scan`, and
+`test_reviewing_home_removes_missing_source_without_deleting_backup`.
 
 **Susceptible boundary:** Green check uses old archive data, stale hashes, missing upload flags or an unavailable helper.
 
@@ -968,3 +979,22 @@ use a deliberately non-promotable receipt. The workflow has read-only repository
 permissions, never publishes or installs, and records bounded failure evidence
 while cleaning temporary packages and signing material. Apple service acceptance
 still requires an actual successful run; these counterexamples do not imply it.
+
+## Explicit action scope
+
+Expanded repo details own their backup and rescan buttons. The overview opens an
+unchecked chooser; selecting all requires an explicit action. The new guarded
+`/api/actions/backup` and `/api/actions/scan` routes require distinct current IDs
+and a current workspace revision. Admission reserves operation locks before
+worker creation. Selected scans preserve unselected receipts. Missing sources
+cannot be backed up; a rescan can re-observe their availability. A direct folder
+review action preserves existing archives and uses the existing removal review.
+The legacy dashboard routes remain compatible; the menu uses explicit routes.
+Native installed acceptance and actual cloud upload remain separate from fixture
+and browser results. `test_selected_actions` supplies the scope/guard regressions;
+`tests/rescan.cjs` and `tests/menu-cards.cjs` exercise the real menu controller.
+
+Reviewed source removals retire their active notification episodes even when the
+last backup receipt still contains a historical error for that source. The error
+receipt is retained; global operation errors continue to notify. GR15 checks this
+through `test_removed_source_retires_alert_but_keeps_failure_history`.

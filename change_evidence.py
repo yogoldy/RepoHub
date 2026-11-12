@@ -333,6 +333,7 @@ class ChangeEvidence:
                 'backup_hash_ref': diagnostic_ref((row.get('last_backup') or {}).get('sha256')),
                 'has_backup': row.get('last_backup') is not None,
                 'fresh': row.get('health', {}).get('fresh'),
+                'scan_id': row.get('scan_id', status.get('scan_id')),
                 'cloud_state': cloud.get('state'), 'cloud_archive_ref': diagnostic_ref(cloud.get('archive')),
                 'percent': cloud.get('percent'), 'has_error': bool(row.get('error') or verification.get('error') or any(
                     (error.get('repo_id') == row['id'] if 'repo_id' in error else error.get('repo') == row['name'])
@@ -351,7 +352,7 @@ class ChangeEvidence:
                 self.menu_contexts[identity] = menu_context
                 self.log.emit('status_snapshot', observation_id=identity, scan_id=status.get('scan_id'), repo_count=len(projection))
                 for facts in projection.values():
-                    self.log.emit('status_repo', observation_id=identity, scan_id=status.get('scan_id'),
+                    self.log.emit('status_repo', observation_id=identity, scan_id=facts.get('scan_id'),
                                   repo_ref=facts['repo_ref'], archive_ref=facts['archive_ref'], run_id=facts['active_run_id'] or facts['run_id'],
                                   reason=facts['change_reason'],
                                   verification_archive_ref=facts['verification_archive_ref'], cloud_archive_ref=facts['cloud_archive_ref'], copying=facts['copying'],

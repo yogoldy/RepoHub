@@ -24,7 +24,10 @@ def annotate_health(status, config, now):
         cloud = row.get("cloud", {})
         verification = row.get("verification", {})
         reasons = []
-        if scan_old:
+        # A completed per-repository check remains useful while a larger scan
+        # is still running. Missing or expired evidence must never become fresh.
+        row_scan_old = age(row.get("scan_checked_at", status.get("scanned_at")), now) > scan_limit
+        if row_scan_old:
             reasons.append("Repo checks stopped updating")
         if upload_expected(row) and age(cloud.get("checked_at"), now) > cloud_limit:
             reasons.append("Upload status needs a fresh check")
@@ -42,13 +45,18 @@ class ProblemTracker:
 
     def update(self, status, now):
         observed = {}
+        # An actively progressing full scan is expected to make old scan data
+        # temporarily unavailable. Bound suppression so stalled scans still alert.
+        scan_progressing = age(status.get("full_scan_progress_at"), now) <= 300
         if not status.get("repos") and not status.get("health", {}).get("fresh", False):
             observed["hub:stale"] = ("Repo Hub", "Repo checks stopped updating", 120, None)
         for row in status.get("repos", []):
             key, name = row["id"], row["name"]
             health = row.get("health", {})
+            scan_only = health.get("reasons") == ["Repo checks stopped updating"]
             if not health.get("fresh", False):
-                observed[key + ":stale"] = (name, "Status outdated", 120, None)
+                delay = 600 if scan_progressing and scan_only else 120
+                observed[key + ":stale"] = (name, "Status outdated", delay, None)
             if row.get("error") or row.get("verification", {}).get("state") == "error":
                 observed[key + ":copy"] = (name, "Backup verification needs attention", 120, None)
             cloud = row.get("cloud", {})
@@ -58,7 +66,15 @@ class ProblemTracker:
                 # A changing percentage is evidence of progress, even with 4355.
                 observed[key + ":upload"] = (name, "Upload has not shown progress for 30 minutes", 1800,
                                                (cloud.get("archive"), cloud.get("percent")))
+        active_ids = {row["id"] for row in status.get("repos", [])}
+        active_names = {row["name"] for row in status.get("repos", [])}
         for error in status.get("backup", {}).get("errors", []):
+            # Historical failures remain in the backup receipt, but a reviewed
+            # removal must also retire that source's active notification episode.
+            if "repo_id" in error and error["repo_id"] not in active_ids | {"repohub-data"}:
+                continue
+            if "repo_id" not in error and "repo" in error and error["repo"] not in active_names:
+                continue
             name = error.get("repo", "Repo Hub")
             observed["backup:" + error.get("repo_id", name)] = (name, "Backup failed; open Repo Hub for details", 120, None)
         backup = status.get("backup", {})

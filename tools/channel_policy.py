@@ -9,6 +9,8 @@ DEV_CHECKS = (
     'test_channel_release.py', 'test_update_feed.py',
     'test_signing_identity.py',
     'test_local_dev.py',
+    'test_selected_actions.py', 'test_rescan.py',
+    'test_policy_health.py', 'test_workspace_registry.py',
 )
 ACCEPTANCE_CASES = {'permissions', 'configuration', 'install_update', 'backup', 'channels'}
 

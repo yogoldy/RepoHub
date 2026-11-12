@@ -14,6 +14,9 @@ def access_failure(error, operation):
         state, detail = 'blocked', 'Access denied. Check folder permissions and macOS Privacy & Security, then retry.'
     elif code in (errno.ENOENT, errno.ENODEV, errno.ENXIO, errno.ENOTDIR):
         state, detail = 'unavailable', 'Folder or storage unavailable. Reconnect it or review the selected path, then retry.'
+        if operation == 'source_read':
+            detail = ('Folder unavailable. Reconnect it if needed, or open Settings → Folders to back up '
+                      'and review and save your selection if it was removed.')
     elif code in (errno.ENOSPC, errno.EDQUOT, errno.EROFS):
         state, detail = 'blocked', 'Storage is full or read-only. Make space or restore write access, then retry.'
     else:

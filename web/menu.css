@@ -290,6 +290,11 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
   color: var(--green);
 }
 
+/* The heading is focused for context, but is not a keyboard control. */
+#settings-title:focus {
+  outline: none;
+}
+
 /* The toolbar stays outside the scrolling page content. */
 #settings-dialog {
   padding: 0;
@@ -635,3 +640,13 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 #all-repos[hidden] {
   display: none;
 }
+
+/* Actions inherit the visible selected-repository boundary. */
+#detail > #repo-action-controls { margin-top: 18px; }
+#repo-action-controls button { overflow-wrap: anywhere; }
+.action-repos { max-height: 42vh; overflow-y: auto; margin: 14px 0; }
+.action-repo { display: flex; align-items: center; gap: 12px; padding: 10px 4px; }
+.action-repo span { min-width: 0; overflow-wrap: anywhere; }
+.action-repo strong, .action-repo small { display: block; }
+.action-repo small { color: var(--muted); margin-top: 4px; }
+#action-error { color: var(--red); }
