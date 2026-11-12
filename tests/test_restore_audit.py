@@ -166,3 +166,9 @@ class RestoreAuditTests(unittest.TestCase):
         self.expected=out/'expected.json'
         self.assertEqual(self.verify(),0)
         self.assertFalse(marker.exists())
+
+    def test_legacy_baseline_without_worktree_scope_still_restores(self):
+        baseline = json.loads(self.expected.read_text())
+        baseline.pop('worktree_metadata', None)
+        self.expected.write_text(json.dumps(baseline))
+        self.assertEqual(self.verify('legacy-baseline'), 0)

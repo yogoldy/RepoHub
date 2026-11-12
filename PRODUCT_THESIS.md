@@ -163,6 +163,18 @@ block channels or signing. CloudKit, remote push notifications, Tailwind and
 TestSprite evaluation remain deferred. Update commands, links and coverage claims
 as each step lands; do not retain a competing release order in historical guides.
 
+## Recovery verifier follow-up — November 12, 2026
+
+The current local-only work first fixes registered-worktree metadata validation
+and large-repository audit limits. Main-repo backups may retain contained Git
+worktree administration after validating its shared-store reference. That does
+not include or rebind outside checkouts, and receipts explicitly retain that gap.
+The worktree change has controlled capture/restore and refusal regressions in GR11.
+Capacity-aware large restores are the next local change; full live Air recovery
+still needs sufficient receiving storage. Explicit inclusion of external folders
+and linked-checkout contents is a later, separately reviewed feature. This work
+does not authorize a push, release publication or installed update.
+
 ## Implemented foundation and pending local follow-up
 
 The previous local update batch shipped through releases 0.0.5–0.0.7. The

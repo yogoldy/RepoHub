@@ -303,7 +303,7 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 
 **Cause / solution:** Use an independently captured manifest, trusted input identities, safe isolated extraction and Git fsck/history checks. Explicitly restore link modes without changing targets.
 
-**Required behavior:** Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts.
+**Required behavior:** Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Permit standard registered-worktree administration only after regular-file, bounded-content and shared-store checks; never follow checkout back-pointers or claim outside checkout files were restored.
 
 **Diagnostic trail:** `archive_verified`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
 
@@ -315,8 +315,15 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 - `test_restore_audit.RestoreAuditTests.test_traversal_duplicate_extra_and_absolute_paths_are_rejected`
 - `test_restore_audit.RestoreAuditTests.test_input_mutation_during_restore_is_reported`
 - `test_restore_audit.RestoreAuditTests.test_restored_hooks_and_fsmonitor_are_not_executed`
+- `test_restore_worktrees.RestoreWorktreeTests.test_registered_worktree_metadata_restores_without_external_checkout`
+- `test_restore_worktrees.RestoreWorktreeTests.test_external_or_malformed_common_directory_is_rejected_before_git`
+- `test_restore_worktrees.RestoreWorktreeTests.test_tampered_archive_common_directory_fails_before_git`
+- `test_restore_worktrees.RestoreWorktreeTests.test_linked_root_git_markers_and_common_store_redirection_stay_rejected`
+- `test_restore_worktrees.RestoreWorktreeTests.test_missing_or_symlinked_administrative_files_are_rejected`
+- `test_restore_worktrees.RestoreWorktreeTests.test_invalid_registered_head_is_not_a_successful_git_audit`
+- `test_restore_audit.RestoreAuditTests.test_legacy_baseline_without_worktree_scope_still_restores`
 
-**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics.
+**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Root linked-worktree Git files, external shared stores, submodules and alternates still fail closed. Captured administrative files retain original checkout back-pointers; they do not capture or rebind those outside checkouts.
 
 ### GR12 — Installation and restart must load the tested release
 

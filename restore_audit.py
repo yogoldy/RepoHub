@@ -153,10 +153,61 @@ def validate_entries(entries):
     for relative,item in entries.items():
         if PurePosixPath(relative).name=='.git' and item['kind']!='directory':raise AuditError('external_git_layout')
         if PurePosixPath(relative).name=='.gitmodules':raise AuditError('submodules_not_in_scope')
-        if '.git' in PurePosixPath(relative).parts and relative.endswith('/commondir'):raise AuditError('external_git_layout')
+        if '.git' in PurePosixPath(relative).parts and relative.endswith('/commondir'):
+            parts = PurePosixPath(relative).parts
+            # Only the main repo's standard registered-worktree layout is in scope.
+            if len(parts) != 4 or parts[:2] != ('.git', 'worktrees'):
+                raise AuditError('external_git_layout')
+            if item['kind'] != 'file':
+                raise AuditError('invalid_worktree_metadata')
         if '.git' in PurePosixPath(relative).parts and (relative.endswith('/objects/info/alternates') or relative.endswith('/objects/info/http-alternates')):
             raise AuditError('git_alternates_not_in_scope')
     return total
+
+
+def worktree_metadata(root, entries):
+    """Validate contained admin files without following checkout back-pointers."""
+    worktrees = entries.get('.git/worktrees')
+    if worktrees is not None and worktrees['kind'] != 'directory':
+        raise AuditError('invalid_worktree_metadata')
+    registrations = []
+    for relative, item in entries.items():
+        parts = PurePosixPath(relative).parts
+        if len(parts) == 3 and parts[:2] == ('.git', 'worktrees'):
+            if item['kind'] != 'directory':
+                raise AuditError('invalid_worktree_metadata')
+            registrations.append(relative)
+
+    def read_admin_file(relative):
+        item = entries.get(relative, {})
+        if item.get('kind') != 'file' or not 0 < item.get('size', 0) <= 4096:
+            raise AuditError('invalid_worktree_metadata')
+        fd = os.open(Path(root) / relative, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd, 'rb') as source:
+            raw = source.read(4097)
+        if len(raw) != item['size'] or hashlib.sha256(raw).hexdigest() != item['sha256']:
+            raise AuditError('worktree_metadata_changed')
+        try:
+            text = raw.decode('utf-8')
+        except UnicodeDecodeError:
+            raise AuditError('invalid_worktree_metadata') from None
+        value = text.removesuffix('\n')
+        if not value or any(character in value for character in ('\n', '\r', '\x00', '\\')):
+            raise AuditError('invalid_worktree_metadata')
+        return value
+
+    for registration in sorted(registrations):
+        # Git writes ../.. here: the shared object store is this same .git directory.
+        # Absolute paths are not portable, even when they happen to resolve inside it.
+        if read_admin_file(registration + '/commondir') != '../..':
+            raise AuditError('invalid_worktree_metadata')
+        back_pointer = read_admin_file(registration + '/gitdir')
+        if PurePosixPath(back_pointer).name != '.git':
+            raise AuditError('invalid_worktree_metadata')
+        read_admin_file(registration + '/HEAD')
+
+    return {'registered_worktrees': len(registrations),
+            'linked_checkout_contents_verified': False}
 
 
 def git_facts(root, evidence):
@@ -201,13 +252,15 @@ def capture(source, checksum, evidence):
     relative_path(source.name)
     evidence.enter('independent_source_capture')
     expected=manifest(source);validate_entries(expected)
+    scope = worktree_metadata(source, expected)
     git=git_facts(source,evidence)
     if expected!=manifest(source):raise AuditError('source_changed_during_git_checks')
     baseline={'schema_version':SCHEMA,'root_name':source.name,'archive_sha256':checksum,
-              'entries':expected,'git':git,'captured_at':datetime.now(timezone.utc).isoformat(),
+              'entries':expected,'git':git,'worktree_metadata':scope,'captured_at':datetime.now(timezone.utc).isoformat(),
               'provenance':'live_source_inventory_not_archive_derived'}
     write_private(evidence.output/'expected.json',baseline)
     evidence.finish('captured',manifest_sha256=digest(evidence.output/'expected.json'),entries=len(expected),
+                    worktree_metadata=scope,
                     note='Capture alone does not prove the supplied archive matches this source point in time.')
 
 
@@ -293,6 +346,10 @@ def verify(archive, expected, manifest_sha256, evidence):
         raise AuditError('restored_manifest_mismatch')
     evidence.emit('manifest_verified',entries=len(actual),manifest_content_sha256=hashlib.sha256(canonical(actual)).hexdigest())
     evidence.enter('git_history_verification')
+    scope = worktree_metadata(destination, actual)
+    default_scope = {'registered_worktrees': 0, 'linked_checkout_contents_verified': False}
+    if scope != baseline.get('worktree_metadata', default_scope):
+        raise AuditError('worktree_metadata_mismatch')
     git=git_facts(destination,evidence)
     if git!=baseline['git']:raise AuditError('git_history_mismatch')
     if actual!=manifest(destination):raise AuditError('restored_tree_changed_during_git_check')
@@ -302,7 +359,7 @@ def verify(archive, expected, manifest_sha256, evidence):
     evidence.finish('passed',archive_sha256=actual_archive,manifest_sha256=actual_manifest,
                     entries=len(actual),git_history='verified' if git is not None else 'not_applicable',
                     claim='Supplied archive restores to the supplied independent source baseline.',
-                    cloud_retrieval_tested=False)
+                    cloud_retrieval_tested=False, worktree_metadata=scope)
 
 
 def main(argv=None):
