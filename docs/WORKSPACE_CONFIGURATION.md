@@ -100,3 +100,19 @@ Menu Settings includes helper-owned source/destination access checks and optiona
 notification/login guidance. Access readiness is separate from hash verification
 and upload evidence. See [the reliability checkpoint](PRO_RELIABILITY_ACCEPTANCE.md)
 for implemented behavior, fault evidence and unfinished native acceptance.
+
+## Explicit manual actions
+
+In the menu, expanded details contain named backup and rescan buttons for that
+repository. The overview opens a checkbox chooser with no default selections;
+all-repository selection is explicit. The helper accepts distinct current
+workspace IDs and a reviewed registry revision at `/api/actions/backup` or
+`/api/actions/scan`. Both paths retain Host/Origin/token checks and operation
+locks. A selected manual backup resets only its selected cadence clocks and
+rechecks only its selected sources. Legacy dashboard APIs remain compatible.
+
+Unavailable sources remain visible and can be rescanned after reconnecting.
+Their detail panel links directly to monitored-folder review; home-mode review
+lists disappeared children as removals before saving. Removing a selection keeps
+its archive, ID and saved settings. A missing parent or substituted identity must
+never be interpreted as an authorized empty replacement backup.

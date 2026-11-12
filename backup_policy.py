@@ -97,9 +97,13 @@ class BackupScheduler:
             if plan["keys"] is None or row["id"] in plan["keys"]:
                 self.attempts[row["id"]] = now
 
-    def manual_completed(self, now):
-        self.last_periodic = now
-        self.periodic = {}
+    def manual_completed(self, now, keys=None):
+        if keys is None:
+            self.last_periodic = now
+            self.periodic = {}
+        else:
+            for key in keys:
+                self.periodic[key] = now
 
 
 def project_schedule(scheduler, settings, source, row, wall_now, monotonic_now,

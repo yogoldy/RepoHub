@@ -1,64 +1,56 @@
-// Exercise the shipped scan request and fetch wrapper without any daily helper.
+// Execute the shipped action controller against isolated status and request doubles.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync('web/menu.js', 'utf8');
-const html = fs.readFileSync('web/menu.html', 'utf8');
-assert.match(html, /<button id="rescan"[^>]*type="button"[^>]*>[\s\S]*?<span id="rescan-label">Rescan now<\/span>\s*<\/button>/);
-const nodes = {rescan: {disabled: false}, 'rescan-label': {textContent: 'Rescan now'},
-  notice: {textContent: ''}};
-// Updating the button's entire text would remove its new icon on the first click.
-Object.defineProperty(nodes.rescan, 'textContent', {
-  set() { throw new Error('Rescan must preserve the button icon'); },
-});
-const calls = [];
-let acknowledge;
-let rejectScan = false;
-let loads = 0;
-const context = vm.createContext({
-  $: selector => nodes[selector.slice(1)], requestingRescan: false, sessionToken: 'expired',
-  AbortController, setTimeout, clearTimeout,
-  load: async () => { loads++; },
-  fetch: async (path, options = {}) => {
-    calls.push({path, options});
-    if (path === '/api/session') return {ok: true, json: async () => ({token: 'current-token'})};
-    assert.equal(path, '/api/scan', 'Rescan must never invoke the backup endpoint');
-    assert.equal(options.method, 'POST');
-    assert.equal(options.headers['X-RepoHub-Token'], 'current-token');
-    assert.equal(options.body, '{}');
-    if (rejectScan) return {ok: false, json: async () => ({error: 'Synthetic refusal'})};
-    return new Promise(resolve => { acknowledge = () => resolve({
-      ok: true, json: async () => ({accepted: true}),
-    }); });
-  },
-});
-vm.runInContext(source.slice(source.indexOf('async function api('),
-  source.indexOf('function nativeAction(')), context);
-vm.runInContext(source.slice(source.indexOf('async function rescanNow('),
-  source.indexOf("$('#backup').onclick=")), context);
-
-(async () => {
-  const first = nodes.rescan.onclick();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(nodes.rescan.disabled, true);
-  assert.equal(nodes['rescan-label'].textContent, 'Requesting scan…');
-  await nodes.rescan.onclick();
-  assert.equal(calls.filter(call => call.path === '/api/scan').length, 1,
-    'Repeated clicks cannot submit concurrent scan requests');
-  acknowledge();
-  await first;
-  assert.equal(loads, 1);
-  assert.equal(nodes.rescan.disabled, false);
-  assert.equal(nodes['rescan-label'].textContent, 'Rescan now');
-  assert.equal(nodes.notice.textContent, 'Scan requested. Status will update automatically.');
-  assert.doesNotMatch(nodes.notice.textContent, /completed|backed up|verified/i);
-
-  rejectScan = true;
-  await nodes.rescan.onclick();
-  assert.equal(nodes.rescan.disabled, false);
-  assert.equal(nodes['rescan-label'].textContent, 'Rescan now');
-  assert.equal(loads, 1, 'A rejected request cannot claim a refreshed result');
-  assert.match(nodes.notice.textContent, /Scan could not be requested.*Synthetic refusal/);
-  assert.equal(calls.filter(call => call.path === '/api/session').length, 2);
-  console.log('Rescan controller: fresh token, duplicate guard, accepted versus completed, and failure recovery passed');
-})().catch(error => { console.error(error); process.exitCode = 1; });
+const nodes = new Map();
+const rows = [{id:'first',name:'First',access:{}}, {id:'second',name:'Second',access:{}}];
+const inputs = [];
+function node(id) {
+  if (!nodes.has(id)) nodes.set(id, {disabled:false, textContent:'', lastElementChild:{},
+    parentElement:null, append(child){child.parentElement=this;}, insertBefore(child){child.parentElement=this;},
+    addEventListener(){}, close(){this.open=false;}, showModal(){this.open=true;},
+    querySelectorAll(selector){return inputs.filter(input=>selector.includes(':checked') ? input.checked : !input.disabled);}});
+  return nodes.get(id);
+}
+node('repo-expansion').parentElement=node('main');
+Object.defineProperty(node('action-repos'),'innerHTML',{set(markup){
+  inputs.splice(0,inputs.length,...[...markup.matchAll(/value="([^"]+)"\s*(disabled)?/g)].map(m=>({value:m[1],disabled:!!m[2],checked:false})));
+}});
+let reject = false;
+const calls=[];
+const context=vm.createContext({$:s=>node(s.slice(1)),selectedId:'first',menuState:{repos:rows,backup:{}},
+  escape:s=>s,RepoStatus:{present:()=>({label:'Backed up'})},sessionToken:'old',
+  setTimeout(){},load(){}, api:async(path,payload)=>{
+    calls.push({path,payload});
+    if(path==='/api/workspaces')return {revision:'current',configuration:{workspaces:rows.map(r=>({...r,active:true}))}};
+    if(path==='/api/session')return {token:'fresh'};
+    assert.match(path,/^\/api\/actions\/(scan|backup)$/);
+    if(reject)throw Error('Selection changed');
+    return {accepted:true};
+  }});
+vm.runInContext(source.slice(source.indexOf('// Capture the controls once:'),source.indexOf("$('#open-backups').onclick")),context);
+(async()=>{
+  await node('rescan').onclick();
+  assert.equal(calls.at(-1).path,'/api/actions/scan');
+  assert.equal(JSON.stringify(calls.at(-1).payload),JSON.stringify({repo_ids:['first'],revision:'current'}));
+  await node('backup').onclick();
+  assert.equal(calls.at(-1).path,'/api/actions/backup');
+  context.selectedId=null;
+  const prior=calls.filter(c=>c.path.startsWith('/api/actions/')).length;
+  await node('rescan').onclick();
+  assert.equal(node('action-dialog').open,true);
+  assert.equal(inputs.filter(i=>i.checked).length,0);
+  assert.equal(node('action-submit').disabled,true);
+  assert.equal(calls.filter(c=>c.path.startsWith('/api/actions/')).length,prior);
+  inputs[1].checked=true;
+  node('action-repos').onchange();
+  await node('action-form').onsubmit({preventDefault(){}});
+  await new Promise(r=>setImmediate(r));
+  assert.equal(JSON.stringify(calls.at(-1).payload.repo_ids),'["second"]');
+  context.selectedId='first'; reject=true;
+  await node('rescan').onclick();
+  assert.match(node('notice').textContent,/Selection changed/);
+  assert.equal(node('rescan').disabled,false);
+  console.log('Actual action controller: explicit single scope, empty overview selection, chosen subset and rejection passed');
+})().catch(e=>{console.error(e);process.exitCode=1;});

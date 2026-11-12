@@ -96,7 +96,7 @@ const renderContext = vm.createContext({
   clientFreshness: 'current', RepoStatus: require('../web/repo-status.js'),
   view: row => require('../web/repo-status.js').present(row),
   escape: value => String(value ?? ''), when: value => value || 'Not yet', bytes: () => '1 MB',
-  openSettings() {}, window: {},
+  openSettings() {}, placeRepoActions() {}, sourceAvailable() { return true; }, window: {},
 });
 vm.runInContext(source.slice(source.indexOf('function renderDetail('),
   source.indexOf('function selectRepo(')), renderContext);

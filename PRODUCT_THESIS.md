@@ -398,3 +398,12 @@ superseded automatic-Stable policy from historical records.
 When an item is implemented, record its commit and actual verification evidence.
 Keep requested scope, implemented behavior, automated results and installed-Mac
 acceptance distinct.
+
+## Scoped backup and rescan patch in progress
+
+Local implementation moves backup/rescan actions into expanded repo details and
+adds an unchecked overview chooser for one, multiple or all repos. The helper
+requires explicit workspace identities and the reviewed selection revision.
+Missing-source details link to the existing review/removal flow; archives remain
+preserved. Long-scan per-repo freshness changes remain part of this patch.
+Installed acceptance, delivery and expanded Air recovery evidence are pending.

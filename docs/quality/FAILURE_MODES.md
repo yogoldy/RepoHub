@@ -979,3 +979,17 @@ use a deliberately non-promotable receipt. The workflow has read-only repository
 permissions, never publishes or installs, and records bounded failure evidence
 while cleaning temporary packages and signing material. Apple service acceptance
 still requires an actual successful run; these counterexamples do not imply it.
+
+## Explicit action scope
+
+Expanded repo details own their backup and rescan buttons. The overview opens an
+unchecked chooser; selecting all requires an explicit action. The new guarded
+`/api/actions/backup` and `/api/actions/scan` routes require distinct current IDs
+and a current workspace revision. Admission reserves operation locks before
+worker creation. Selected scans preserve unselected receipts. Missing sources
+cannot be backed up; a rescan can re-observe their availability. A direct folder
+review action preserves existing archives and uses the existing removal review.
+The legacy dashboard routes remain compatible; the menu uses explicit routes.
+Native installed acceptance and actual cloud upload remain separate from fixture
+and browser results. `test_selected_actions` supplies the scope/guard regressions;
+`tests/rescan.cjs` and `tests/menu-cards.cjs` exercise the real menu controller.
