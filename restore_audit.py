@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Controlled offline restore audit. Private inputs/results never belong in Git."""
 import argparse
+import errno
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -17,7 +18,9 @@ import time
 
 SCHEMA = 1
 MAX_ENTRIES = 250000
-MAX_BYTES = 8 * 1024**3
+DEFAULT_FREE_RESERVE = 512 * 1024**2
+COPY_CHUNK_BYTES = 1024**2
+SPACE_CHECK_INTERVAL = 16 * 1024**2
 
 
 class AuditError(Exception):
@@ -48,7 +51,9 @@ def write_private(path, value):
 
 
 class Evidence:
-    def __init__(self, output):
+    def __init__(self, output, max_bytes=None, reserve_bytes=DEFAULT_FREE_RESERVE):
+        self.max_bytes = max_bytes
+        self.reserve_bytes = reserve_bytes
         self.output = Path(output)
         if self.output.exists() or self.output.is_symlink():
             raise AuditError('output_must_be_new')
@@ -57,7 +62,8 @@ class Evidence:
         self.started = time.monotonic()
         self.events = self.output/'events.jsonl'
         self.emit('audit_started', python=sys.version.split()[0], platform=platform.platform(),
-                  verifier_sha256=digest(__file__), max_entries=MAX_ENTRIES, max_bytes=MAX_BYTES,
+                  verifier_sha256=digest(__file__), max_entries=MAX_ENTRIES, max_bytes=max_bytes,
+                  free_space_reserve_bytes=reserve_bytes,
                   network_policy='offline_commands_only', execute_restored_code=False)
 
     def emit(self, event, **facts):
@@ -85,6 +91,8 @@ def inventory(root):
                 path=Path(child.path);s=path.lstat();relative=path.relative_to(root).as_posix()
                 if not (stat.S_ISREG(s.st_mode) or stat.S_ISDIR(s.st_mode) or stat.S_ISLNK(s.st_mode)):
                     raise AuditError('unsupported_source_file_type')
+                if len(result) >= MAX_ENTRIES:
+                    raise AuditError('resource_limit')
                 result[relative]=stamp(path)
                 if stat.S_ISDIR(s.st_mode):walk(path)
     walk(root)
@@ -120,7 +128,7 @@ def relative_path(value):
     return p
 
 
-def validate_entries(entries):
+def validate_entries(entries, max_bytes=None):
     if not isinstance(entries,dict) or len(entries)>MAX_ENTRIES:raise AuditError('invalid_manifest')
     total=0
     for relative,item in entries.items():
@@ -148,7 +156,11 @@ def validate_entries(entries):
                     if not parts:raise AuditError('external_or_invalid_symlink')
                     parts.pop()
                 elif part not in ('','.'):parts.append(part)
-    if total>MAX_BYTES:raise AuditError('resource_limit')
+    if max_bytes is not None:
+        if type(max_bytes) is not int or max_bytes <= 0:
+            raise AuditError('invalid_byte_budget')
+        if total > max_bytes:
+            raise AuditError('byte_budget_exceeded')
     # Git files outside this root, submodules and alternates need a separate protocol.
     for relative,item in entries.items():
         if PurePosixPath(relative).name=='.git' and item['kind']!='directory':raise AuditError('external_git_layout')
@@ -251,7 +263,7 @@ def capture(source, checksum, evidence):
     if source.is_symlink() or not source.is_dir():raise AuditError('invalid_source_root')
     relative_path(source.name)
     evidence.enter('independent_source_capture')
-    expected=manifest(source);validate_entries(expected)
+    expected=manifest(source);validate_entries(expected, evidence.max_bytes)
     scope = worktree_metadata(source, expected)
     git=git_facts(source,evidence)
     if expected!=manifest(source):raise AuditError('source_changed_during_git_checks')
@@ -264,7 +276,68 @@ def capture(source, checksum, evidence):
                     note='Capture alone does not prove the supplied archive matches this source point in time.')
 
 
-def extract_checked(archive, baseline, destination, evidence):
+class RestoreBudget:
+    """Plan destination allocation and recheck capacity as bounded copies progress."""
+    def __init__(self, destination, entries, evidence):
+        self.directory = Path(destination).parent
+        self.evidence = evidence
+        self.remaining_bytes = validate_entries(entries, evidence.max_bytes)
+        self.reserve_bytes = evidence.reserve_bytes
+        if type(self.reserve_bytes) is not int or self.reserve_bytes < 0:
+            raise AuditError('invalid_space_reserve')
+        volume = os.statvfs(self.directory)
+        self.entry_bytes = max(volume.f_frsize or volume.f_bsize, 4096)
+        # A conservative per-entry allowance covers rounding and filesystem metadata.
+        self.remaining_entries = len(entries) + 1
+        self.initial_bytes = self.remaining_bytes
+        self.check(record=True)
+
+    def check(self, record=False):
+        available = shutil.disk_usage(self.directory)[2]
+        required = (self.remaining_bytes + self.remaining_entries * self.entry_bytes
+                    + self.reserve_bytes)
+        if record or available < required:
+            self.evidence.emit(
+                'restore_capacity', available_bytes=available, required_bytes=required,
+                remaining_data_bytes=self.remaining_bytes,
+                allocation_allowance_bytes=self.remaining_entries * self.entry_bytes,
+                reserve_bytes=self.reserve_bytes,
+            )
+        if available < required:
+            raise AuditError('restore_capacity_insufficient')
+
+    def created_entry(self):
+        self.remaining_entries -= 1
+
+    def copied(self, size):
+        self.remaining_bytes -= size
+        if self.remaining_bytes < 0:
+            raise AuditError('archive_size_overrun')
+
+
+def copy_member(source, target, size, budget):
+    """Copy the declared member size without whole-file reads or unbounded writes."""
+    remaining = size
+    since_space_check = 0
+    budget.check()
+    while remaining:
+        block = source.read(min(COPY_CHUNK_BYTES, remaining))
+        if not block:
+            raise AuditError('truncated_archive_member')
+        if len(block) > min(COPY_CHUNK_BYTES, remaining):
+            raise AuditError('archive_size_overrun')
+        if target.write(block) != len(block):
+            raise AuditError('short_restore_write')
+        remaining -= len(block)
+        budget.copied(len(block))
+        since_space_check += len(block)
+        if since_space_check >= SPACE_CHECK_INTERVAL:
+            budget.check()
+            since_space_check = 0
+    budget.check()
+
+
+def extract_checked(archive, baseline, destination, evidence, budget):
     expected=baseline['entries'];root_name=baseline['root_name'];members={};root_member=None
     evidence.enter('archive_preflight')
     with tarfile.open(archive,'r:gz') as stored:
@@ -288,24 +361,35 @@ def extract_checked(archive, baseline, destination, evidence):
                 if expected[key]['size']!=item['size'] or expected[key]['sha256']!=item['sha256']:raise AuditError('hardlink_mismatch')
             elif kind=='file' and member.size!=item['size']:raise AuditError('file_size_mismatch')
             total+=item.get('size',0)
-            if len(members)>=MAX_ENTRIES or total>MAX_BYTES:raise AuditError('resource_limit')
+            if len(members) >= MAX_ENTRIES:
+                raise AuditError('resource_limit')
+            if evidence.max_bytes is not None and total > evidence.max_bytes:
+                raise AuditError('byte_budget_exceeded')
             members[relative]=member
         if root_member is None or members.keys()!=expected.keys():raise AuditError('missing_archive_entries')
+        budget.check()
         destination.mkdir(mode=0o700)
+        budget.created_entry()
         evidence.enter('isolated_extraction')
         directories=[r for r,i in expected.items() if i['kind']=='directory']
         for relative in sorted(directories,key=lambda r:len(PurePosixPath(r).parts)):
+            budget.check()
             (destination/relative).mkdir(mode=0o700)
+            budget.created_entry()
         for relative,member in members.items():
             if expected[relative]['kind']!='file':continue
+            budget.check()
             fd=os.open(destination/relative,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            budget.created_entry()
             with os.fdopen(fd,'wb') as target,stored.extractfile(member) as source:
-                shutil.copyfileobj(source,target,1024*1024)
+                copy_member(source, target, expected[relative]['size'], budget)
                 os.fchmod(target.fileno(),expected[relative]['mode'])
         for relative,item in expected.items():
             if item['kind']=='symlink':
                 link=destination/relative
+                budget.check()
                 os.symlink(item['target'],link)
+                budget.created_entry()
                 # Symlink modes can depend on the receiving Mac's umask. Change
                 # the link itself, never its target, and fail closed if unsupported.
                 if stat.S_IMODE(link.lstat().st_mode)!=item['mode']:
@@ -317,6 +401,9 @@ def extract_checked(archive, baseline, destination, evidence):
                         raise AuditError('symlink_mode_restore_unsupported')
         for relative in sorted(directories,key=lambda r:len(PurePosixPath(r).parts),reverse=True):
             os.chmod(destination/relative,expected[relative]['mode'])
+        if budget.remaining_bytes != 0 or budget.remaining_entries != 0:
+            raise AuditError('restore_budget_mismatch')
+        budget.check()
         evidence.emit('extraction_finished',entries=len(members),bytes=total)
 
 
@@ -326,18 +413,26 @@ def verify(archive, expected, manifest_sha256, evidence):
         if path.is_symlink() or not path.is_file():raise AuditError('missing_or_nonregular_input')
     inputs={str(p):stamp(p) for p in (archive,expected)}
     evidence.enter('input_identity')
-    if expected.stat().st_size>128*1024**2 or archive.stat().st_size>MAX_BYTES:raise AuditError('resource_limit')
-    actual_manifest=digest(expected);actual_archive=digest(archive)
-    evidence.emit('input_hashes',archive_sha256=actual_archive,manifest_sha256=actual_manifest,
-                  archive_bytes=archive.stat().st_size)
-    if actual_manifest!=manifest_sha256:raise AuditError('expected_manifest_checksum_mismatch')
+    if expected.stat().st_size > 128 * 1024**2:
+        raise AuditError('resource_limit')
+    actual_manifest = digest(expected)
+    if actual_manifest != manifest_sha256:
+        raise AuditError('expected_manifest_checksum_mismatch')
     baseline=json.loads(expected.read_text())
     if baseline.get('schema_version')!=SCHEMA or baseline.get('provenance')!='live_source_inventory_not_archive_derived':raise AuditError('invalid_baseline_provenance')
     relative_path(baseline['root_name'])
     if '/' in baseline['root_name']:raise AuditError('invalid_root_name')
-    validate_entries(baseline['entries'])
-    if actual_archive!=baseline['archive_sha256']:raise AuditError('archive_checksum_mismatch')
-    destination=evidence.output/'restored';extract_checked(archive,baseline,destination,evidence)
+    validate_entries(baseline['entries'], evidence.max_bytes)
+    destination = evidence.output / 'restored'
+    evidence.enter('capacity_preflight')
+    budget = RestoreBudget(destination, baseline['entries'], evidence)
+    evidence.enter('archive_identity')
+    actual_archive = digest(archive)
+    evidence.emit('input_hashes', archive_sha256=actual_archive,
+                  manifest_sha256=actual_manifest, archive_bytes=archive.stat().st_size)
+    if actual_archive != baseline['archive_sha256']:
+        raise AuditError('archive_checksum_mismatch')
+    extract_checked(archive, baseline, destination, evidence, budget)
     evidence.enter('restored_manifest_comparison')
     actual=manifest(destination)
     if actual!=baseline['entries']:
@@ -359,7 +454,25 @@ def verify(archive, expected, manifest_sha256, evidence):
     evidence.finish('passed',archive_sha256=actual_archive,manifest_sha256=actual_manifest,
                     entries=len(actual),git_history='verified' if git is not None else 'not_applicable',
                     claim='Supplied archive restores to the supplied independent source baseline.',
-                    cloud_retrieval_tested=False, worktree_metadata=scope)
+                    cloud_retrieval_tested=False, worktree_metadata=scope,
+                    restored_bytes=budget.initial_bytes, byte_budget=evidence.max_bytes,
+                    free_space_reserve_bytes=evidence.reserve_bytes)
+
+
+def positive_bytes(value):
+    try:
+        result = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError('Expected a positive byte count') from None
+    if result <= 0:
+        raise argparse.ArgumentTypeError('Expected a positive byte count')
+    return result
+
+
+def nonnegative_bytes(value):
+    if value == '0':
+        return 0
+    return positive_bytes(value)
 
 
 def main(argv=None):
@@ -371,6 +484,15 @@ def main(argv=None):
     verify_parser=sub.add_parser('verify');verify_parser.add_argument('--archive',required=True)
     verify_parser.add_argument('--expected',required=True);verify_parser.add_argument('--manifest-sha256',required=True)
     verify_parser.add_argument('--out',required=True)
+    for command_parser in (capture_parser, verify_parser):
+        command_parser.add_argument(
+            '--max-bytes', type=positive_bytes, default=None,
+            help='Optional maximum total restored file bytes; no fixed default ceiling',
+        )
+    verify_parser.add_argument(
+        '--reserve-bytes', type=nonnegative_bytes, default=DEFAULT_FREE_RESERVE,
+        help='Free space to retain in addition to the planned restore (default: 512 MiB)',
+    )
     args=parser.parse_args(argv)
     evidence=None
     try:
@@ -380,12 +502,18 @@ def main(argv=None):
         if args.action=='capture':
             source=Path(args.source).resolve()
             if output==source or source in output.parents:raise AuditError('output_inside_source')
-        evidence=Evidence(args.out)
+        evidence = Evidence(args.out, max_bytes=args.max_bytes,
+                            reserve_bytes=getattr(args, 'reserve_bytes', DEFAULT_FREE_RESERVE))
         if args.action=='capture':capture(args.source,args.archive_sha256,evidence)
         else:verify(args.archive,args.expected,args.manifest_sha256,evidence)
         return 0
     except Exception as error:
-        reason=str(error) if isinstance(error,AuditError) else type(error).__name__
+        if isinstance(error, AuditError):
+            reason = str(error)
+        elif isinstance(error, OSError) and error.errno in (errno.ENOSPC, errno.EDQUOT):
+            reason = 'restore_capacity_exhausted'
+        else:
+            reason = type(error).__name__
         if evidence:evidence.finish('failed',reason=reason)
         print('Audit failed: '+reason,file=sys.stderr)
         return 1

@@ -10,7 +10,7 @@ A pass means: **the supplied archive matches the trusted expected archive checks
 
 | Variable | Control/evidence |
 | --- | --- |
-| Verifier source | Pin the exact handoff commit on `codex/backup-change-detection`; record `git rev-parse HEAD` and `git status --porcelain` before starting. Do not silently update the verifier. |
+| Verifier source | Pin the exact approved verifier commit; record `git rev-parse HEAD` and `git status --porcelain` before starting. Do not silently update the verifier. |
 | Archive identity | Exact expected SHA-256 taken from the app's recorded backup receipt, not recomputed from the received archive to create the expectation. |
 | Source expectation | `expected.json` captured by the local source-inventory command; it must describe the same content point in time as the chosen backup. Never derive it from the tested archive. |
 | Baseline transfer | Expected SHA-256 of `expected.json` supplied separately in the trusted handoff. The tool checks it before parsing. |
@@ -18,7 +18,7 @@ A pass means: **the supplied archive matches the trusted expected archive checks
 | Restore destination | New private directory per run; existing outputs are refused. Never restore over a working repo. |
 | Toolchain | Python standard library and installed Git; log versions, platform, verifier-file hash, Git subcommands, exit codes and output digests. No dependency install is needed. |
 | Execution/network | Do not execute restored code or hooks, run its tests, install its dependencies, contact remotes, or change global Git/system config. Git commands explicitly disable hooks, fsmonitor, lazy fetch, prompts and all transport protocols. Cloud egress should be disabled after the inputs arrive; document the actual environment network setting. The script itself is not an OS network sandbox. |
-| Limits | 250,000 entries, 8 GiB expanded file bytes, 8 GiB compressed input, 128 MiB baseline JSON, 120-second Git-command timeout. Insufficient VM disk/memory is a failed/incomplete run, not a pass. |
+| Limits | 250,000 entries, 128 MiB baseline JSON and 120-second Git-command timeout remain. No fixed compressed/expanded byte ceiling. Optional `--max-bytes` bounds total restored regular-file bytes. Destination capacity must cover remaining data, per-entry allocation allowance and a configurable free-space reserve (512 MiB by default). Insufficient capacity is a failed run, not a pass. |
 | Immutable inputs | Record hashes at start/end and check source/input changes during capture/verification. Do not edit or regenerate inputs to make a failure pass. |
 | Deviations | Record every departure from the handoff before the test. Missing inputs or unsupported cases stop the test; disclose them. |
 
@@ -54,7 +54,7 @@ The public GitHub repo supplies **only the verifier, tests and instructions**. A
 2. You may run synthetic tests first. Record them separately and label them **synthetic harness validation**, not personal/cloud restore success:
 
    ```sh
-   python3 -B -m unittest discover -s tests -p test_restore_audit.py -v
+   python3 -B -m unittest discover -s tests -p 'test_restore*.py' -v
    ```
 
    Expected negative tests print `Audit failed:` messages and still result in a successful unittest run. Distinguish these from failure of the test suite.
@@ -77,10 +77,41 @@ The public GitHub repo supplies **only the verifier, tests and instructions**. A
 
 The script validates archive/checksum identities; rejects missing, extra, duplicate, absolute or traversal entries; rejects special files and unsafe symlinks; preflights before extraction; compares every restored manifest entry; checks `git fsck --full --strict`, HEAD, branch/tag refs and reachable history counts; and confirms inputs/extracted files remain unchanged through verification. Git hooks and restored programs are never invoked. A non-Git folder reports Git checks as not applicable.
 
-This first protocol supports ordinary repos with contained `.git` directories. It refuses worktree Git pointers/commondir, external object alternates, submodules, escaping/absolute symlinks and special permission bits rather than silently skipping them. Internal symlinks are preserved. Hardlink file bytes are restored as ordinary files; hardlink inode sharing is not asserted.
+This protocol supports ordinary repos with contained `.git` directories and standard registered-worktree administrative files whose `commondir` is the relative internal shared-store reference `../..`. Administrative files must be regular, bounded and hash-consistent; malformed or redirected stores fail before Git checks. Original checkout back-pointers are retained as bytes and are not followed to capture outside checkout contents. Receipts disclose the registration count and `linked_checkout_contents_verified: false`. Root linked-worktree `.git` files, external object alternates, submodules, escaping/absolute symlinks and special permission bits remain refused rather than silently skipped. The supported metadata layout follows [Git’s repository layout documentation](https://git-scm.com/docs/gitrepository-layout). Internal symlinks are preserved. Hardlink file bytes are restored as ordinary files; hardlink inode sharing is not asserted.
 
 The comparison does not assert root-container permissions, macOS ACLs/xattrs/resource forks, ownership, timestamps, live-database consistency or application usability. Original file contents and ordinary permission bits are tested on the receiving filesystem; environment-specific mismatches must be reported. A provenance label/checksum binds the supplied baseline but cannot independently prove who captured it. Missing capture-time evidence cannot be replaced by inspecting the received archive.
 
+## Large restores and capacity evidence
+
+`verify` plans capacity on the filesystem containing its new output directory,
+before hashing a potentially cloud-backed archive or creating the restored tree.
+It repeats the check before extraction, at entry boundaries and during file copies.
+File reads/writes use chunks of at most 1 MiB. The receiver must already have room
+for the supplied archive; allocation planning covers the additional restored data,
+per-entry allocation allowance and reserve. These checks do not reserve space or
+guarantee future availability against other writers or filesystem quotas.
+
+Optional flags are explicit byte counts:
+
+- `capture --max-bytes N` and `verify --max-bytes N` reject manifests whose total
+  regular-file sizes exceed N. Omitting this flag applies no fixed byte ceiling.
+- `verify --reserve-bytes N` changes the extra free-space reserve; the default is
+  536870912 bytes (512 MiB). Zero is allowed only when deliberately requested.
+
+`restore_capacity` events record numeric free/required/remaining bytes and reserve,
+without private source paths. `restore_capacity_insufficient` identifies a failed
+capacity check; `restore_capacity_exhausted` identifies an OS out-of-space/quota
+failure. Failed partial output stays in its private run directory for inspection;
+archives and baselines are never deleted or changed to recover space. Use a new
+output directory for a disclosed retry.
+
+A local Pro checkpoint on November 12, 2026 restored an actual 8 GiB plus 1 MiB
+fixture, compared the full manifest, rechecked both inputs and cleaned only its
+owned temporary data. Recovery tests also exercise above-8-GiB planning, explicit
+budgets, low disk, mid-copy space loss and bounded-memory streams. These synthetic
+results do not establish the 29.5 GB personal-repo restore on the Air, whose free
+space was about 16 GB at the checkpoint.
+
 ## Current readiness
 
-Harness and handoff prepared and tested with synthetic repos locally. No real personal archive or baseline has been transferred and no independent cloud restore result is claimed. The next step is provision of the agreed private inputs, followed by the cloud agent's documented run.
+The verifier has local synthetic coverage for contained registered-worktree metadata and capacity-aware large restores. Private Air receive/restore observations exist for selected repos, including a settled-tree comparison; they are not an all-repo or direct-cloud-retrieval pass. External dependency inclusion and linked-checkout capture remain deferred. The largest live restore still needs sufficient receiving storage, then a fresh pinned-input run. No push, release or installed update is part of this local change.

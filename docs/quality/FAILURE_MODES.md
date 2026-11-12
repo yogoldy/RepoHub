@@ -323,7 +323,18 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 - `test_restore_worktrees.RestoreWorktreeTests.test_invalid_registered_head_is_not_a_successful_git_audit`
 - `test_restore_audit.RestoreAuditTests.test_legacy_baseline_without_worktree_scope_still_restores`
 
-**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Root linked-worktree Git files, external shared stores, submodules and alternates still fail closed. Captured administrative files retain original checkout back-pointers; they do not capture or rebind those outside checkouts.
+- `test_restore_capacity.RestoreCapacityTests.test_valid_manifest_above_eight_gib_has_no_fixed_byte_ceiling`
+- `test_restore_capacity.RestoreCapacityTests.test_insufficient_capacity_fails_before_any_extracted_file`
+- `test_restore_capacity.RestoreCapacityTests.test_large_plan_uses_allocation_fragments_and_explicit_budget`
+- `test_restore_capacity.RestoreCapacityTests.test_operator_budget_and_reserve_are_recorded_on_a_real_restore`
+- `test_restore_capacity.RestoreCapacityTests.test_operator_budget_refuses_capture_and_restore_without_extraction`
+- `test_restore_capacity.RestoreCapacityTests.test_space_loss_mid_copy_retains_failure_receipt_and_unchanged_inputs`
+- `test_restore_capacity.RestoreCapacityTests.test_filesystem_space_error_never_becomes_a_pass`
+- `test_restore_capacity.RestoreCapacityTests.test_copy_uses_bounded_memory_and_detects_short_or_overlong_streams`
+- `test_restore_capacity.RestoreCapacityTests.test_invalid_budget_arguments_and_entry_guard_still_fail_closed`
+- `test_restore_capacity.RestoreCapacityTests.test_inventory_entry_limit_stops_before_building_an_unbounded_manifest`
+
+**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Root linked-worktree Git files, external shared stores, submodules and alternates still fail closed. Captured administrative files retain original checkout back-pointers; they do not capture or rebind those outside checkouts. Large restores have no fixed byte ceiling: optional operator budgets, capacity preflight, a configurable free-space reserve and periodic checks constrain extraction. Entry-count/baseline limits remain. Capacity checks are observations, not disk reservations; partial failed outputs are retained and never reported as a pass.
 
 ### GR12 — Installation and restart must load the tested release
 
