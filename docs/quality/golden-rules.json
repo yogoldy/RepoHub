@@ -262,7 +262,7 @@
         "archive_verified"
       ],
       "cause_and_solution": "Use an independently captured manifest, trusted input identities, safe isolated extraction and Git fsck/history checks. Explicitly restore link modes without changing targets.",
-      "required_behavior": "Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Accept only validated contained registered-worktree metadata and disclose that linked checkout contents are not verified. Plan restore capacity from verified manifest sizes, retain a free-space reserve, bound copies and refuse exhausted capacity without altering inputs.",
+      "required_behavior": "Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Accept only validated contained registered-worktree metadata and disclose that linked checkout contents are not verified. Restore links that leave the root as exact link text without following them, list them in capture and restore receipts, and keep outside links within Git storage refused. Plan restore capacity from verified manifest sizes, retain a free-space reserve, bound copies and refuse exhausted capacity without altering inputs.",
       "test_ids": [
         "test_restore_audit.RestoreAuditTests.test_full_restore_with_ignored_uncommitted_git_and_log_receipts",
         "test_restore_audit.RestoreAuditTests.test_symlink_mode_survives_different_receiver_umask_without_changing_target",
@@ -277,6 +277,12 @@
         "test_restore_worktrees.RestoreWorktreeTests.test_missing_or_symlinked_administrative_files_are_rejected",
         "test_restore_worktrees.RestoreWorktreeTests.test_invalid_registered_head_is_not_a_successful_git_audit",
         "test_restore_audit.RestoreAuditTests.test_legacy_baseline_without_worktree_scope_still_restores",
+        "test_restore_audit.RestoreAuditTests.test_outside_link_is_reported_but_git_alternates_fail_capture",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_outside_links_restore_exactly_and_are_reported",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_forged_entry_beneath_an_outside_link_never_writes_outside",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_git_internal_outside_links_stay_rejected_before_git",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_tampered_link_report_or_target_fails",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_baseline_without_link_report_still_restores_and_discloses",
         "test_restore_capacity.RestoreCapacityTests.test_valid_manifest_above_eight_gib_has_no_fixed_byte_ceiling",
         "test_restore_capacity.RestoreCapacityTests.test_insufficient_capacity_fails_before_any_extracted_file",
         "test_restore_capacity.RestoreCapacityTests.test_large_plan_uses_allocation_fragments_and_explicit_budget",
@@ -288,7 +294,7 @@
         "test_restore_capacity.RestoreCapacityTests.test_invalid_budget_arguments_and_entry_guard_still_fail_closed",
         "test_restore_capacity.RestoreCapacityTests.test_inventory_entry_limit_stops_before_building_an_unbounded_manifest"
       ],
-      "remaining_gap": "Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics."
+      "remaining_gap": "Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Outside link targets are reported, but their contents are not captured; explicit inclusion is a separate feature."
     },
     {
       "id": "GR12",

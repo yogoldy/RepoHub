@@ -303,7 +303,7 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 
 **Cause / solution:** Use an independently captured manifest, trusted input identities, safe isolated extraction and Git fsck/history checks. Explicitly restore link modes without changing targets.
 
-**Required behavior:** Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Permit standard registered-worktree administration only after regular-file, bounded-content and shared-store checks; never follow checkout back-pointers or claim outside checkout files were restored.
+**Required behavior:** Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Permit standard registered-worktree administration only after regular-file, bounded-content and shared-store checks; never follow checkout back-pointers or claim outside checkout files were restored. Restore links that leave the root as exact link text, never follow them, list them in receipts and keep Git-storage links that leave the root refused.
 
 **Diagnostic trail:** `archive_verified`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
 
@@ -322,6 +322,12 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 - `test_restore_worktrees.RestoreWorktreeTests.test_missing_or_symlinked_administrative_files_are_rejected`
 - `test_restore_worktrees.RestoreWorktreeTests.test_invalid_registered_head_is_not_a_successful_git_audit`
 - `test_restore_audit.RestoreAuditTests.test_legacy_baseline_without_worktree_scope_still_restores`
+- `test_restore_audit.RestoreAuditTests.test_outside_link_is_reported_but_git_alternates_fail_capture`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_outside_links_restore_exactly_and_are_reported`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_forged_entry_beneath_an_outside_link_never_writes_outside`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_git_internal_outside_links_stay_rejected_before_git`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_tampered_link_report_or_target_fails`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_baseline_without_link_report_still_restores_and_discloses`
 
 - `test_restore_capacity.RestoreCapacityTests.test_valid_manifest_above_eight_gib_has_no_fixed_byte_ceiling`
 - `test_restore_capacity.RestoreCapacityTests.test_insufficient_capacity_fails_before_any_extracted_file`
@@ -334,7 +340,7 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 - `test_restore_capacity.RestoreCapacityTests.test_invalid_budget_arguments_and_entry_guard_still_fail_closed`
 - `test_restore_capacity.RestoreCapacityTests.test_inventory_entry_limit_stops_before_building_an_unbounded_manifest`
 
-**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Root linked-worktree Git files, external shared stores, submodules and alternates still fail closed. Captured administrative files retain original checkout back-pointers; they do not capture or rebind those outside checkouts. Large restores have no fixed byte ceiling: optional operator budgets, capacity preflight, a configurable free-space reserve and periodic checks constrain extraction. Entry-count/baseline limits remain. Capacity checks are observations, not disk reservations; partial failed outputs are retained and never reported as a pass.
+**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Root linked-worktree Git files, external shared stores, submodules and alternates still fail closed. Links that leave the root restore as link text; their targets' contents are not captured and may not exist on the receiving Mac. Captured administrative files retain original checkout back-pointers; they do not capture or rebind those outside checkouts. Large restores have no fixed byte ceiling: optional operator budgets, capacity preflight, a configurable free-space reserve and periodic checks constrain extraction. Entry-count/baseline limits remain. Capacity checks are observations, not disk reservations; partial failed outputs are retained and never reported as a pass.
 
 ### GR12 — Installation and restart must load the tested release
 

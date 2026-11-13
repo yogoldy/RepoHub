@@ -104,10 +104,12 @@ class RestoreAuditTests(unittest.TestCase):
             self.assertFalse((self.base/str(i)/'restored').exists())
         self.assertFalse((self.base/'escape').exists())
 
-    def test_external_links_and_git_layouts_fail_capture(self):
+    def test_outside_link_is_reported_but_git_alternates_fail_capture(self):
         (self.root/'link').unlink();(self.root/'link').symlink_to('/private/outside')
         self.assertEqual(audit.main(['capture','--source',str(self.root),'--archive-sha256',audit.digest(self.archive),
-                                    '--out',str(self.base/'external')]),1)
+                                    '--out',str(self.base/'external')]),0)
+        report=json.loads((self.base/'external/expected.json').read_text())['outside_links']
+        self.assertEqual([(item['path'],item['scope']) for item in report],[('link','absolute')])
         (self.root/'link').unlink();(self.root/'.git/objects/info/alternates').write_text('/private/objects')
         self.assertEqual(audit.main(['capture','--source',str(self.root),'--archive-sha256',audit.digest(self.archive),
                                     '--out',str(self.base/'alternates')]),1)

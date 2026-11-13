@@ -78,7 +78,13 @@ class Evidence:
         self.emit('stage_started')
 
     def finish(self, result, **facts):
-        self.emit('audit_finished', result=result, **facts)
+        logged = dict(facts)
+        links = logged.get('outside_links')
+        if isinstance(links, dict):
+            # Link targets can be private paths; events record only the summary.
+            logged['outside_links'] = {'count': links.get('count'),
+                                       'contents_included': links.get('contents_included')}
+        self.emit('audit_finished', result=result, **logged)
         write_private(self.output/'result.json', {'schema_version':SCHEMA, 'result':result, **facts})
 
 
@@ -128,6 +134,76 @@ def relative_path(value):
     return p
 
 
+
+OUTSIDE_TARGET_TYPES = ('directory', 'file', 'missing', 'unavailable', 'other')
+
+
+def link_scope(relative, target):
+    """Classify link text lexically; the target itself is never consulted."""
+    if PurePosixPath(target).is_absolute():
+        return 'absolute'
+    parts = list(PurePosixPath(relative).parent.parts)
+    for part in target.split('/'):
+        if part == '..':
+            if not parts:
+                return 'relative_escaping'
+            parts.pop()
+        elif part not in ('', '.'):
+            parts.append(part)
+    return 'inside'
+
+
+def target_type(link):
+    """Describe what an outside link points at without reading or copying it."""
+    try:
+        info = os.stat(link)
+    except (FileNotFoundError, NotADirectoryError):
+        return 'missing'
+    except OSError:
+        return 'unavailable'
+    if stat.S_ISDIR(info.st_mode):
+        return 'directory'
+    if stat.S_ISREG(info.st_mode):
+        return 'file'
+    return 'other'
+
+
+def outside_links(entries, root=None):
+    """List links whose text leaves the root. Without a live root, types are unrecorded."""
+    report = []
+    for relative in sorted(entries):
+        item = entries[relative]
+        if item['kind'] != 'symlink':
+            continue
+        scope = link_scope(relative, item['target'])
+        if scope == 'inside':
+            continue
+        report.append({'path': relative, 'target': item['target'], 'scope': scope,
+                       'target_type': target_type(Path(root) / relative) if root else 'not_recorded'})
+    return report
+
+
+def checked_outside_links(baseline):
+    """The baseline's link report must describe exactly the links in its entries."""
+    derived = outside_links(baseline['entries'])
+    recorded = baseline.get('outside_links')
+    if recorded is None:
+        # Baselines captured before this report existed still disclose their links.
+        return derived
+    if not isinstance(recorded, list) or len(recorded) != len(derived):
+        raise AuditError('outside_link_summary_mismatch')
+    for item, expected in zip(recorded, derived):
+        if (not isinstance(item, dict) or set(item) != set(expected)
+                or item.get('target_type') not in OUTSIDE_TARGET_TYPES
+                or any(item[key] != expected[key] for key in ('path', 'target', 'scope'))):
+            raise AuditError('outside_link_summary_mismatch')
+    return recorded
+
+
+def link_receipt(links):
+    return {'count': len(links), 'contents_included': False, 'items': links}
+
+
 def validate_entries(entries, max_bytes=None):
     if not isinstance(entries,dict) or len(entries)>MAX_ENTRIES:raise AuditError('invalid_manifest')
     total=0
@@ -147,15 +223,12 @@ def validate_entries(entries, max_bytes=None):
             total+=item['size']
         elif kind=='symlink':
             target=item['target']
-            if not isinstance(target,str) or not target or '\\' in target or '\x00' in target or PurePosixPath(target).is_absolute():
+            if not isinstance(target,str) or not target or '\\' in target or '\x00' in target:
                 raise AuditError('external_or_invalid_symlink')
-            # Preserve link text, but require its lexical target to remain inside the root.
-            parts=list(path.parent.parts)
-            for part in target.split('/'):
-                if part=='..':
-                    if not parts:raise AuditError('external_or_invalid_symlink')
-                    parts.pop()
-                elif part not in ('','.'):parts.append(part)
+            # Outside links restore as link text and are never followed. Git storage
+            # that leaves the root still needs its own protocol, so it stays refused.
+            if '.git' in path.parts and link_scope(relative,target)!='inside':
+                raise AuditError('external_git_layout')
     if max_bytes is not None:
         if type(max_bytes) is not int or max_bytes <= 0:
             raise AuditError('invalid_byte_budget')
@@ -264,15 +337,17 @@ def capture(source, checksum, evidence):
     relative_path(source.name)
     evidence.enter('independent_source_capture')
     expected=manifest(source);validate_entries(expected, evidence.max_bytes)
+    links = outside_links(expected, source)
+    evidence.emit('outside_links_reported', count=len(links))
     scope = worktree_metadata(source, expected)
     git=git_facts(source,evidence)
     if expected!=manifest(source):raise AuditError('source_changed_during_git_checks')
     baseline={'schema_version':SCHEMA,'root_name':source.name,'archive_sha256':checksum,
-              'entries':expected,'git':git,'worktree_metadata':scope,'captured_at':datetime.now(timezone.utc).isoformat(),
+              'entries':expected,'git':git,'worktree_metadata':scope,'outside_links':links,'captured_at':datetime.now(timezone.utc).isoformat(),
               'provenance':'live_source_inventory_not_archive_derived'}
     write_private(evidence.output/'expected.json',baseline)
     evidence.finish('captured',manifest_sha256=digest(evidence.output/'expected.json'),entries=len(expected),
-                    worktree_metadata=scope,
+                    worktree_metadata=scope, outside_links=link_receipt(links),
                     note='Capture alone does not prove the supplied archive matches this source point in time.')
 
 
@@ -423,6 +498,8 @@ def verify(archive, expected, manifest_sha256, evidence):
     relative_path(baseline['root_name'])
     if '/' in baseline['root_name']:raise AuditError('invalid_root_name')
     validate_entries(baseline['entries'], evidence.max_bytes)
+    links = checked_outside_links(baseline)
+    evidence.emit('outside_links_reported', count=len(links))
     destination = evidence.output / 'restored'
     evidence.enter('capacity_preflight')
     budget = RestoreBudget(destination, baseline['entries'], evidence)
@@ -455,6 +532,7 @@ def verify(archive, expected, manifest_sha256, evidence):
                     entries=len(actual),git_history='verified' if git is not None else 'not_applicable',
                     claim='Supplied archive restores to the supplied independent source baseline.',
                     cloud_retrieval_tested=False, worktree_metadata=scope,
+                    outside_links=link_receipt(links),
                     restored_bytes=budget.initial_bytes, byte_budget=evidence.max_bytes,
                     free_space_reserve_bytes=evidence.reserve_bytes)
 
