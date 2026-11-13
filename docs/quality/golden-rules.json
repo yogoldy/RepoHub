@@ -672,6 +672,27 @@
         "test_validate_signing.ValidateSigningTests.test_workflow_keeps_signing_opt_in_read_only_and_after_full_gate"
       ],
       "remaining_gap": "Synthetic GitHub tests and public-key fixtures do not prove live prerelease/feed publication, Apple notarization, channel changes in the installed native app or Pro/Air update continuity. Those require separately authorized live delivery and native acceptance."
+    },
+    {
+      "id": "GR27",
+      "title": "Outside items are reviewed explicitly and never change backup status",
+      "breakpoint": "Links and linked checkouts can point to content outside a repo; following them silently copies unreviewed data, and reporting them as problems turns ordinary repos red.",
+      "diagnostic_events": [
+        "outside_review"
+      ],
+      "cause_and_solution": "Detect outside links and Git worktree registrations from the scan inventory without following them. Measure sizes only when the review opens. Store per-repo choices in a separate revision-checked file keyed to the link inside the repo.",
+      "required_behavior": "Defaults keep links only and committed work only. Unknown, escaping or invalid choices and stale revisions are refused. Removed links drop out of the review. Choices never change needs_backup, verification or card status. Logs record only a repo alias and result, never outside paths or contents.",
+      "test_ids": [
+        "test_outside_items.DetectionTests.test_links_are_classified_without_following_and_git_internals_are_skipped",
+        "test_outside_items.DetectionTests.test_linked_checkouts_follow_git_registrations_and_removed_folders",
+        "test_outside_items.DetectionTests.test_malformed_registration_is_reported_invalid_not_followed",
+        "test_outside_items.DetectionTests.test_folder_size_reports_incomplete_totals_as_lower_bounds",
+        "test_outside_items.OutsideHubTests.test_scan_counts_outside_items_and_choices_never_change_backup_need",
+        "test_outside_items.OutsideHubTests.test_review_defaults_and_revision_checked_saves",
+        "test_outside_items.OutsideHubTests.test_http_routes_keep_token_origin_and_revision_guards",
+        "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
+      ],
+      "remaining_gap": "Choices are recorded but included contents are not archived until the separate-archive commit lands. Installed native review and live outside folders on the Pro and Air are not yet observed."
     }
   ]
 }

@@ -650,3 +650,12 @@ dialog{color:var(--text);background:var(--bg);border:1px solid var(--line);borde
 .action-repo strong, .action-repo small { display: block; }
 .action-repo small { color: var(--muted); margin-top: 4px; }
 #action-error { color: var(--red); }
+
+.outside-group { margin: 14px 0; }
+.outside-group h3 { font-size: 13px; margin: 0 0 8px; }
+.outside-item { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); margin: 0; }
+.outside-item p { margin: 0; overflow-wrap: anywhere; }
+.outside-item small, .outside-group li small { color: var(--muted); }
+.outside-group ul { margin: 0; padding-left: 18px; overflow-wrap: anywhere; }
+#outside-error { color: var(--red); font-size: 11px; }
+#outside-error:empty { display: none; }

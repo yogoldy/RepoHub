@@ -34,6 +34,8 @@ from workspace_registry import WorkspaceRegistry, workspace_id, require_source, 
 from backup_layout import BackupLayout, LayoutTransaction
 from destination_policy import require_destination
 from git_discovery import GitDiscovery
+import outside_items
+from outside_items import OutsideChoices
 from setup_service import SetupService
 from report_preview import preview_report
 from report_delivery import send_report, connection_status, delivery_status, case_path, read_private
@@ -409,6 +411,8 @@ class Hub:
                               load_json(self.repo_settings_path, {}).items()}
         if not self.repo_settings_path.exists():
             atomic_json(self.repo_settings_path, self.repo_settings)
+        self.outside_choices = OutsideChoices(self.data_dir / "outside-choices.json", atomic_json)
+        self.outside_detected = {}
         saved_clock = load_json(self.state_dir / "schedule-clock.json", {})
         previous_times = [datetime.fromisoformat(item["completed_at"]).timestamp() for item in self.index.values()]
         self.last_periodic_at = saved_clock.get("last_periodic_at", max(previous_times, default=0))
@@ -626,7 +630,9 @@ class Hub:
                                 "files": sum(stat.S_ISREG(e[1]) for e in entries),
                                 "bytes": sum(e[2] for e in entries if stat.S_ISREG(e[1])),
                                 "signature": fingerprint(entries), "edit_signature": fingerprint(edit_entries(entries))})
+                    row["outside"] = self.detect_outside(key, root, entries)
                 except Exception as e:
+                    self.outside_detected.pop(key, None)
                     row["error"] = str(e)
                     if isinstance(e, OSError):
                         row["access"] = access_failure(e, "source_read")
@@ -795,6 +801,43 @@ class Hub:
             atomic_json(self.repo_settings_path, updated)
             self.repo_settings = updated
             return self.repo_settings_status(key)
+
+    def detect_outside(self, key, root, entries):
+        """Report outside items; detection never changes backup status."""
+        try:
+            detected = outside_items.detect(root, entries)
+        except (OSError, ValueError, UnicodeError):
+            self.outside_detected.pop(key, None)
+            return {"state": "unavailable"}
+        self.outside_detected[key] = detected
+        return outside_items.counts(detected)
+
+    def outside_status(self, key):
+        with self.lock:
+            if key not in self.repositories():
+                raise ValueError("Unknown repository")
+            detected = self.outside_detected.get(key)
+            if detected is None:
+                raise ValueError("Outside items have not been checked yet. Rescan this repo.")
+            revision = self.outside_choices.revision()
+            choices = self.outside_choices.for_repo(key, detected)
+        # Sizes and Git status are measured only when the review page opens.
+        return {"repo_id": key, "items": outside_items.review(detected, git_info),
+                "choices": choices, "revision": revision}
+
+    def save_outside_choices(self, key, payload):
+        if set(payload) != {"choices", "revision"}:
+            raise ValueError("Invalid outside-item request")
+        with self.lock:
+            if key not in self.repositories():
+                raise ValueError("Unknown repository")
+            detected = self.outside_detected.get(key)
+            if detected is None:
+                raise FileExistsError("Outside items have not been checked yet. Rescan before saving.")
+            known = {item["path"] for item in detected["links"] if item["category"] == "linked_folder"}
+            self.outside_choices.save(key, payload["choices"], payload["revision"], known)
+        self.diagnostics.emit("outside_review", result="saved", repo_ref=diagnostic_ref(key))
+        return self.outside_status(key)
 
     def automatic_tick(self):
         if not self.configured or self.setup_recovery_required:
@@ -1176,6 +1219,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path.startswith("/api/repo-settings/"):
                 return self.send(self.hub.repo_settings_status(path.removeprefix("/api/repo-settings/")))
+            if path.startswith("/api/outside/"):
+                return self.send(self.hub.outside_status(path.removeprefix("/api/outside/")))
             if path == "/api/readiness":
                 return self.send(self.hub.readiness_status())
             if path == "/api/workspaces":
@@ -1210,6 +1255,7 @@ class Handler(BaseHTTPRequestHandler):
                       "/menu.html": "menu.html", "/menu.css": "menu.css", "/menu.js": "menu.js",
                       "/menu-appearance.js": "menu-appearance.js",
                       "/update-channels.js": "update-channels.js",
+                      "/outside-items.js": "outside-items.js",
                       "/setup.html": "setup.html", "/setup.js": "setup.js", "/setup.css": "setup.css",
                       "/report.css": "report.css", "/report-preview.js": "report-preview.js", "/repo-status.js": "repo-status.js", "/diagnostics-client.js": "diagnostics-client.js"}
             if path not in routes:
@@ -1282,6 +1328,11 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(value, 202)
                 except FileExistsError as error:
                     return self.send({'error': str(error)}, 409)
+            if path.startswith("/api/outside/"):
+                try:
+                    return self.send(self.hub.save_outside_choices(path.removeprefix("/api/outside/"), payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
             if path.startswith("/api/repo-settings/"):
                 try:
                     return self.send(self.hub.save_repo_settings(path.removeprefix("/api/repo-settings/"), payload))

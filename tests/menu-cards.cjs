@@ -273,6 +273,19 @@ assert.equal(diagnostics.readDetailTiming(get('detail'), currentTiming).text_mat
 captureProof('missing-expanded-line', 'detail', {repo_id: 'id-0',
   detail_timing: diagnostics.readDetailTiming(get('detail'), currentTiming)});
 render();
+// Outside items add one review line in details and never change the card status.
+const statusBefore = cards()[0].querySelector('.card-status').textContent;
+const classBefore = cards()[0].className;
+state.repos[0].outside = {linked_folders: 1, checkouts: 1, reinstall: 0, removed_checkouts: 0};
+render();
+assert.match(get('outside-review').textContent, /1 linked folder · 1 linked checkout · Review/);
+assert.equal(cards()[0].querySelector('.card-status').textContent, statusBefore);
+assert.equal(cards()[0].className, classBefore);
+state.repos[0].outside = {state: 'unavailable'};
+render();
+assert.equal(get('outside-review'), null, 'Unavailable detection adds no review line');
+delete state.repos[0].outside;
+render();
 const keyboard = get('cards').events.keydown;
 keyboard({key: 'Escape', target: cards()[0], preventDefault() {}});
 assert.equal(get('repo-expansion').hidden, true);

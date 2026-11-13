@@ -1022,3 +1022,20 @@ Reviewed source removals retire their active notification episodes even when the
 last backup receipt still contains a historical error for that source. The error
 receipt is retained; global operation errors continue to notify. GR15 checks this
 through `test_removed_source_retires_alert_but_keeps_failure_history`.
+
+## GR27 — Outside items are reviewed explicitly
+
+Each scan lists links that leave a repo and Git worktree registrations without following them. Linked folders can be reviewed; links to single files and installed tools are listed for reinstalling. Choices are saved per repo in a revision-checked file and never change backup status. Sizes and uncommitted-change counts are measured only when the review opens, and incomplete totals are shown as lower bounds. Diagnostics record only `outside_review` with a repo alias.
+
+**Regression tests:**
+
+- `test_outside_items.DetectionTests.test_links_are_classified_without_following_and_git_internals_are_skipped`
+- `test_outside_items.DetectionTests.test_linked_checkouts_follow_git_registrations_and_removed_folders`
+- `test_outside_items.DetectionTests.test_malformed_registration_is_reported_invalid_not_followed`
+- `test_outside_items.DetectionTests.test_folder_size_reports_incomplete_totals_as_lower_bounds`
+- `test_outside_items.OutsideHubTests.test_scan_counts_outside_items_and_choices_never_change_backup_need`
+- `test_outside_items.OutsideHubTests.test_review_defaults_and_revision_checked_saves`
+- `test_outside_items.OutsideHubTests.test_http_routes_keep_token_origin_and_revision_guards`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** Included contents are not archived yet; installed and live-device review remain unobserved.

@@ -35,6 +35,7 @@ WEB_ASSETS = (
     'index.html',
     'menu-appearance.js',
     'update-channels.js',
+    'outside-items.js',
     'menu.css',
     'menu.html',
     'menu.js',

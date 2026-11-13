@@ -175,7 +175,7 @@ a configurable free-space reserve, bounded copies and failure receipts. The full
 Python suite passed 382 tests; 27 recovery tests also passed on macOS Python 3.9.6.
 An actual above-8-GiB Pro fixture restore passed without changing its inputs.
 Full live Air recovery still needs sufficient receiving storage. Explicit inclusion
-of external folders and linked-checkout contents is a later, separately reviewed feature. This work
+of external folders and linked-checkout contents is in progress as four local commits: outside-link restore (3cb246d), detection and reviewed choices, separate archives, and linked checkouts with a 30-day keep window for removed items. This work
 does not authorize a push, release publication or installed update.
 
 ## Implemented foundation and pending local follow-up
