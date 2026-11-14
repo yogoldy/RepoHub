@@ -53,6 +53,8 @@
     let markup = '';
     if (folders.length) {
       markup += '<section class="outside-group"><h3>Linked folders</h3>' + folders.map(item => {
+        if (item.blocked) return '<div class="outside-item"><p><strong>' + escape(item.path) + '</strong> <small>→ '
+          + escape(item.target) + '</small></p><p class="settings-note">Kept as a link: ' + escape(item.blocked) + '.</p></div>';
         const current = draft.linked_folders[item.path] || 'link_only';
         return '<div class="outside-item"><p><strong>' + escape(item.path) + '</strong> <small>→ '
           + escape(item.target) + ' · ' + escape(size(item)) + '</small></p>'
@@ -89,7 +91,7 @@
     const selects = list.querySelectorAll ? list.querySelectorAll('select') : [];
     for (const select of selects) select.disabled = busy;
     $('outside-note').textContent = loading ? 'Checking items outside this folder…'
-      : 'Choices are saved on this Mac. Included contents are not backed up yet in this build; the repo backup itself is unchanged.';
+      : 'Choices are saved on this Mac. Included folders are saved as separate verified archives beside the repo backup, and Backed up appears only after every archive is verified and uploaded.';
   }
 
   function apply(result) {

@@ -207,7 +207,7 @@ function renderDetail(presentation) {
       ${retryingRepo === repo.id ? 'Check requested…' : 'Retry check now'}</button>` : '';
   const schedule = RepoStatus.describeSchedule(repo, menuState.power_source);
   const timing = presentation?.timing || RepoStatus.timing(repo, menuState.backup, clientFreshness);
-  const outsideLine = outsideSummary(repo.outside);
+  const outsideLine = outsideSummary(repo.outside, repo.included_folders);
   const markup = `
     <p class="detail-context">${escape(repo.name)}</p>
     <h2 class="status-headline" data-category="${state.category}">${escape(state.headline)}</h2>
@@ -288,11 +288,12 @@ function renderDetail(presentation) {
     }
   };
 }
-function outsideSummary(outside) {
+function outsideSummary(outside, included) {
   if (!outside || outside.state === 'unavailable') return '';
   const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
   const parts = [];
-  if (outside.linked_folders) parts.push(plural(outside.linked_folders, 'linked folder'));
+  if (outside.linked_folders) parts.push(plural(outside.linked_folders, 'linked folder')
+    + (included && included.included ? ' (' + included.included + ' included)' : ''));
   if (outside.checkouts) parts.push(plural(outside.checkouts, 'linked checkout'));
   if (outside.removed_checkouts) parts.push(plural(outside.removed_checkouts, 'removed checkout'));
   if (outside.reinstall) parts.push(plural(outside.reinstall, 'tool link'));

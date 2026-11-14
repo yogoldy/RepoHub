@@ -1025,7 +1025,7 @@ through `test_removed_source_retires_alert_but_keeps_failure_history`.
 
 ## GR27 — Outside items are reviewed explicitly
 
-Each scan lists links that leave a repo and Git worktree registrations without following them. Linked folders can be reviewed; links to single files and installed tools are listed for reinstalling. Choices are saved per repo in a revision-checked file and never change backup status. Sizes and uncommitted-change counts are measured only when the review opens, and incomplete totals are shown as lower bounds. Diagnostics record only `outside_review` with a repo alias.
+Each scan lists links that leave a repo and Git worktree registrations without following them. Linked folders can be reviewed; links to single files and installed tools are listed for reinstalling. Choices are saved per repo in a revision-checked file; detection and link-only choices never change backup status. Sizes and uncommitted-change counts are measured only when the review opens, and incomplete totals are shown as lower bounds. Diagnostics record only `outside_review` with a repo alias.
 
 **Regression tests:**
 
@@ -1038,4 +1038,25 @@ Each scan lists links that leave a repo and Git worktree registrations without f
 - `test_outside_items.OutsideHubTests.test_http_routes_keep_token_origin_and_revision_guards`
 - `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
 
-**Remaining exposure:** Included contents are not archived yet; installed and live-device review remain unobserved.
+**Remaining exposure:** Installed and live-device review remain unobserved. Included folders are covered by GR28.
+
+## GR28 — Included linked folders are separate verified archives
+
+A linked folder whose saved choice is include is archived on its own, beside its repo's backup in `linked/<link path>/`. Links inside it are stored as links and never followed, and the repo archive format is unchanged. The repo's index entry records the set. RepoHub asks macOS about every archive in the set and reports one combined upload state, so **Backed up** appears only when each archive is verified and confirmed uploaded for that exact archive. Changed folder contents mark the repo for backup; a timestamp-only change reuses the verified archive. Superseded folder archives are pruned only after the whole new set uploads and never from a stale copy of the set.
+
+Folders that overlap a monitored repo, a backup destination, RepoHub data, a system or top-level location, or another included link are refused when choices are saved. If a link changes later, the backup reports the refusal for that repo and keeps the last verified archive referenced. Setup layout changes move folder archives with their repo after checksum verification. Restore receipts name included archives by link path and checksum (`--include LINK=SHA256`); each folder archive is audited with its own capture and verify run. Diagnostics record repo aliases and reason codes through `included_folder_archived`, `included_folder_refused` and `included_folder_failed`, never outside paths or contents.
+
+**Regression tests:**
+
+- `test_included_folders.IncludedFolderTests.test_included_folder_gets_its_own_verified_archive_and_restore_receipt`
+- `test_included_folders.IncludedFolderTests.test_backed_up_requires_every_archive_in_the_set_to_upload`
+- `test_included_folders.IncludedFolderTests.test_upload_helper_is_asked_about_every_archive`
+- `test_included_folders.IncludedFolderTests.test_included_folder_changes_mark_the_repo_for_backup`
+- `test_included_folders.IncludedFolderTests.test_superseded_folder_archives_are_pruned_only_after_the_whole_set_uploads`
+- `test_included_folders.IncludedFolderTests.test_unsafe_or_duplicate_inclusions_are_refused`
+- `test_included_folders.IncludedFolderTests.test_a_link_retargeted_after_review_is_reported_and_keeps_the_last_archive`
+- `test_included_folders.IncludedFolderTests.test_setup_layout_change_moves_folder_archives_with_their_repo`
+- `test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** Moving restored folder contents back to their original location is a later guided step. Linked checkouts and the 30-day keep window for removed items land in the next commit. Installed native behavior and live iCloud upload of folder archives are not yet observed.

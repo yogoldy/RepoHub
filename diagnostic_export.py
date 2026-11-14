@@ -16,6 +16,7 @@ EVENTS = frozenset("application_update update_checkpoint ui_timing timing_disagr
 IDENTITIES = frozenset("session_id report_ref repo_ref archive_ref previous_archive_ref verification_archive_ref cloud_archive_ref run_id previous_run_id scan_id previous_scan_id observation_id client_id build_id backup_hash_ref edit_signature previous_signature source_signature backup_signature content_signature archive_content_signature path_ref".split())
 EVENTS = EVENTS | {'menu_bar_presented', 'menu_bar_disagreement'}
 EVENTS = EVENTS | {'setup_review', 'setup_applied', 'setup_continued', 'setup_recovery', 'git_discovery', 'outside_review'}
+EVENTS = EVENTS | {'included_folder_archived', 'included_folder_refused', 'included_folder_failed'}
 BOOLEANS = frozenset("after_edits archive_dataless copying has_error has_backup ignored_finder_only backup_required cached needs_backup metadata_changed fresh scan_running backup_running native".split())
 ENUMS = {
     'update_phase': UPDATE_PHASES,
@@ -41,7 +42,7 @@ ENUMS = {
     'verification_state': {'changing','matched','different','checking','error','missing','unknown'},
     'state': {'accessible','blocked','unchecked','changed','draft','sending','sent','failed','uncertain','battery','adapter','unknown','pending','uploading','uploaded','error','unavailable','recording'},
     'mode': {'home','manual','content','metadata','all','selected','posix','pending','uploading','uploaded','error','unknown'},
-    'stage': {'scan','scheduler','cloud','source_inspection','source_hashing','archive_creation','archive_verification','archive_transfer','destination_verification','existing_verification','publication_recovery','index_publication','retention'},
+    'stage': {'scan','scheduler','cloud','source_inspection','source_hashing','archive_creation','archive_verification','archive_transfer','destination_verification','existing_verification','publication_recovery','index_publication','retention','included_folders'},
     'result': {'saved','selected','waiting','complete','failed','failed_power_paused','power_paused','not_started','partial','reused','created','verified','removed','kept','deferred','unknown','ready','not_ready','views_differ','unobserved_interval','unobserved_completion'},
     'reason': set("helper_stopped client_request_failed client_response_timeout client_cache_expired source_changed_during_verification report_confirmed delivery_unconfirmed connection_required github_access_denied github_rejected network_unavailable invalid_response report_identity_conflict invalid_receipt account_changed power_unknown periodic_due edits_settled automatic_disabled source_error awaiting_change_observation edits_not_settled retry_delay periodic_not_due scan_error verification_error first_backup_pending awaiting_hash_check timestamp_only_match contents_match finder_metadata_ignored repo_files_differ finder_metadata_only git_data_only finder_and_git_data content_difference_unclassified backup_pending_unclassified checks_not_fresh observed_error active_repo_backup awaiting_hash_verification presentation_inputs_disagree finder_only_project_match fresh_hashes_and_upload_confirmed macos_uploading macos_upload_pending upload_not_confirmed helper_restarted forced poll manual scheduled after_edits observation_expired helper_unavailable macos_observation keep_all no_superseded_archives awaiting_upload power_changed backup_busy verification_io_unavailable finder_only connection storage conflict other upload download".split()),
     'error_type': {'SourceIdentityChanged','OSError','PermissionError','FileNotFoundError','TimeoutError','RuntimeError','ValueError','TypeError','TarError','ReadError','EOFError','OverflowError'},
@@ -53,6 +54,8 @@ ENUMS = {
 ENUMS['display_label'] |= {value[1] for value in PRESENTATION_TEXT.values()}
 ENUMS['display_headline'] = {value[2] for value in PRESENTATION_TEXT.values()}
 ENUMS['category'] |= {value[0] for value in PRESENTATION_TEXT.values()}
+ENUMS['reason'] |= {'not_a_directory', 'too_broad', 'system_location', 'app_state', 'backup_destination',
+                     'inside_monitored_repo', 'duplicate_target', 'included_folder_changed'}
 FREQUENCIES = {0,15,30,60,120,240}
 DELAYS = {2,5,10,15,30}
 ERROR_CODES = frozenset(errno.errorcode) | {4354,4355}

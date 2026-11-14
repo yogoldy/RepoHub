@@ -9,7 +9,8 @@ const posts = [];
 let revision = 'r1';
 let fail = false, hold = false, release, discard = false, finished = 0;
 let saved = {linked_folders: {node_modules: 'link_only'}, checkouts: 'committed_only'};
-const items = {linked_folders: [{path: 'node_modules', target: '/x/node_modules', target_type: 'directory', bytes: 2048, complete: true}],
+const items = {linked_folders: [{path: 'node_modules', target: '/x/node_modules', target_type: 'directory', bytes: 2048, complete: true},
+    {path: 'shared', target: '/x/other', target_type: 'directory', bytes: 1, complete: true, blocked: 'it overlaps a monitored repo'}],
   reinstall: [{path: '.venv/bin/python3', target: '/opt/homebrew/bin/python3', target_type: 'file'}],
   checkouts: [{name: 'draft', path: '/x/draft', state: 'present', bytes: 10, complete: false, changed_files: 0}]};
 const respond = (ok, value) => ({ok, json: async () => value});
@@ -37,6 +38,8 @@ const choose = value => get('outside-list').onchange({target: {dataset: {link: '
   assert.match(get('outside-list').innerHTML, /Keep link only/);
   assert.match(get('outside-list').innerHTML, /at least 10 B · no uncommitted changes/);
   assert.match(get('outside-list').innerHTML, /Reinstall on a new Mac/);
+  assert.match(get('outside-list').innerHTML, /Kept as a link: it overlaps a monitored repo/);
+  assert(!get('outside-list').innerHTML.includes('data-link="shared"'), 'Blocked folders offer no include choice');
   assert(get('outside-save').disabled, 'No-change saves are disabled');
   choose('include');
   assert(!get('outside-save').disabled);

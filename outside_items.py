@@ -2,7 +2,7 @@
 
 Detection reads link text and Git's worktree registrations from the scan's
 existing inventory. It never copies, follows into or changes outside content.
-Choices are recorded here; archiving included content is a separate step.
+Choices are recorded here; the helper archives included folders separately.
 """
 import hashlib
 import json
@@ -12,12 +12,24 @@ import re
 import stat
 import time
 
+from workspace_registry import overlaps
+
 SYSTEM_PREFIXES = ('/opt/', '/usr/', '/System/', '/Library/', '/Applications/',
                    '/bin/', '/sbin/', '/etc/', '/private/etc/')
 MAX_ADMIN_BYTES = 4096
 LINK_CHOICES = ('link_only', 'include')
 CHECKOUT_CHOICES = ('committed_only', 'include')
 REPO_KEY = re.compile(r'^[A-Za-z0-9_-]{1,80}$')
+BROAD = (Path('/'), Path('/Users'), Path('/Volumes'))
+REFUSALS = {
+    'not_a_directory': 'its link no longer points to a folder',
+    'too_broad': 'it is a top-level or home folder',
+    'system_location': 'it is a system or installed-tool folder',
+    'app_state': "it overlaps RepoHub's own data",
+    'backup_destination': 'it overlaps a backup destination',
+    'inside_monitored_repo': 'it overlaps a monitored repo, which is backed up on its own',
+    'duplicate_target': 'another included link already covers that folder',
+}
 
 
 def link_scope(relative, target):
@@ -115,6 +127,41 @@ def counts(detected):
             'removed_checkouts': sum(item['state'] != 'present' for item in checkouts)}
 
 
+def included_folders(detected, choices):
+    """Linked folders whose saved choice is include and whose link is still present."""
+    chosen = choices.get('linked_folders', {})
+    return [item for item in detected['links']
+            if item['category'] == 'linked_folder' and chosen.get(item['path']) == 'include']
+
+
+def inclusion_target(link, repositories=(), destinations=(), state=None, seen=None):
+    """Resolve a reviewed link's folder, or return why it cannot be archived separately."""
+    try:
+        real = Path(link).resolve(strict=True)
+        info = os.stat(real)
+    except (OSError, RuntimeError):
+        return None, 'not_a_directory'
+    if not stat.S_ISDIR(info.st_mode):
+        return None, 'not_a_directory'
+    if real in BROAD or real == Path.home():
+        return None, 'too_broad'
+    if (str(real) + '/').startswith(SYSTEM_PREFIXES):
+        return None, 'system_location'
+    if state is not None and overlaps(real, Path(state)):
+        return None, 'app_state'
+    if any(overlaps(real, Path(path)) for path in destinations):
+        return None, 'backup_destination'
+    if any(overlaps(real, Path(path)) for path in repositories):
+        return None, 'inside_monitored_repo'
+    if seen and any(overlaps(real, Path(path)) for path in seen):
+        return None, 'duplicate_target'
+    return real, None
+
+
+def refusal_text(path, reason):
+    return path + ' cannot be included: ' + REFUSALS[reason] + '.'
+
+
 def folder_size(path, max_entries=200000, max_seconds=3.0):
     """Bounded metadata walk; an incomplete total is reported as a lower bound."""
     total = entries = 0
@@ -139,11 +186,18 @@ def folder_size(path, max_entries=200000, max_seconds=3.0):
     return {'bytes': total, 'complete': complete}
 
 
-def review(detected, git_status):
+def review(detected, git_status, refusals=None):
     def public(item):
         return {key: item[key] for key in ('path', 'target', 'target_type')}
-    folders = [{**public(item), **folder_size(item['resolved'])}
-               for item in detected['links'] if item['category'] == 'linked_folder']
+    refusals = refusals or {}
+    folders = []
+    for item in detected['links']:
+        if item['category'] != 'linked_folder':
+            continue
+        row = {**public(item), **folder_size(item['resolved'])}
+        if item['path'] in refusals:
+            row['blocked'] = REFUSALS[refusals[item['path']]]
+        folders.append(row)
     reinstall = [public(item) for item in detected['links'] if item['category'] == 'reinstall']
     checkouts = []
     for item in detected['checkouts']:

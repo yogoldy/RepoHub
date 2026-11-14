@@ -681,7 +681,7 @@
         "outside_review"
       ],
       "cause_and_solution": "Detect outside links and Git worktree registrations from the scan inventory without following them. Measure sizes only when the review opens. Store per-repo choices in a separate revision-checked file keyed to the link inside the repo.",
-      "required_behavior": "Defaults keep links only and committed work only. Unknown, escaping or invalid choices and stale revisions are refused. Removed links drop out of the review. Choices never change needs_backup, verification or card status. Logs record only a repo alias and result, never outside paths or contents.",
+      "required_behavior": "Defaults keep links only and committed work only. Unknown, escaping or invalid choices and stale revisions are refused. Removed links drop out of the review. Detection and link-only choices never change needs_backup, verification or card status; included folders follow GR28. Logs record only a repo alias and result, never outside paths or contents.",
       "test_ids": [
         "test_outside_items.DetectionTests.test_links_are_classified_without_following_and_git_internals_are_skipped",
         "test_outside_items.DetectionTests.test_linked_checkouts_follow_git_registrations_and_removed_folders",
@@ -692,7 +692,33 @@
         "test_outside_items.OutsideHubTests.test_http_routes_keep_token_origin_and_revision_guards",
         "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
       ],
-      "remaining_gap": "Choices are recorded but included contents are not archived until the separate-archive commit lands. Installed native review and live outside folders on the Pro and Air are not yet observed."
+      "remaining_gap": "Installed native review and live outside folders on the Pro and Air are not yet observed. Included folders are covered by GR28."
+    },
+    {
+      "id": "GR28",
+      "title": "Included linked folders are separate verified archives that count toward Backed up",
+      "breakpoint": "A reviewed linked folder lives outside the repo. Copying it into the repo archive changes that archive's format, and judging only the repo archive reports Backed up before the folder's copy is verified or uploaded.",
+      "diagnostic_events": [
+        "included_folder_archived",
+        "included_folder_refused",
+        "included_folder_failed",
+        "upload_observed"
+      ],
+      "cause_and_solution": "Archive each folder whose saved choice is include on its own, beside the repo backup in linked/<link path>/, storing links inside it as links. Record the set on the repo's index entry, ask macOS about every archive in it, and feed one combined upload state into the existing repo status. Refuse folders that overlap a monitored repo, a backup destination, RepoHub data, a system or top-level location, or another included link.",
+      "required_behavior": "The repo archive format is unchanged. Backed up requires every archive in the set to be verified and confirmed uploaded for that exact archive. Changed folder contents mark the repo for backup; timestamp-only changes reuse the verified archive. Superseded folder archives are pruned only after the whole new set uploads and never from a stale copy of the set. Unsafe choices are refused when saved and reported for the repo at backup time while the last verified archive stays referenced. Setup layout changes move folder archives with their repo after checksum verification. Restore receipts name included archives by link path and checksum. Logs record aliases and reason codes, never outside paths or contents.",
+      "test_ids": [
+        "test_included_folders.IncludedFolderTests.test_included_folder_gets_its_own_verified_archive_and_restore_receipt",
+        "test_included_folders.IncludedFolderTests.test_backed_up_requires_every_archive_in_the_set_to_upload",
+        "test_included_folders.IncludedFolderTests.test_upload_helper_is_asked_about_every_archive",
+        "test_included_folders.IncludedFolderTests.test_included_folder_changes_mark_the_repo_for_backup",
+        "test_included_folders.IncludedFolderTests.test_superseded_folder_archives_are_pruned_only_after_the_whole_set_uploads",
+        "test_included_folders.IncludedFolderTests.test_unsafe_or_duplicate_inclusions_are_refused",
+        "test_included_folders.IncludedFolderTests.test_a_link_retargeted_after_review_is_reported_and_keeps_the_last_archive",
+        "test_included_folders.IncludedFolderTests.test_setup_layout_change_moves_folder_archives_with_their_repo",
+        "test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims",
+        "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
+      ],
+      "remaining_gap": "Moving restored folder contents back to their original location is a later guided step; each folder archive is audited with its own capture and verify run. Linked checkouts and the 30-day keep window for removed items land in the next commit. Installed native behavior and live iCloud upload of folder archives on the Pro and Air are not yet observed."
     }
   ]
 }

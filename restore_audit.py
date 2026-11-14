@@ -83,7 +83,8 @@ class Evidence:
         if isinstance(links, dict):
             # Link targets can be private paths; events record only the summary.
             logged['outside_links'] = {'count': links.get('count'),
-                                       'contents_included': links.get('contents_included')}
+                                       'contents_included': links.get('contents_included'),
+                                       'included_archives': len(links.get('included_archives') or [])}
         self.emit('audit_finished', result=result, **logged)
         write_private(self.output/'result.json', {'schema_version':SCHEMA, 'result':result, **facts})
 
@@ -200,8 +201,33 @@ def checked_outside_links(baseline):
     return recorded
 
 
-def link_receipt(links):
-    return {'count': len(links), 'contents_included': False, 'items': links}
+def included_map(values, links):
+    """Pair outside folder links with the checksums of their separate archives."""
+    folders = {item['path'] for item in links if item['target_type'] == 'directory'}
+    result = {}
+    for value in values:
+        if not isinstance(value, str) or '=' not in value:
+            raise AuditError('invalid_included_contents')
+        path, checksum = value.rsplit('=', 1)
+        if path in result or path not in folders or not re.fullmatch('[0-9a-f]{64}', checksum):
+            raise AuditError('invalid_included_contents')
+        result[path] = checksum
+    return result
+
+
+def checked_included(baseline, links):
+    recorded = baseline.get('included_contents', {})
+    if not isinstance(recorded, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in recorded.items()):
+        raise AuditError('invalid_included_contents')
+    return included_map([path + '=' + checksum for path, checksum in recorded.items()], links)
+
+
+def link_receipt(links, included=None):
+    """Included folders are separate archives, audited with their own capture and verify run."""
+    included = included or {}
+    return {'count': len(links), 'contents_included': bool(links) and all(item['path'] in included for item in links),
+            'items': links,
+            'included_archives': [{'path': path, 'archive_sha256': included[path]} for path in sorted(included)]}
 
 
 def validate_entries(entries, max_bytes=None):
@@ -330,7 +356,7 @@ def git_facts(root, evidence):
             'history_count':run('rev-list','--all','--count').stdout.decode().strip()}
 
 
-def capture(source, checksum, evidence):
+def capture(source, checksum, evidence, included_values=None):
     if not re.fullmatch('[0-9a-f]{64}',checksum):raise AuditError('invalid_expected_checksum')
     source=Path(source)
     if source.is_symlink() or not source.is_dir():raise AuditError('invalid_source_root')
@@ -339,15 +365,16 @@ def capture(source, checksum, evidence):
     expected=manifest(source);validate_entries(expected, evidence.max_bytes)
     links = outside_links(expected, source)
     evidence.emit('outside_links_reported', count=len(links))
+    included = included_map(included_values or [], links)
     scope = worktree_metadata(source, expected)
     git=git_facts(source,evidence)
     if expected!=manifest(source):raise AuditError('source_changed_during_git_checks')
     baseline={'schema_version':SCHEMA,'root_name':source.name,'archive_sha256':checksum,
-              'entries':expected,'git':git,'worktree_metadata':scope,'outside_links':links,'captured_at':datetime.now(timezone.utc).isoformat(),
+              'entries':expected,'git':git,'worktree_metadata':scope,'outside_links':links,'included_contents':included,'captured_at':datetime.now(timezone.utc).isoformat(),
               'provenance':'live_source_inventory_not_archive_derived'}
     write_private(evidence.output/'expected.json',baseline)
     evidence.finish('captured',manifest_sha256=digest(evidence.output/'expected.json'),entries=len(expected),
-                    worktree_metadata=scope, outside_links=link_receipt(links),
+                    worktree_metadata=scope, outside_links=link_receipt(links, included),
                     note='Capture alone does not prove the supplied archive matches this source point in time.')
 
 
@@ -500,6 +527,7 @@ def verify(archive, expected, manifest_sha256, evidence):
     validate_entries(baseline['entries'], evidence.max_bytes)
     links = checked_outside_links(baseline)
     evidence.emit('outside_links_reported', count=len(links))
+    included = checked_included(baseline, links)
     destination = evidence.output / 'restored'
     evidence.enter('capacity_preflight')
     budget = RestoreBudget(destination, baseline['entries'], evidence)
@@ -532,7 +560,7 @@ def verify(archive, expected, manifest_sha256, evidence):
                     entries=len(actual),git_history='verified' if git is not None else 'not_applicable',
                     claim='Supplied archive restores to the supplied independent source baseline.',
                     cloud_retrieval_tested=False, worktree_metadata=scope,
-                    outside_links=link_receipt(links),
+                    outside_links=link_receipt(links, included),
                     restored_bytes=budget.initial_bytes, byte_budget=evidence.max_bytes,
                     free_space_reserve_bytes=evidence.reserve_bytes)
 
@@ -558,6 +586,8 @@ def main(argv=None):
     sub=parser.add_subparsers(dest='action',required=True)
     capture_parser=sub.add_parser('capture');capture_parser.add_argument('--source',required=True)
     capture_parser.add_argument('--archive-sha256',required=True)
+    capture_parser.add_argument('--include',action='append',default=[],metavar='LINK=SHA256',
+                                help='Name a linked folder whose contents are in a separate verified archive')
     capture_parser.add_argument('--out',required=True)
     verify_parser=sub.add_parser('verify');verify_parser.add_argument('--archive',required=True)
     verify_parser.add_argument('--expected',required=True);verify_parser.add_argument('--manifest-sha256',required=True)
@@ -582,7 +612,7 @@ def main(argv=None):
             if output==source or source in output.parents:raise AuditError('output_inside_source')
         evidence = Evidence(args.out, max_bytes=args.max_bytes,
                             reserve_bytes=getattr(args, 'reserve_bytes', DEFAULT_FREE_RESERVE))
-        if args.action=='capture':capture(args.source,args.archive_sha256,evidence)
+        if args.action=='capture':capture(args.source,args.archive_sha256,evidence,args.include)
         else:verify(args.archive,args.expected,args.manifest_sha256,evidence)
         return 0
     except Exception as error:

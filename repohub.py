@@ -43,6 +43,7 @@ from report_delivery import send_report, connection_status, delivery_status, cas
 WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
 ARCHIVE_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{6}Z\.tar\.gz$")
+LINKED = "::linked::"  # Upload-status IDs for included-folder archives.
 
 
 def utc_now():
@@ -683,6 +684,13 @@ class Hub:
                 if current and not self.layout.contains(key, current['archive']):
                     row['needs_backup'] = True
                     row['verification'] = {'state': 'missing'}
+                if not row.get("error"):
+                    included = self.included_state(key, root, current)
+                    if included["included"]:
+                        row["included_folders"] = included
+                        if included["pending"]:
+                            row["needs_backup"] = True
+                            row["linked_pending"] = True
                 row["cloud"] = self.cloud_for(key, current)
                 self.evidence.repo_checked(row, scan_id, (time.monotonic() - repo_started) * 1000, not verification_performed)
                 rows.append(row)
@@ -821,8 +829,9 @@ class Hub:
                 raise ValueError("Outside items have not been checked yet. Rescan this repo.")
             revision = self.outside_choices.revision()
             choices = self.outside_choices.for_repo(key, detected)
+            refusals = self.inclusion_refusals(key, detected)
         # Sizes and Git status are measured only when the review page opens.
-        return {"repo_id": key, "items": outside_items.review(detected, git_info),
+        return {"repo_id": key, "items": outside_items.review(detected, git_info, refusals),
                 "choices": choices, "revision": revision}
 
     def save_outside_choices(self, key, payload):
@@ -835,9 +844,141 @@ class Hub:
             if detected is None:
                 raise FileExistsError("Outside items have not been checked yet. Rescan before saving.")
             known = {item["path"] for item in detected["links"] if item["category"] == "linked_folder"}
+            outside_items.validate_repo(payload["choices"], known)
+            chosen = {path for path, choice in payload["choices"]["linked_folders"].items() if choice == "include"}
+            refused = self.inclusion_refusals(key, detected, chosen)
+            if refused:
+                path, reason = sorted(refused.items())[0]
+                self.diagnostics.emit("outside_review", result="failed", reason=reason, repo_ref=diagnostic_ref(key))
+                raise ValueError(outside_items.refusal_text(path, reason))
             self.outside_choices.save(key, payload["choices"], payload["revision"], known)
         self.diagnostics.emit("outside_review", result="saved", repo_ref=diagnostic_ref(key))
         return self.outside_status(key)
+
+    def inclusion_guard(self):
+        """Locations an included folder must never overlap."""
+        return {"repositories": tuple(self.repositories().values()),
+                "destinations": (self.backups, *(Path(path) for path in self.setup_record.get("previous_destinations", []))),
+                "state": self.state_dir}
+
+    def inclusion_refusals(self, key, detected, chosen=None):
+        """Reason codes for linked folders that cannot be archived separately.
+
+        With chosen paths, a later link to an already included folder is a duplicate.
+        """
+        root = self.repositories()[key]
+        guard = self.inclusion_guard()
+        refusals = {}
+        seen = [] if chosen is not None else None
+        for item in detected["links"]:
+            if item["category"] != "linked_folder" or (chosen is not None and item["path"] not in chosen):
+                continue
+            real, reason = outside_items.inclusion_target(root / item["path"], seen=seen, **guard)
+            if reason:
+                refusals[item["path"]] = reason
+            elif seen is not None:
+                seen.append(real)
+        return refusals
+
+    def included_state(self, key, root, current):
+        """Compare reviewed linked folders with their saved archives using metadata only."""
+        detected = self.outside_detected.get(key)
+        if detected is None:
+            return {"included": 0, "pending": 0}
+        try:
+            items = outside_items.included_folders(detected, self.outside_choices.for_repo(key, detected))
+        except (OSError, ValueError):
+            return {"included": 0, "pending": 0}
+        saved = (current or {}).get("linked") or {}
+        pending = 0
+        for item in items:
+            entry = saved.get(item["path"])
+            try:
+                real = (Path(root) / item["path"]).resolve(strict=True)
+                ok = bool(entry and entry.get("source") == str(real)
+                          and self.layout.contains_linked(key, item["path"], entry["archive"])
+                          and Path(entry["archive"]).is_file()
+                          and fingerprint(tree_entries(real)) == entry.get("signature"))
+            except (OSError, ValueError, RuntimeError):
+                ok = False
+            pending += not ok
+        return {"included": len(items), "pending": pending}
+
+    def archive_included(self, key, root, entries, previous, run_id, observe, failures, deferred):
+        """Archive reviewed linked folders beside the repo backup, each verified on its own.
+
+        Returns the repo's linked-folder map. A folder that cannot be archived keeps
+        its last verified archive referenced and is reported for this repo.
+        """
+        saved = (previous or {}).get("linked") or {}
+        try:
+            detected = outside_items.detect(root, entries)
+            items = outside_items.included_folders(detected, self.outside_choices.for_repo(key, detected))
+        except (OSError, ValueError, UnicodeError) as error:
+            failures.append({"repo": root.name, "repo_id": key,
+                             "error": "Included folders could not be checked: " + str(error)})
+            return dict(saved)
+        linked = {}
+        if not items:
+            return linked
+        observe("included_folders")
+        guard = self.inclusion_guard()
+        seen = []
+        for item in items:
+            path, link = item["path"], Path(root) / item["path"]
+            real, refusal = outside_items.inclusion_target(link, seen=seen, **guard)
+            if refusal:
+                self.lifecycle.emit("included_folder_refused", key=key, run_id=run_id, reason=refusal, result="not_started")
+                failures.append({"repo": root.name, "repo_id": key, "error": outside_items.refusal_text(path, refusal)})
+                if path in saved:
+                    linked[path] = saved[path]
+                continue
+            seen.append(real)
+            started = time.monotonic()
+            try:
+                destination = self.layout.linked_directory(key, path)
+                entry = saved.get(path)
+                verified = None
+                if (entry and entry.get("source") == str(real)
+                        and self.layout.contains_linked(key, path, entry["archive"])
+                        and Path(entry["archive"]).is_file()):
+                    try:
+                        verified = verify_current(real, entry)
+                    except SourceChanged:
+                        raise
+                    except (RuntimeError, tarfile.TarError):
+                        verified = None  # Replace a damaged copy from the source; nothing is pruned first.
+                if verified and (verified["state"] == "matched" or verified.get("ignored_finder_only") is True):
+                    linked[path] = {**entry, "signature": verified["signature"],
+                                    "content_signature": verified["archive_content_signature"]}
+                    self.lifecycle.emit("included_folder_archived", key=key, current=linked[path], result="reused")
+                    continue
+
+                def check_link():
+                    self.registry.require_workspace(key, root)
+                    if self.setup_record.get("destination"):
+                        require_destination(self.setup_record["destination"])
+                    LayoutTransaction.safe_target(self.backups, destination)
+                    if os.readlink(link) != item["target"] or link.resolve() != real:
+                        raise SourceChanged("An included folder's link changed during the backup")
+                result = snapshot(real, destination, self.state_dir / "staging", source_check=check_link)
+                result.update(run_id=run_id, source=str(real), target=item["target"])
+                linked[path] = result
+                self.lifecycle.emit("included_folder_archived", key=key, current=result, result="created",
+                                    bytes=result["archive_bytes"], duration_ms=(time.monotonic() - started) * 1000)
+            except SourceChanged:
+                deferred.append({"repo": root.name, "repo_id": key, "reason": "source_changed_during_verification"})
+                self.lifecycle.emit("verification_deferred", key=key, run_id=run_id, stage="included_folders",
+                                    reason="source_changed_during_verification", result="deferred")
+                if path in saved:
+                    linked[path] = saved[path]
+            except Exception as error:
+                self.lifecycle.emit("included_folder_failed", key=key, run_id=run_id, severity="error", result="failed",
+                                    error_type=type(error).__name__, error_code=getattr(error, "errno", None))
+                failures.append({"repo": root.name, "repo_id": key, "error": "Included folder " + path + ": " + str(error)})
+                if path in saved:
+                    linked[path] = saved[path]
+        return linked
 
     def automatic_tick(self):
         if not self.configured or self.setup_recovery_required:
@@ -882,6 +1023,27 @@ class Hub:
                     {"last_periodic_at": self.last_periodic_at, "repos": self.repo_periodic_at})
 
     def cloud_for(self, key, current):
+        """One upload state per repo: every archive in its set must be confirmed."""
+        state = self.cloud_one(key, current)
+        linked = (current or {}).get("linked") or {}
+        if not linked:
+            return state
+        parts = [(path, self.cloud_one(key + LINKED + path, entry)) for path, entry in sorted(linked.items())]
+        if all(part.get("state") == "uploaded" for _, part in parts):
+            return state
+        notes = {"error": "upload issue", "unknown": "upload status unavailable",
+                 "pending": "upload not yet confirmed", "uploading": "uploading"}
+        for wanted in ("error", "unknown", "pending", "uploading"):
+            for path, part in [(None, state)] + parts:
+                if part.get("state") == wanted:
+                    combined = {k: v for k, v in part.items() if k not in ("percent", "progress_source")}
+                    combined["archive"] = current["archive"]
+                    if path is not None:
+                        combined["detail"] = "Included folder " + path + ": " + (part.get("detail") or notes[wanted])
+                    return combined
+        return {"state": "unknown", "archive": current["archive"]}
+
+    def cloud_one(self, key, current):
         observed = self.cloud_states.get(key, {})
         if not current or observed.get("archive") != current["archive"]:
             return {"state": "unknown"}
@@ -892,9 +1054,15 @@ class Hub:
 
     def refresh_cloud(self):
         with self.lock:
-            copies = {key: dict(value) for key, value in self.index.items()}
+            copies = json.loads(json.dumps(self.index))
         requests = [{"id": key, "path": value["archive"]} for key, value in copies.items()
                     if self.layout.contains(key, value['archive'])]
+        targets = dict(copies)
+        for key, value in copies.items():
+            for path, entry in (value.get("linked") or {}).items():
+                if self.layout.contains_linked(key, path, entry["archive"]):
+                    requests.append({"id": key + LINKED + path, "path": entry["archive"]})
+                    targets[key + LINKED + path] = entry
         helper = self.config.get("cloud_helper", str(Path(__file__).parent / "cloud-status"))
         try:
             result = subprocess.run([helper], input=json.dumps(requests), text=True,
@@ -913,7 +1081,7 @@ class Hub:
             state = cloud_status(item)
             if item.get("probe_error"):
                 state = {"state": "unknown", "detail": "Upload-status helper unavailable"}
-            self.lifecycle.transition("upload_observed", key=request["id"], current=copies[request["id"]],
+            self.lifecycle.transition("upload_observed", key=request["id"], current=targets[request["id"]],
                                       state=state["state"], percent=state.get("percent"),
                                       reason=state.get("reason", "helper_unavailable" if item.get("probe_error") else "macos_observation"),
                                       has_error=bool(item.get("error") or item.get("probe_error")),
@@ -946,16 +1114,22 @@ class Hub:
             self.lifecycle.transition("retention_decision", key=key, current=current, reason="keep_all", result="kept")
             return
         with self.lock:
-            if self.index.get(key, {}).get("archive") != current["archive"]:
+            stored = self.index.get(key, {})
+            if (stored.get("archive") != current["archive"]
+                    or (stored.get("linked") or {}) != (current.get("linked") or {})):
                 raise ValueError("Refusing cleanup using a superseded upload observation")
-        destination = self.layout.directory(key)
-        retained = Path(current["archive"])
-        if (destination.is_symlink() or destination.resolve() != destination or self.backups not in destination.parents
-                or retained.parent != destination or retained.is_symlink()
-                or not ARCHIVE_NAME.fullmatch(retained.name)):
-            raise ValueError("Refusing cleanup outside the managed snapshot folder")
-        obsolete = [p for p in destination.iterdir() if p != retained
-                    and ARCHIVE_NAME.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
+        # The repo archive and each included-folder archive form one retained set.
+        groups = [(self.layout.directory(key), Path(current["archive"]), current["sha256"])]
+        for path, entry in sorted((current.get("linked") or {}).items()):
+            groups.append((self.layout.linked_directory(key, path), Path(entry["archive"]), entry["sha256"]))
+        obsolete = []
+        for destination, retained, _ in groups:
+            if (destination.is_symlink() or destination.resolve() != destination or self.backups not in destination.parents
+                    or retained.parent != destination or retained.is_symlink()
+                    or not ARCHIVE_NAME.fullmatch(retained.name)):
+                raise ValueError("Refusing cleanup outside the managed snapshot folder")
+            obsolete += [p for p in destination.iterdir() if p != retained
+                         and ARCHIVE_NAME.fullmatch(p.name) and p.is_file() and not p.is_symlink()]
         if not obsolete:
             self.lifecycle.transition("retention_decision", key=key, current=current, reason="no_superseded_archives", result="kept")
             return
@@ -963,8 +1137,9 @@ class Hub:
                 and self.cloud_for(key, current).get("state") != "uploaded"):
             self.lifecycle.transition("retention_decision", key=key, current=current, reason="awaiting_upload", result="kept")
             return  # Keep the previously uploaded copy until its replacement reaches iCloud.
-        if sha256(retained) != current["sha256"]:
-            raise RuntimeError("Current archive failed verification; older backups were kept")
+        for _, retained, digest in groups:
+            if sha256(retained) != digest:
+                raise RuntimeError("Current archive failed verification; older backups were kept")
         self.lifecycle.emit("retention_verified", key=key, current=current, files=len(obsolete), result="verified")
         for path in obsolete:
             self.lifecycle.emit("prune_started", key=key, current=current, previous_archive_ref=diagnostic_ref(str(path)))
@@ -1037,6 +1212,15 @@ class Hub:
                     signature = fingerprint(entries)
                     with self.lock:
                         previous = self.index.get(key)
+                    linked = {}
+                    if key != "repohub-data":
+                        counted = (len(failures), len(deferred))
+                        linked = self.archive_included(key, root, entries, previous, run_id, observe, failures, deferred)
+                        if len(failures) > counted[0]:
+                            outcome = "failed"
+                        elif len(deferred) > counted[1] and outcome == "complete":
+                            outcome = "deferred"
+                        stage = "source_inspection"
                     current_archive = (previous or {}).get("archive")
                     verified = None
                     if previous and self.layout.contains(key, previous['archive']) and Path(previous["archive"]).is_file():
@@ -1069,6 +1253,10 @@ class Hub:
                         with self.lock:
                             self.verifications[key] = verified
                             previous["content_signature"] = verified["archive_content_signature"]
+                            if linked:
+                                previous["linked"] = linked
+                            else:
+                                previous.pop("linked", None)
                             atomic_json_if_changed(self.state_dir / "backups.json", self.index)
                         self.lifecycle.emit("archive_reused", key=key, run_id=run_id,
                                             archive_ref=diagnostic_ref(previous["archive"]),
@@ -1093,6 +1281,8 @@ class Hub:
                                         backup_hash_ref=diagnostic_ref(result["sha256"]), result="verified")
                     result["run_id"] = run_id
                     result["name"] = root.name
+                    if linked:
+                        result["linked"] = linked
                     observe("index_publication")
                     with self.lock:
                         self.index[key] = result

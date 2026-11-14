@@ -223,6 +223,8 @@ def change_reason(row, facts):
         if counts['finder_metadata'] or counts['git_data']:
             return 'finder_and_git_data'
         return 'content_difference_unclassified'
+    if state == 'matched' and row.get('linked_pending'):
+        return 'included_folder_changed'
     return 'backup_pending_unclassified'
 
 
