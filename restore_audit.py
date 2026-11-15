@@ -85,6 +85,9 @@ class Evidence:
             logged['outside_links'] = {'count': links.get('count'),
                                        'contents_included': links.get('contents_included'),
                                        'included_archives': len(links.get('included_archives') or [])}
+        if isinstance(logged.get('included_checkouts'), list):
+            # Checkout names can be private; events record only the count.
+            logged['included_checkouts'] = len(logged['included_checkouts'])
         self.emit('audit_finished', result=result, **logged)
         write_private(self.output/'result.json', {'schema_version':SCHEMA, 'result':result, **facts})
 
@@ -356,7 +359,33 @@ def git_facts(root, evidence):
             'history_count':run('rev-list','--all','--count').stdout.decode().strip()}
 
 
-def capture(source, checksum, evidence, included_values=None):
+def checkout_map(values, entries):
+    """Pair registered worktree names with the checksums of their separate checkout archives."""
+    result = {}
+    for value in values:
+        if not isinstance(value, str) or '=' not in value:
+            raise AuditError('invalid_included_checkouts')
+        name, checksum = value.rsplit('=', 1)
+        if (name in result or '/' in name or name in ('', '.', '..')
+                or entries.get('.git/worktrees/' + name, {}).get('kind') != 'directory'
+                or not re.fullmatch('[0-9a-f]{64}', checksum)):
+            raise AuditError('invalid_included_checkouts')
+        result[name] = checksum
+    return result
+
+
+def checked_checkouts(baseline):
+    recorded = baseline.get('included_checkouts', {})
+    if not isinstance(recorded, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in recorded.items()):
+        raise AuditError('invalid_included_checkouts')
+    return checkout_map([name + '=' + checksum for name, checksum in recorded.items()], baseline['entries'])
+
+
+def checkout_receipt(checkouts):
+    return [{'name': name, 'archive_sha256': checkouts[name]} for name in sorted(checkouts)]
+
+
+def capture(source, checksum, evidence, included_values=None, checkout_values=None):
     if not re.fullmatch('[0-9a-f]{64}',checksum):raise AuditError('invalid_expected_checksum')
     source=Path(source)
     if source.is_symlink() or not source.is_dir():raise AuditError('invalid_source_root')
@@ -366,15 +395,17 @@ def capture(source, checksum, evidence, included_values=None):
     links = outside_links(expected, source)
     evidence.emit('outside_links_reported', count=len(links))
     included = included_map(included_values or [], links)
+    checkouts = checkout_map(checkout_values or [], expected)
     scope = worktree_metadata(source, expected)
     git=git_facts(source,evidence)
     if expected!=manifest(source):raise AuditError('source_changed_during_git_checks')
     baseline={'schema_version':SCHEMA,'root_name':source.name,'archive_sha256':checksum,
-              'entries':expected,'git':git,'worktree_metadata':scope,'outside_links':links,'included_contents':included,'captured_at':datetime.now(timezone.utc).isoformat(),
+              'entries':expected,'git':git,'worktree_metadata':scope,'outside_links':links,'included_contents':included,'included_checkouts':checkouts,'captured_at':datetime.now(timezone.utc).isoformat(),
               'provenance':'live_source_inventory_not_archive_derived'}
     write_private(evidence.output/'expected.json',baseline)
     evidence.finish('captured',manifest_sha256=digest(evidence.output/'expected.json'),entries=len(expected),
                     worktree_metadata=scope, outside_links=link_receipt(links, included),
+                    included_checkouts=checkout_receipt(checkouts),
                     note='Capture alone does not prove the supplied archive matches this source point in time.')
 
 
@@ -528,6 +559,7 @@ def verify(archive, expected, manifest_sha256, evidence):
     links = checked_outside_links(baseline)
     evidence.emit('outside_links_reported', count=len(links))
     included = checked_included(baseline, links)
+    checkouts = checked_checkouts(baseline)
     destination = evidence.output / 'restored'
     evidence.enter('capacity_preflight')
     budget = RestoreBudget(destination, baseline['entries'], evidence)
@@ -561,6 +593,7 @@ def verify(archive, expected, manifest_sha256, evidence):
                     claim='Supplied archive restores to the supplied independent source baseline.',
                     cloud_retrieval_tested=False, worktree_metadata=scope,
                     outside_links=link_receipt(links, included),
+                    included_checkouts=checkout_receipt(checkouts),
                     restored_bytes=budget.initial_bytes, byte_budget=evidence.max_bytes,
                     free_space_reserve_bytes=evidence.reserve_bytes)
 
@@ -588,6 +621,8 @@ def main(argv=None):
     capture_parser.add_argument('--archive-sha256',required=True)
     capture_parser.add_argument('--include',action='append',default=[],metavar='LINK=SHA256',
                                 help='Name a linked folder whose contents are in a separate verified archive')
+    capture_parser.add_argument('--checkout',action='append',default=[],metavar='NAME=SHA256',
+                                help='Name a registered checkout whose contents are in a separate verified archive')
     capture_parser.add_argument('--out',required=True)
     verify_parser=sub.add_parser('verify');verify_parser.add_argument('--archive',required=True)
     verify_parser.add_argument('--expected',required=True);verify_parser.add_argument('--manifest-sha256',required=True)
@@ -612,7 +647,7 @@ def main(argv=None):
             if output==source or source in output.parents:raise AuditError('output_inside_source')
         evidence = Evidence(args.out, max_bytes=args.max_bytes,
                             reserve_bytes=getattr(args, 'reserve_bytes', DEFAULT_FREE_RESERVE))
-        if args.action=='capture':capture(args.source,args.archive_sha256,evidence,args.include)
+        if args.action=='capture':capture(args.source,args.archive_sha256,evidence,args.include,args.checkout)
         else:verify(args.archive,args.expected,args.manifest_sha256,evidence)
         return 0
     except Exception as error:

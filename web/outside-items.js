@@ -5,7 +5,8 @@
     c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const clone = value => JSON.parse(JSON.stringify(value));
   let repoId = null, saved = null, draft = null, revision = '', report = null;
-  let loading = false, saving = false, generation = 0;
+  let loading = false, saving = false, removing = false, generation = 0;
+  let kept = [], confirmItem = null;
 
   async function call(path, payload) {
     const options = {};
@@ -70,7 +71,7 @@
         + option('include', 'Include checkout folders', draft.checkouts) + '</select>'
         + checkouts.map(item => '<p class="outside-item"><strong>' + escape(item.name) + '</strong> <small>'
           + escape(describeCheckout(item)) + '</small></p>').join('')
-        + '<p class="settings-note">Applies to checkouts created later too. Committed work is already in this repo\'s Git data.</p></section>';
+        + '<p class="settings-note">Applies to checkouts created later too; each included checkout is saved as its own verified archive. Committed work is already in this repo\'s Git data.</p></section>';
     }
     if (reinstall.length) {
       markup += '<section class="outside-group"><h3>Reinstall on a new Mac</h3>'
@@ -78,17 +79,28 @@
         + reinstall.map(item => '<li><strong>' + escape(item.path) + '</strong> <small>→ '
           + escape(item.target) + '</small></li>').join('') + '</ul></section>';
     }
+    if (kept.length) {
+      const day = value => new Intl.DateTimeFormat(undefined, {month: 'short', day: 'numeric'}).format(new Date(value));
+      markup += '<section class="outside-group"><h3>Kept after removal</h3>' + kept.map(item => {
+        const label = item.reason === 'excluded' ? 'No longer included'
+          : 'Removed ' + (item.kind === 'checkouts' ? 'checkout' : 'linked folder');
+        const until = item.keep_until ? ' · kept until ' + day(item.keep_until) : ' · kept';
+        return '<div class="outside-item"><p><strong>' + escape(item.name) + '</strong> <small>'
+          + escape(label + until) + '</small></p><button type="button" data-remove="' + escape(item.item) + '">'
+          + (confirmItem === item.item ? 'Confirm remove' : 'Remove now') + '</button></div>';
+      }).join('') + '<p class="settings-note">Backups of removed items are kept for 30 days, then deleted automatically.</p></section>';
+    }
     $('outside-list').innerHTML = markup
       || '<p class="settings-note">Nothing outside this folder was found in the latest check.</p>';
   }
 
   function renderState() {
-    const busy = loading || saving;
+    const busy = loading || saving || removing;
     $('outside-save').disabled = busy || !dirty();
     $('outside-save').textContent = saving ? 'Saving…' : 'Save changes';
     $('outside-cancel').disabled = saving;
     const list = $('outside-list');
-    const selects = list.querySelectorAll ? list.querySelectorAll('select') : [];
+    const selects = list.querySelectorAll ? list.querySelectorAll('select, button') : [];
     for (const select of selects) select.disabled = busy;
     $('outside-note').textContent = loading ? 'Checking items outside this folder…'
       : 'Choices are saved on this Mac. Included folders are saved as separate verified archives beside the repo backup, and Backed up appears only after every archive is verified and uploaded.';
@@ -99,6 +111,8 @@
     saved = clone(result.choices);
     draft = clone(saved);
     revision = result.revision;
+    kept = result.kept || [];
+    confirmItem = null;
     renderList();
   }
 
@@ -121,10 +135,11 @@
   }
 
   async function leave() {
-    if (saving) return false;
+    if (saving || removing) return false;
     if (!await root.RepoHubSettings.confirmDiscard(dirty())) return false;
     generation++;
     loading = false;
+    confirmItem = null;
     if (saved) draft = clone(saved);
     renderList();
     $('outside-error').textContent = '';
@@ -138,6 +153,25 @@
     if (target.dataset && target.dataset.link) draft.linked_folders[target.dataset.link] = target.value;
     else if (target.id === 'outside-checkouts') draft.checkouts = target.value;
     renderState();
+  };
+  $('outside-list').onclick = async event => {
+    const id = event.target && event.target.dataset && event.target.dataset.remove;
+    if (!id || loading || saving || removing) return;
+    if (confirmItem !== id) { confirmItem = id; renderList(); return; }
+    const item = kept.find(entry => entry.item === id);
+    removing = true;
+    $('outside-error').textContent = '';
+    renderState();
+    try {
+      const draftKept = dirty() ? clone(draft) : null;
+      apply(await call('/api/outside/' + encodeURIComponent(repoId) + '/remove', {item: id, ref: item.ref}));
+      if (draftKept) { draft = draftKept; renderList(); }
+    } catch (error) {
+      $('outside-error').textContent = error.message;
+    } finally {
+      removing = false;
+      renderState();
+    }
   };
   $('outside-cancel').onclick = () => $('settings-back').click();
   $('outside-save').onclick = async () => {

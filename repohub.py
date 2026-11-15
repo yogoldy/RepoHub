@@ -18,7 +18,7 @@ import subprocess
 import tarfile
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer as StandardThreadingHTTPServer
 from socketserver import TCPServer
 from urllib.parse import unquote, urlparse
@@ -44,6 +44,19 @@ WEB = Path(__file__).parent / "web"
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
 ARCHIVE_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{6}Z\.tar\.gz$")
 LINKED = "::linked::"  # Upload-status IDs for included-folder archives.
+CHECKOUT = "::checkout::"  # Upload-status IDs for included-checkout archives.
+KEPT = {"linked": "linked:", "checkouts": "checkout:"}
+KEPT_FIELDS = {"kind", "name", "reason", "removed_at", "keep_until"}
+KEEP_WINDOW = timedelta(days=30)  # Authorized automatic deletion window for removed outside items.
+
+
+def set_outside(entry, outside):
+    """Record a repo's included linked folders, checkouts and kept items on its index entry."""
+    for field in ("linked", "checkouts", "removed"):
+        if outside.get(field):
+            entry[field] = outside[field]
+        else:
+            entry.pop(field, None)
 
 
 def utc_now():
@@ -686,7 +699,7 @@ class Hub:
                     row['verification'] = {'state': 'missing'}
                 if not row.get("error"):
                     included = self.included_state(key, root, current)
-                    if included["included"]:
+                    if any(included.values()):
                         row["included_folders"] = included
                         if included["pending"]:
                             row["needs_backup"] = True
@@ -830,9 +843,10 @@ class Hub:
             revision = self.outside_choices.revision()
             choices = self.outside_choices.for_repo(key, detected)
             refusals = self.inclusion_refusals(key, detected)
+            kept = self.kept_items(key)
         # Sizes and Git status are measured only when the review page opens.
         return {"repo_id": key, "items": outside_items.review(detected, git_info, refusals),
-                "choices": choices, "revision": revision}
+                "choices": choices, "revision": revision, "kept": kept}
 
     def save_outside_choices(self, key, payload):
         if set(payload) != {"choices", "revision"}:
@@ -880,105 +894,242 @@ class Hub:
                 seen.append(real)
         return refusals
 
+    def outside_plan(self, key, root, detected):
+        """Included linked folders and checkouts as (group, name, source, item)."""
+        choices = self.outside_choices.for_repo(key, detected)
+        plan = [("linked", item["path"], Path(root) / item["path"], item)
+                for item in outside_items.included_folders(detected, choices)]
+        plan += [("checkouts", item["name"], Path(item["path"]), item)
+                 for item in outside_items.included_checkouts(detected, choices, root)]
+        return plan
+
+    def outside_directory(self, key, group, name):
+        return (self.layout.linked_directory(key, name) if group == "linked"
+                else self.layout.checkout_directory(key, name))
+
+    def outside_parts(self, key, current):
+        """Archives that join the repo archive in one uploaded set."""
+        parts = []
+        for group, prefix, label in (("linked", LINKED, "Included folder "), ("checkouts", CHECKOUT, "Linked checkout ")):
+            for name, entry in sorted(((current or {}).get(group) or {}).items()):
+                parts.append((group, name, label + name, key + prefix + name, entry))
+        return parts
+
+    def kept_items(self, key):
+        kept = (self.index.get(key) or {}).get("removed") or {}
+        return [{"item": item, "kind": entry["kind"], "name": entry["name"], "reason": entry["reason"],
+                 "removed_at": entry["removed_at"], "keep_until": entry.get("keep_until"),
+                 "ref": diagnostic_ref(entry["archive"])} for item, entry in sorted(kept.items())]
+
     def included_state(self, key, root, current):
-        """Compare reviewed linked folders with their saved archives using metadata only."""
+        """Compare included linked folders and checkouts with their saved archives using metadata only."""
+        current = current or {}
+        state = {"included": 0, "checkouts": 0, "pending": 0, "kept": len(current.get("removed") or {})}
         detected = self.outside_detected.get(key)
         if detected is None:
-            return {"included": 0, "pending": 0}
+            return state
         try:
-            items = outside_items.included_folders(detected, self.outside_choices.for_repo(key, detected))
+            plan = self.outside_plan(key, root, detected)
         except (OSError, ValueError):
-            return {"included": 0, "pending": 0}
-        saved = (current or {}).get("linked") or {}
-        pending = 0
-        for item in items:
-            entry = saved.get(item["path"])
+            return state
+        for group, name, source, _ in plan:
+            state["included" if group == "linked" else "checkouts"] += 1
+            entry = (current.get(group) or {}).get(name)
             try:
-                real = (Path(root) / item["path"]).resolve(strict=True)
+                real = source.resolve(strict=True)
                 ok = bool(entry and entry.get("source") == str(real)
-                          and self.layout.contains_linked(key, item["path"], entry["archive"])
+                          and Path(entry["archive"]).parent == self.outside_directory(key, group, name)
                           and Path(entry["archive"]).is_file()
                           and fingerprint(tree_entries(real)) == entry.get("signature"))
             except (OSError, ValueError, RuntimeError):
                 ok = False
-            pending += not ok
-        return {"included": len(items), "pending": pending}
+            state["pending"] += not ok
+        # Saved items that are gone or no longer included move to the keep window at the next backup.
+        planned = {(group, name) for group, name, _, _ in plan}
+        state["pending"] += sum((group, name) not in planned for group in ("linked", "checkouts")
+                                for name in (current.get(group) or {}))
+        return state
 
-    def archive_included(self, key, root, entries, previous, run_id, observe, failures, deferred):
-        """Archive reviewed linked folders beside the repo backup, each verified on its own.
+    def archive_outside(self, key, root, entries, previous, run_id, observe, failures, deferred):
+        """Archive included linked folders and checkouts beside the repo backup, each verified on its own.
 
-        Returns the repo's linked-folder map. A folder that cannot be archived keeps
-        its last verified archive referenced and is reported for this repo.
+        Returns the repo's linked, checkouts and removed maps. An item that cannot be
+        archived keeps its last verified archive referenced and is reported for this
+        repo. An item that is gone or no longer included moves to the keep window and
+        rejoins the set if it returns.
         """
-        saved = (previous or {}).get("linked") or {}
+        previous = previous or {}
+        saved = {group: dict(previous.get(group) or {}) for group in ("linked", "checkouts")}
+        removed = dict(previous.get("removed") or {})
         try:
             detected = outside_items.detect(root, entries)
-            items = outside_items.included_folders(detected, self.outside_choices.for_repo(key, detected))
+            plan = self.outside_plan(key, root, detected)
         except (OSError, ValueError, UnicodeError) as error:
             failures.append({"repo": root.name, "repo_id": key,
-                             "error": "Included folders could not be checked: " + str(error)})
-            return dict(saved)
-        linked = {}
-        if not items:
-            return linked
-        observe("included_folders")
+                             "error": "Items outside this folder could not be checked: " + str(error)})
+            return {**saved, "removed": removed}
+        result = {"linked": {}, "checkouts": {}}
+        if plan:
+            observe("included_folders")
         guard = self.inclusion_guard()
         seen = []
-        for item in items:
-            path, link = item["path"], Path(root) / item["path"]
-            real, refusal = outside_items.inclusion_target(link, seen=seen, **guard)
+        for group, name, source, item in plan:
+            label = ("Included folder " if group == "linked" else "Linked checkout ") + name
+            kept_key = KEPT[group] + name
+            earlier = saved[group].get(name) or removed.get(kept_key)
+            real, refusal = outside_items.inclusion_target(source, seen=seen, **guard)
             if refusal:
                 self.lifecycle.emit("included_folder_refused", key=key, run_id=run_id, reason=refusal, result="not_started")
-                failures.append({"repo": root.name, "repo_id": key, "error": outside_items.refusal_text(path, refusal)})
-                if path in saved:
-                    linked[path] = saved[path]
+                failures.append({"repo": root.name, "repo_id": key,
+                                 "error": outside_items.refusal_text(name if group == "linked" else label, refusal)})
+                if name in saved[group]:
+                    result[group][name] = saved[group][name]
                 continue
             seen.append(real)
             started = time.monotonic()
             try:
-                destination = self.layout.linked_directory(key, path)
-                entry = saved.get(path)
+                destination = self.outside_directory(key, group, name)
                 verified = None
-                if (entry and entry.get("source") == str(real)
-                        and self.layout.contains_linked(key, path, entry["archive"])
-                        and Path(entry["archive"]).is_file()):
+                if (earlier and earlier.get("source") == str(real)
+                        and Path(earlier["archive"]).parent == destination
+                        and Path(earlier["archive"]).is_file()):
                     try:
-                        verified = verify_current(real, entry)
+                        verified = verify_current(real, earlier)
                     except SourceChanged:
                         raise
                     except (RuntimeError, tarfile.TarError):
                         verified = None  # Replace a damaged copy from the source; nothing is pruned first.
                 if verified and (verified["state"] == "matched" or verified.get("ignored_finder_only") is True):
-                    linked[path] = {**entry, "signature": verified["signature"],
-                                    "content_signature": verified["archive_content_signature"]}
-                    self.lifecycle.emit("included_folder_archived", key=key, current=linked[path], result="reused")
+                    entry = {k: v for k, v in earlier.items() if k not in KEPT_FIELDS}
+                    entry.update(signature=verified["signature"], content_signature=verified["archive_content_signature"])
+                    result[group][name] = entry
+                    removed.pop(kept_key, None)
+                    self.lifecycle.emit("included_folder_archived", key=key, current=entry, result="reused")
                     continue
 
-                def check_link():
+                def check_source():
                     self.registry.require_workspace(key, root)
                     if self.setup_record.get("destination"):
                         require_destination(self.setup_record["destination"])
                     LayoutTransaction.safe_target(self.backups, destination)
-                    if os.readlink(link) != item["target"] or link.resolve() != real:
-                        raise SourceChanged("An included folder's link changed during the backup")
-                result = snapshot(real, destination, self.state_dir / "staging", source_check=check_link)
-                result.update(run_id=run_id, source=str(real), target=item["target"])
-                linked[path] = result
-                self.lifecycle.emit("included_folder_archived", key=key, current=result, result="created",
-                                    bytes=result["archive_bytes"], duration_ms=(time.monotonic() - started) * 1000)
+                    if group == "linked":
+                        if os.readlink(source) != item["target"] or source.resolve() != real:
+                            raise SourceChanged("An included folder's link changed during the backup")
+                    elif source.resolve() != real or not (real / ".git").is_file():
+                        raise SourceChanged("A linked checkout moved during the backup")
+                created = snapshot(real, destination, self.state_dir / "staging", source_check=check_source)
+                created.update(run_id=run_id, source=str(real))
+                if group == "linked":
+                    created["target"] = item["target"]
+                result[group][name] = created
+                removed.pop(kept_key, None)
+                self.lifecycle.emit("included_folder_archived", key=key, current=created, result="created",
+                                    bytes=created["archive_bytes"], duration_ms=(time.monotonic() - started) * 1000)
             except SourceChanged:
                 deferred.append({"repo": root.name, "repo_id": key, "reason": "source_changed_during_verification"})
                 self.lifecycle.emit("verification_deferred", key=key, run_id=run_id, stage="included_folders",
                                     reason="source_changed_during_verification", result="deferred")
-                if path in saved:
-                    linked[path] = saved[path]
+                if name in saved[group]:
+                    result[group][name] = saved[group][name]
             except Exception as error:
                 self.lifecycle.emit("included_folder_failed", key=key, run_id=run_id, severity="error", result="failed",
                                     error_type=type(error).__name__, error_code=getattr(error, "errno", None))
-                failures.append({"repo": root.name, "repo_id": key, "error": "Included folder " + path + ": " + str(error)})
-                if path in saved:
-                    linked[path] = saved[path]
-        return linked
+                failures.append({"repo": root.name, "repo_id": key, "error": label + ": " + str(error)})
+                if name in saved[group]:
+                    result[group][name] = saved[group][name]
+        # Following Git: a removed checkout or folder is not an error. Its last verified
+        # archive stays in a keep window instead of being deleted immediately.
+        now = datetime.now(timezone.utc)
+        present = {"linked": {i["path"] for i in detected["links"] if i["category"] == "linked_folder"},
+                   "checkouts": {i["name"] for i in detected["checkouts"] if i["state"] == "present"}}
+        planned = {(group, name) for group, name, _, _ in plan}
+        for group in ("linked", "checkouts"):
+            for name, entry in saved[group].items():
+                if (group, name) in planned:
+                    continue
+                reason = "excluded" if name in present[group] else "removed"
+                removed[KEPT[group] + name] = {
+                    **entry, "kind": group, "name": name, "reason": reason, "removed_at": now.isoformat(),
+                    "keep_until": (now + KEEP_WINDOW).isoformat() if self.retention == "latest" else None}
+                self.lifecycle.emit("outside_item_kept", key=key, run_id=run_id, reason=reason, result="kept")
+        return {**result, "removed": removed}
+
+    def delete_kept(self, key, item_key, reason):
+        """Delete one kept item's managed archives. The caller holds the backup lock."""
+        with self.lock:
+            current = self.index.get(key) or {}
+            entry = (current.get("removed") or {}).get(item_key)
+            active = entry is not None and entry["name"] in (current.get(entry["kind"]) or {})
+        if entry is None:
+            return 0
+        if active:
+            raise ValueError("This item is backed up again; nothing was removed")
+        directory = self.outside_directory(key, entry["kind"], entry["name"])
+        managed = Path(entry["archive"]).parent == directory
+        files = []
+        if managed:
+            if (directory.is_symlink() or (directory.exists() and directory.resolve() != directory)
+                    or self.backups not in directory.parents):
+                raise ValueError("Refusing to delete outside the managed snapshot folder")
+            if directory.is_dir():
+                files = [p for p in directory.iterdir() if ARCHIVE_NAME.fullmatch(p.name)
+                         and p.is_file() and not p.is_symlink()]
+        elif reason == "user_removed":
+            raise ValueError("This kept backup is in a previous destination and was left in place")
+        # A kept backup in a previous destination is left in place; only its record is dropped.
+        for path in files:
+            path.unlink()
+        if files:
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        with self.lock:
+            updated = self.index.get(key)
+            if updated and item_key in (updated.get("removed") or {}):
+                del updated["removed"][item_key]
+                if not updated["removed"]:
+                    updated.pop("removed")
+                atomic_json(self.state_dir / "backups.json", self.index)
+                atomic_json(self.backups / "index.json", self.index)
+        self.lifecycle.emit("outside_item_deleted", key=key, reason=reason if managed else "previous_destination",
+                            files=len(files), result="removed" if files else "kept")
+        return len(files)
+
+    def expire_kept(self, key):
+        """Delete kept items whose 30-day window has passed. The caller holds the backup lock."""
+        if self.retention != "latest":
+            return
+        with self.lock:
+            kept = dict((self.index.get(key) or {}).get("removed") or {})
+        now = time.time()
+        for item_key, entry in kept.items():
+            try:
+                until = entry.get("keep_until")
+                if until and datetime.fromisoformat(until).timestamp() <= now:
+                    self.delete_kept(key, item_key, "keep_window_expired")
+            except Exception as error:
+                self.lifecycle.transition("retention_failed", key=key, severity="error", result="deferred",
+                                          error_type=type(error).__name__)
+
+    def remove_kept(self, key, payload):
+        """Remove now: delete one kept item's archives at the user's request."""
+        if (set(payload) != {"item", "ref"} or not isinstance(payload["item"], str)
+                or not isinstance(payload["ref"], str)):
+            raise ValueError("Invalid removal request")
+        if key not in self.repositories():
+            raise ValueError("Unknown repository")
+        if not self.backup_lock.acquire(blocking=False):
+            raise FileExistsError("A backup is running. Try again after it finishes.")
+        try:
+            with self.lock:
+                entry = ((self.index.get(key) or {}).get("removed") or {}).get(payload["item"])
+            if entry is None or diagnostic_ref(entry["archive"]) != payload["ref"]:
+                raise FileExistsError("This item changed. Reopen this page before removing it.")
+            self.delete_kept(key, payload["item"], "user_removed")
+        finally:
+            self.backup_lock.release()
+        return self.outside_status(key)
 
     def automatic_tick(self):
         if not self.configured or self.setup_recovery_required:
@@ -1025,21 +1176,18 @@ class Hub:
     def cloud_for(self, key, current):
         """One upload state per repo: every archive in its set must be confirmed."""
         state = self.cloud_one(key, current)
-        linked = (current or {}).get("linked") or {}
-        if not linked:
-            return state
-        parts = [(path, self.cloud_one(key + LINKED + path, entry)) for path, entry in sorted(linked.items())]
-        if all(part.get("state") == "uploaded" for _, part in parts):
+        parts = [(label, self.cloud_one(upload_id, entry)) for _, _, label, upload_id, entry in self.outside_parts(key, current)]
+        if not parts or all(part.get("state") == "uploaded" for _, part in parts):
             return state
         notes = {"error": "upload issue", "unknown": "upload status unavailable",
                  "pending": "upload not yet confirmed", "uploading": "uploading"}
         for wanted in ("error", "unknown", "pending", "uploading"):
-            for path, part in [(None, state)] + parts:
+            for label, part in [(None, state)] + parts:
                 if part.get("state") == wanted:
                     combined = {k: v for k, v in part.items() if k not in ("percent", "progress_source")}
                     combined["archive"] = current["archive"]
-                    if path is not None:
-                        combined["detail"] = "Included folder " + path + ": " + (part.get("detail") or notes[wanted])
+                    if label is not None:
+                        combined["detail"] = label + ": " + (part.get("detail") or notes[wanted])
                     return combined
         return {"state": "unknown", "archive": current["archive"]}
 
@@ -1059,10 +1207,14 @@ class Hub:
                     if self.layout.contains(key, value['archive'])]
         targets = dict(copies)
         for key, value in copies.items():
-            for path, entry in (value.get("linked") or {}).items():
-                if self.layout.contains_linked(key, path, entry["archive"]):
-                    requests.append({"id": key + LINKED + path, "path": entry["archive"]})
-                    targets[key + LINKED + path] = entry
+            for group, name, _, upload_id, entry in self.outside_parts(key, value):
+                try:
+                    contained = Path(entry["archive"]).parent == self.outside_directory(key, group, name)
+                except ValueError:
+                    contained = False
+                if contained:
+                    requests.append({"id": upload_id, "path": entry["archive"]})
+                    targets[upload_id] = entry
         helper = self.config.get("cloud_helper", str(Path(__file__).parent / "cloud-status"))
         try:
             result = subprocess.run([helper], input=json.dumps(requests), text=True,
@@ -1105,6 +1257,7 @@ class Hub:
                             self.lifecycle.transition("retention_failed", key=key, current=current,
                                                       severity="error", result="deferred", error_type=type(e).__name__)
                             print("Retention cleanup deferred:", key, str(e), flush=True)
+                    self.expire_kept(key)
             finally:
                 self.backup_lock.release()
 
@@ -1116,12 +1269,13 @@ class Hub:
         with self.lock:
             stored = self.index.get(key, {})
             if (stored.get("archive") != current["archive"]
-                    or (stored.get("linked") or {}) != (current.get("linked") or {})):
+                    or (stored.get("linked") or {}) != (current.get("linked") or {})
+                    or (stored.get("checkouts") or {}) != (current.get("checkouts") or {})):
                 raise ValueError("Refusing cleanup using a superseded upload observation")
-        # The repo archive and each included-folder archive form one retained set.
+        # The repo archive and each included folder or checkout archive form one retained set.
         groups = [(self.layout.directory(key), Path(current["archive"]), current["sha256"])]
-        for path, entry in sorted((current.get("linked") or {}).items()):
-            groups.append((self.layout.linked_directory(key, path), Path(entry["archive"]), entry["sha256"]))
+        for group, name, _, _, entry in self.outside_parts(key, current):
+            groups.append((self.outside_directory(key, group, name), Path(entry["archive"]), entry["sha256"]))
         obsolete = []
         for destination, retained, _ in groups:
             if (destination.is_symlink() or destination.resolve() != destination or self.backups not in destination.parents
@@ -1212,10 +1366,10 @@ class Hub:
                     signature = fingerprint(entries)
                     with self.lock:
                         previous = self.index.get(key)
-                    linked = {}
+                    outside = {}
                     if key != "repohub-data":
                         counted = (len(failures), len(deferred))
-                        linked = self.archive_included(key, root, entries, previous, run_id, observe, failures, deferred)
+                        outside = self.archive_outside(key, root, entries, previous, run_id, observe, failures, deferred)
                         if len(failures) > counted[0]:
                             outcome = "failed"
                         elif len(deferred) > counted[1] and outcome == "complete":
@@ -1253,10 +1407,7 @@ class Hub:
                         with self.lock:
                             self.verifications[key] = verified
                             previous["content_signature"] = verified["archive_content_signature"]
-                            if linked:
-                                previous["linked"] = linked
-                            else:
-                                previous.pop("linked", None)
+                            set_outside(previous, outside)
                             atomic_json_if_changed(self.state_dir / "backups.json", self.index)
                         self.lifecycle.emit("archive_reused", key=key, run_id=run_id,
                                             archive_ref=diagnostic_ref(previous["archive"]),
@@ -1265,6 +1416,7 @@ class Hub:
                         # Finish an interrupted publication/cleanup without making another copy.
                         atomic_json_if_changed(self.backups / "index.json", self.index)
                         self.retain_current(key, previous)
+                        self.expire_kept(key)
                         self.lifecycle.emit("repo_backup_finished", key=key, run_id=run_id, result="reused",
                                             archive_ref=diagnostic_ref(previous["archive"]), duration_ms=(time.monotonic()-repo_started)*1000)
                         continue
@@ -1281,8 +1433,7 @@ class Hub:
                                         backup_hash_ref=diagnostic_ref(result["sha256"]), result="verified")
                     result["run_id"] = run_id
                     result["name"] = root.name
-                    if linked:
-                        result["linked"] = linked
+                    set_outside(result, outside)
                     observe("index_publication")
                     with self.lock:
                         self.index[key] = result
@@ -1295,6 +1446,7 @@ class Hub:
                                                    "archive_stamp": archive_stamp(result["archive"])}
                     observe("retention")
                     self.retain_current(key, result)
+                    self.expire_kept(key)
                     self.lifecycle.emit("repo_backup_finished", key=key, current=result, result="created",
                                         bytes=result["archive_bytes"], duration_ms=(time.monotonic()-repo_started)*1000)
                 except SourceChanged:
@@ -1518,6 +1670,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(value, 202)
                 except FileExistsError as error:
                     return self.send({'error': str(error)}, 409)
+            if path.startswith("/api/outside/") and path.endswith("/remove"):
+                try:
+                    return self.send(self.hub.remove_kept(
+                        path.removeprefix("/api/outside/").removesuffix("/remove"), payload))
+                except FileExistsError as e:
+                    return self.send({"error": str(e)}, 409)
             if path.startswith("/api/outside/"):
                 try:
                     return self.send(self.hub.save_outside_choices(path.removeprefix("/api/outside/"), payload))

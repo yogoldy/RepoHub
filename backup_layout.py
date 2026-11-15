@@ -218,6 +218,14 @@ class BackupLayout:
         LayoutTransaction.safe_target(self.root, target)
         return target
 
+    def checkout_directory(self, key, name):
+        """Included linked checkouts are archived beside their repo's backups."""
+        if '/' in name:
+            raise ValueError('Invalid checkout name')
+        target = self.directory(key) / 'checkouts' / relative_path(name)
+        LayoutTransaction.safe_target(self.root, target)
+        return target
+
     def contains_linked(self, key, path, archive):
         if self.names is not None and key not in self.names:
             return False

@@ -718,7 +718,32 @@
         "test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims",
         "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
       ],
-      "remaining_gap": "Moving restored folder contents back to their original location is a later guided step; each folder archive is audited with its own capture and verify run. Linked checkouts and the 30-day keep window for removed items land in the next commit. Installed native behavior and live iCloud upload of folder archives on the Pro and Air are not yet observed."
+      "remaining_gap": "Moving restored folder contents back to their original location is a later guided step; each folder archive is audited with its own capture and verify run. Linked checkouts and the 30-day keep window are covered by GR29. Installed native behavior and live iCloud upload of folder archives on the Pro and Air are not yet observed."
+    },
+    {
+      "id": "GR29",
+      "title": "Linked checkouts follow Git as separate archives, and removed outside items are kept for 30 days",
+      "breakpoint": "Agents create and delete linked checkouts constantly. Requiring a review for each one leaves new work unprotected, and deleting a backup as soon as its folder disappears loses data when a folder is only temporarily missing.",
+      "diagnostic_events": [
+        "included_folder_archived",
+        "included_folder_refused",
+        "outside_item_kept",
+        "outside_item_deleted"
+      ],
+      "cause_and_solution": "When a repo includes checkouts, archive each present checkout from Git's registration list on its own, beside the repo backup in checkouts/<registration name>/, as part of the repo's uploaded set. A checkout or included linked folder that is gone or no longer included moves to a keep window with its last verified archive and rejoins the set if it returns. Under latest-only retention its archives are deleted only after 30 days, or sooner through Remove now.",
+      "required_behavior": "New registered checkouts are backed up without another review; nested checkouts stay in the repo archive; refused locations are reported for the repo. Removing a checkout causes no error. Kept items are not required for Backed up. Nothing kept is deleted inside the window, and keep-all retention never deletes on a timer. Remove now requires the exact kept archive's reference, the token-guarded route and no running backup. Setup layout changes move checkout and kept archives with their repo. Restore receipts name included checkouts by registration and checksum. Logs record aliases and reason codes only.",
+      "test_ids": [
+        "test_linked_checkouts.LinkedCheckoutTests.test_included_checkout_is_its_own_verified_archive_and_restore_receipt",
+        "test_linked_checkouts.LinkedCheckoutTests.test_new_checkouts_are_followed_and_a_removed_one_is_kept_for_30_days",
+        "test_linked_checkouts.LinkedCheckoutTests.test_a_temporarily_missing_checkout_is_kept_and_rejoins_when_it_returns",
+        "test_linked_checkouts.LinkedCheckoutTests.test_keep_window_expires_after_30_days_and_remove_now_deletes_on_request",
+        "test_linked_checkouts.LinkedCheckoutTests.test_nested_refused_and_excluded_checkouts",
+        "test_linked_checkouts.LinkedCheckoutTests.test_upload_and_pruning_require_the_whole_set_including_checkouts",
+        "test_linked_checkouts.LinkedCheckoutTests.test_upload_helper_is_asked_about_checkout_archives",
+        "test_linked_checkouts.LinkedCheckoutTests.test_setup_layout_change_moves_checkout_and_kept_archives",
+        "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
+      ],
+      "remaining_gap": "The keep window starts at the first backup after an item disappears. The audit tool refuses a checkout archive on its own because its root .git is a file; it restores beside the repo and is reattached with Git as a later guided step. Installed native behavior and live iCloud upload on the Pro and Air are not yet observed."
     }
   ]
 }

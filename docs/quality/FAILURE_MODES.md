@@ -1059,4 +1059,26 @@ Folders that overlap a monitored repo, a backup destination, RepoHub data, a sys
 - `test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims`
 - `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
 
-**Remaining exposure:** Moving restored folder contents back to their original location is a later guided step. Linked checkouts and the 30-day keep window for removed items land in the next commit. Installed native behavior and live iCloud upload of folder archives are not yet observed.
+**Remaining exposure:** Moving restored folder contents back to their original location is a later guided step. Linked checkouts and the 30-day keep window are covered by GR29. Installed native behavior and live iCloud upload of folder archives are not yet observed.
+
+## GR29 — Linked checkouts follow Git; removed items are kept for 30 days
+
+When a repo includes checkouts, every present checkout in Git's registration list is archived on its own, beside the repo's backup in `checkouts/<registration name>/`, and joins the repo's uploaded set. New checkouts are backed up without another review. A checkout nested inside the repo is already in the repo archive. Checkouts in refused locations, such as a backup destination, are reported for the repo.
+
+A checkout or included linked folder that is gone or no longer included is not an error. Its last verified archive moves to a keep window shown as **Removed checkout · kept until <date>** or **No longer included · kept until <date>**, and it rejoins the set if the folder returns. Kept items are not required for **Backed up**. Under latest-only retention their archives are deleted after 30 days, or sooner through **Remove now**, which needs a second click, the exact kept archive reference, the token-guarded route and no running backup. Keep-all retention never deletes on a timer. This is the narrow automatic-deletion exception recorded in AGENTS.md.
+
+Setup layout changes move checkout and kept archives with their repo. Restore receipts name included checkouts with `--checkout NAME=SHA256`. Diagnostics record `outside_item_kept` and `outside_item_deleted` with repo aliases and reason codes only.
+
+**Regression tests:**
+
+- `test_linked_checkouts.LinkedCheckoutTests.test_included_checkout_is_its_own_verified_archive_and_restore_receipt`
+- `test_linked_checkouts.LinkedCheckoutTests.test_new_checkouts_are_followed_and_a_removed_one_is_kept_for_30_days`
+- `test_linked_checkouts.LinkedCheckoutTests.test_a_temporarily_missing_checkout_is_kept_and_rejoins_when_it_returns`
+- `test_linked_checkouts.LinkedCheckoutTests.test_keep_window_expires_after_30_days_and_remove_now_deletes_on_request`
+- `test_linked_checkouts.LinkedCheckoutTests.test_nested_refused_and_excluded_checkouts`
+- `test_linked_checkouts.LinkedCheckoutTests.test_upload_and_pruning_require_the_whole_set_including_checkouts`
+- `test_linked_checkouts.LinkedCheckoutTests.test_upload_helper_is_asked_about_checkout_archives`
+- `test_linked_checkouts.LinkedCheckoutTests.test_setup_layout_change_moves_checkout_and_kept_archives`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** The keep window starts at the first backup after an item disappears. A checkout archive restores beside the repo and is reattached with Git as a later guided step; the audit tool refuses it on its own because its root `.git` is a file. Installed native behavior and live iCloud upload are not yet observed.

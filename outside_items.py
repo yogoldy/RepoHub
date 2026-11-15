@@ -134,6 +134,19 @@ def included_folders(detected, choices):
             if item['category'] == 'linked_folder' and chosen.get(item['path']) == 'include']
 
 
+def included_checkouts(detected, choices, root):
+    """Present registered checkouts when the repo includes them.
+
+    Git's registration list decides: new checkouts join without another review.
+    A checkout nested inside the repo is already in the repo archive.
+    """
+    if choices.get('checkouts') != 'include':
+        return []
+    base = os.path.realpath(str(root)) + '/'
+    return [item for item in detected['checkouts'] if item['state'] == 'present'
+            and not (os.path.realpath(item['path']) + '/').startswith(base)]
+
+
 def inclusion_target(link, repositories=(), destinations=(), state=None, seen=None):
     """Resolve a reviewed link's folder, or return why it cannot be archived separately."""
     try:

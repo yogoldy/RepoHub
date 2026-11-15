@@ -138,7 +138,7 @@ class IncludedFolderTests(unittest.TestCase):
         self.hub.backup()
         self.hub.scan(force=True)
         self.assertFalse(self.row()['needs_backup'])
-        self.assertEqual(self.row()['included_folders'], {'included': 1, 'pending': 0})
+        self.assertEqual(self.row()['included_folders'], {'included': 1, 'checkouts': 0, 'pending': 0, 'kept': 0})
         first = self.linked()['archive']
         stamp = time.time() + 5
         os.utime(self.outside / 'package.js', (stamp, stamp))

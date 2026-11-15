@@ -294,7 +294,9 @@ function outsideSummary(outside, included) {
   const parts = [];
   if (outside.linked_folders) parts.push(plural(outside.linked_folders, 'linked folder')
     + (included && included.included ? ' (' + included.included + ' included)' : ''));
-  if (outside.checkouts) parts.push(plural(outside.checkouts, 'linked checkout'));
+  if (outside.checkouts) parts.push(plural(outside.checkouts, 'linked checkout')
+    + (included && included.checkouts ? ' (included)' : ''));
+  if (included && included.kept) parts.push(included.kept + ' kept after removal');
   if (outside.removed_checkouts) parts.push(plural(outside.removed_checkouts, 'removed checkout'));
   if (outside.reinstall) parts.push(plural(outside.reinstall, 'tool link'));
   return parts.length ? parts.join(' · ') + ' · Review' : '';
