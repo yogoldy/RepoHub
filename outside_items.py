@@ -47,8 +47,21 @@ def link_scope(relative, target):
     return 'inside'
 
 
+def absolute_inside(root, target):
+    """An absolute link whose normalized path stays in the repo is not an outside item.
+
+    Only the link text and folder aliases are consulted; the target is never read.
+    """
+    if not PurePosixPath(target).is_absolute():
+        return False
+    path = os.path.normpath(target)
+    candidates = {path, os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))}
+    bases = {os.path.normpath(str(root)), os.path.realpath(str(root))}
+    return any(item == base or item.startswith(base.rstrip('/') + '/') for item in candidates for base in bases)
+
+
 def classify_link(root, relative, target):
-    if link_scope(relative, target) == 'inside':
+    if link_scope(relative, target) == 'inside' or absolute_inside(root, target):
         return None
     resolved = os.path.normpath(os.path.join(str(root), os.path.dirname(relative), target))
     try:

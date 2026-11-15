@@ -58,6 +58,27 @@ class DetectionTests(unittest.TestCase):
         self.assertEqual(outside_items.counts(found),
                          {'linked_folders': 1, 'reinstall': 2, 'checkouts': 0, 'removed_checkouts': 0})
 
+    def test_absolute_links_that_stay_inside_the_repo_are_not_outside_items(self):
+        # Modeled on build trees that link to their own sources with absolute paths.
+        (self.root / 'cache').mkdir()
+        (self.root / 'cache/data').write_text('cached')
+        (self.root / 'build').mkdir()
+        for number in range(3):
+            (self.root / 'build' / ('obj%d' % number)).symlink_to(str(self.root / 'cache/data'))
+        (self.root / 'cache-link').symlink_to(str(self.root / 'cache'), target_is_directory=True)
+        # The temporary folder's unresolved spelling (/var vs /private/var on macOS) is still inside.
+        (self.root / 'alias').symlink_to(str(Path(self.temp.name) / 'Main' / 'work.txt'))
+        (self.root / 'escape').symlink_to(str(self.root / 'cache' / '..' / '..' / 'outside'),
+                                          target_is_directory=True)
+        (self.root / 'sibling').symlink_to(str(self.root) + '-sibling/tool')
+        found = outside_items.detect(self.root, tree_entries(self.root))
+        by_path = {item['path']: item for item in found['links']}
+        self.assertEqual(set(by_path), {'escape', 'sibling'})
+        self.assertEqual(by_path['escape']['category'], 'linked_folder')
+        self.assertEqual(by_path['sibling']['category'], 'reinstall')
+        self.assertEqual(outside_items.counts(found),
+                         {'linked_folders': 1, 'reinstall': 1, 'checkouts': 0, 'removed_checkouts': 0})
+
     def test_linked_checkouts_follow_git_registrations_and_removed_folders(self):
         kept, gone = self.base / 'kept', self.base / 'gone'
         git('worktree', 'add', '-q', '-b', 'kept', str(kept), cwd=self.root)

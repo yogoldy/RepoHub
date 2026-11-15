@@ -1025,7 +1025,7 @@ through `test_removed_source_retires_alert_but_keeps_failure_history`.
 
 ## GR27 — Outside items are reviewed explicitly
 
-Each scan lists links that leave a repo and Git worktree registrations without following them. Linked folders can be reviewed; links to single files and installed tools are listed for reinstalling. Choices are saved per repo in a revision-checked file; detection and link-only choices never change backup status. Sizes and uncommitted-change counts are measured only when the review opens, and incomplete totals are shown as lower bounds. Diagnostics record only `outside_review` with a repo alias.
+Each scan lists links that leave a repo and Git worktree registrations without following them. An absolute link whose path stays inside the repo, such as a build tree linking to its own source folder, is not an outside item; on November 15 the installed build 13 counted 75,748 of these in one repo before this check. Linked folders can be reviewed; links to single files and installed tools are listed for reinstalling. Choices are saved per repo in a revision-checked file; detection and link-only choices never change backup status. Sizes and uncommitted-change counts are measured only when the review opens, and incomplete totals are shown as lower bounds. Diagnostics record only `outside_review` with a repo alias.
 
 **Regression tests:**
 
@@ -1033,6 +1033,7 @@ Each scan lists links that leave a repo and Git worktree registrations without f
 - `test_outside_items.DetectionTests.test_linked_checkouts_follow_git_registrations_and_removed_folders`
 - `test_outside_items.DetectionTests.test_malformed_registration_is_reported_invalid_not_followed`
 - `test_outside_items.DetectionTests.test_folder_size_reports_incomplete_totals_as_lower_bounds`
+- `test_outside_items.DetectionTests.test_absolute_links_that_stay_inside_the_repo_are_not_outside_items`
 - `test_outside_items.OutsideHubTests.test_scan_counts_outside_items_and_choices_never_change_backup_need`
 - `test_outside_items.OutsideHubTests.test_review_defaults_and_revision_checked_saves`
 - `test_outside_items.OutsideHubTests.test_http_routes_keep_token_origin_and_revision_guards`
