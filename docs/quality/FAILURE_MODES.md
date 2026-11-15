@@ -1082,3 +1082,18 @@ Setup layout changes move checkout and kept archives with their repo. Restore re
 - `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
 
 **Remaining exposure:** The keep window starts at the first backup after an item disappears. A checkout archive restores beside the repo and is reattached with Git as a later guided step; the audit tool refuses it on its own because its root `.git` is a file. Installed native behavior and live iCloud upload are not yet observed.
+
+## GR30 — One RepoHub copy owns the helper port
+
+On November 15 the Pro had two app copies. Sparkle updated `/Applications/Repo Hub.app` to build 13, while a build 12 helper from `~/Applications`, orphaned since its app quit, still held port 8767. The new helper exited with `Address already in use`, only the old helper answered, and the update watchdog rolled back a correctly installed build.
+
+A helper that cannot bind now probes the listener, writes `helper-conflict.json` with `another_copy_running` or `port_in_use`, and exits with code 75. A bundled helper exits once its parent app is gone, after any backup finishes. The app refuses to start beside a RepoHub copy running from another folder and shows **Another copy of RepoHub is running** when its own helper hit a conflict. The update watchdog keeps the installed build when that build recorded `another_copy_running`, because restoring the old build would hit the same conflict. Diagnostics record `helper_conflict` and `helper_parent_exited` with reason codes only.
+
+**Regression tests:**
+
+- `test_helper_conflict.HelperConflictTests.test_second_helper_reports_another_copy_and_leaves_it_running`
+- `test_helper_conflict.HelperConflictTests.test_successful_start_clears_a_stale_conflict`
+- `test_helper_conflict.HelperConflictTests.test_helper_stops_after_its_app_exits_but_never_mid_backup`
+- `test_helper_conflict.HelperConflictTests.test_update_watchdog_reports_another_copy_instead_of_rolling_back`
+
+**Remaining exposure:** The native alerts are compiled but not driven by an automated UI test. Installed behavior on the Pro and Air is not yet observed.

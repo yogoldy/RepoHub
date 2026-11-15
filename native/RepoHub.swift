@@ -21,8 +21,21 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var statusGeneration = 0
     var lastAppliedStatusGeneration = 0
     var address = URL(string: "http://127.0.0.1:8767/")!
+    var reportedConflict = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if PackagedApplication.enabled, let other = NSRunningApplication.runningApplications(
+            withBundleIdentifier: Bundle.main.bundleIdentifier ?? "").first(where: {
+                $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+                    && $0.bundleURL?.resolvingSymlinksInPath() != Bundle.main.bundleURL.resolvingSymlinksInPath() }) {
+            let alert = NSAlert()
+            alert.messageText = "Another copy of RepoHub is already running."
+            alert.informativeText = "It is running from " + (other.bundleURL?.deletingLastPathComponent().path ?? "another folder")
+                + ". Quit that copy and keep one RepoHub app installed, then open RepoHub again. Your backups have not been changed."
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
         if PackagedApplication.enabled {
             do {
                 let application = try PackagedApplication()
@@ -103,6 +116,20 @@ final class HubDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                     return
                 }
                 if let packaged = self.packaged {
+                    if packaged.helper?.isRunning != true, packaged.helperConflict() != nil {
+                        self.statusItem.button?.title = " !"
+                        self.statusItem.button?.toolTip = "RepoHub: another copy of RepoHub is running"
+                        self.statusItem.button?.setAccessibilityLabel("RepoHub: another copy of RepoHub is running")
+                        self.updates?.record("failed", reason: "another_copy_running")
+                        if !self.reportedConflict {
+                            self.reportedConflict = true
+                            let alert = NSAlert()
+                            alert.messageText = "Another copy of RepoHub is running."
+                            alert.informativeText = "This copy's backup helper could not start because another RepoHub copy is using it. Quit the other copy and keep one RepoHub app installed, then reopen this one. Your backups have not been changed."
+                            alert.runModal()
+                        }
+                        return
+                    }
                     guard packaged.matches(status) else {
                         self.statusItem.button?.title = " !"
                         self.statusItem.button?.toolTip = "RepoHub: application components do not match"

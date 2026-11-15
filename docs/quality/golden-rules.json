@@ -744,6 +744,24 @@
         "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
       ],
       "remaining_gap": "The keep window starts at the first backup after an item disappears. The audit tool refuses a checkout archive on its own because its root .git is a file; it restores beside the repo and is reattached with Git as a later guided step. Installed native behavior and live iCloud upload on the Pro and Air are not yet observed."
+    },
+    {
+      "id": "GR30",
+      "title": "One RepoHub copy owns the helper port, and a second copy says so",
+      "breakpoint": "Two installed app copies or a helper that outlived its app hold the local port. A new helper then exits with an unexplained bind traceback, the app may silently display the other copy's helper, and the update watchdog rolls back a correctly installed build.",
+      "diagnostic_events": [
+        "helper_conflict",
+        "helper_parent_exited"
+      ],
+      "cause_and_solution": "A helper that cannot bind probes the listener, records helper-conflict.json (another_copy_running or port_in_use) and exits with code 75. A bundled helper exits after its parent app is gone, once any backup finishes. The app refuses to start beside a copy running from another folder, shows a clear message when its own helper hit a conflict, and the update watchdog keeps the installed build when that build recorded another_copy_running.",
+      "required_behavior": "The other copy keeps running untouched. Non-RepoHub listeners are reported as port_in_use. A successful start clears a stale conflict record. The parent watch never stops a helper during a backup. Only a conflict recorded by the target build prevents rollback; anything else follows the existing recovery path. Logs record reason codes only.",
+      "test_ids": [
+        "test_helper_conflict.HelperConflictTests.test_second_helper_reports_another_copy_and_leaves_it_running",
+        "test_helper_conflict.HelperConflictTests.test_successful_start_clears_a_stale_conflict",
+        "test_helper_conflict.HelperConflictTests.test_helper_stops_after_its_app_exits_but_never_mid_backup",
+        "test_helper_conflict.HelperConflictTests.test_update_watchdog_reports_another_copy_instead_of_rolling_back"
+      ],
+      "remaining_gap": "The native launch check and conflict message are compiled and the conflict-record parser is checked natively, but the alerts themselves are not driven by an automated UI test. Installed behavior on the Pro and Air is not yet observed."
     }
   ]
 }

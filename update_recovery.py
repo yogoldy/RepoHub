@@ -90,6 +90,17 @@ def guard(record, timeout=120):
         return 'identity_changed'
     if installed.get('CFBundleVersion') != record['target_build']:
         return 'not_installed'
+    conflict = state / 'helper-conflict.json'
+    try:
+        if not conflict.is_symlink() and conflict.is_file() and conflict.stat().st_size < 4096:
+            value = json.loads(conflict.read_text())
+            if (isinstance(value, dict) and value.get('reason') == 'another_copy_running'
+                    and value.get('own_build') == record['target_build']):
+                # The new build installed correctly; another RepoHub copy holds the
+                # helper port. Restoring the old build would hit the same conflict.
+                return 'another_copy_running'
+    except (OSError, ValueError):
+        pass
     try:
         processes = json.loads((state / 'application-processes.json').read_text())
     except (OSError, ValueError):

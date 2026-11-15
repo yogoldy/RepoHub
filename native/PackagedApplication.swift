@@ -137,8 +137,21 @@ final class PackagedApplication {
             && identity["build"] == release.build && identity["bundle_id"] == release.bundle_id
     }
 
+    // Written by a helper that found the port held by another RepoHub copy.
+    func helperConflict() -> [String: Any]? {
+        let url = stateDirectory.appendingPathComponent("helper-conflict.json")
+        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+              values.isRegularFile == true, values.isSymbolicLink != true,
+              let data = try? Data(contentsOf: url), data.count < 4096,
+              let value = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              value["reason"] as? String == "another_copy_running",
+              value["own_build"] as? String == release.build else { return nil }
+        return value
+    }
+
     func startHelper() throws {
         guard let executable = bundle.executableURL else { throw Failure.packageInvalid }
+        try? FileManager.default.removeItem(at: stateDirectory.appendingPathComponent("helper-conflict.json"))
         let log = stateDirectory.appendingPathComponent("packaged-helper.log")
         if !FileManager.default.fileExists(atPath: log.path) {
             FileManager.default.createFile(atPath: log.path, contents: nil, attributes: [.posixPermissions: 0o600])
