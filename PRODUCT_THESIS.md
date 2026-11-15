@@ -163,6 +163,21 @@ block channels or signing. CloudKit, remote push notifications, Tailwind and
 TestSprite evaluation remain deferred. Update commands, links and coverage claims
 as each step lands; do not retain a competing release order in historical guides.
 
+## Recovery verifier follow-up — November 12, 2026
+
+The current local-only work first fixes registered-worktree metadata validation
+and large-repository audit limits. Main-repo backups may retain contained Git
+worktree administration after validating its shared-store reference. That does
+not include or rebind outside checkouts, and receipts explicitly retain that gap.
+The worktree change has controlled capture/restore and refusal regressions in GR11.
+Capacity-aware large restores are implemented locally with optional byte budgets,
+a configurable free-space reserve, bounded copies and failure receipts. The full
+Python suite passed 382 tests; 27 recovery tests also passed on macOS Python 3.9.6.
+An actual above-8-GiB Pro fixture restore passed without changing its inputs.
+Full live Air recovery still needs sufficient receiving storage. Explicit inclusion
+of external folders and linked-checkout contents is in progress as four local commits: outside-link restore (3cb246d), detection and reviewed choices (4ab0a38), separate verified archives for included linked folders, and linked checkouts with a 30-day keep window for removed items. All four are committed locally; removed or no longer included items are kept for 30 days before automatic deletion. This work
+does not authorize a push, release publication or installed update.
+
 ## Implemented foundation and pending local follow-up
 
 The previous local update batch shipped through releases 0.0.5–0.0.7. The

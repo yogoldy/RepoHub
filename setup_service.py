@@ -149,6 +149,18 @@ class SetupService:
                         raise ValueError('Current archive failed verification; migration stopped')
                     moves.append((str(old.relative_to(root)), name))
                     current['archive'] = str(root / name / Path(current['archive']).name)
+                    for field in ('linked', 'checkouts', 'removed'):
+                        for entry in (current.get(field) or {}).values():
+                            archive = Path(entry['archive'])
+                            try:
+                                inner = archive.relative_to(old)
+                            except ValueError:
+                                continue  # Not in this managed folder; the next backup makes a new copy.
+                            if field == 'removed' and not archive.is_file():
+                                continue
+                            if hub.archive_digest(entry['archive']) != entry['sha256']:
+                                raise ValueError('Outside-item archive failed verification; migration stopped')
+                            entry['archive'] = str(root / name / inner)
             previous = list(hub.setup_record.get('previous_destinations', []))
             if hub.configured and root != hub.backups and str(hub.backups) not in previous:
                 previous.append(str(hub.backups))

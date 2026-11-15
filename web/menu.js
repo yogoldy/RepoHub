@@ -207,6 +207,7 @@ function renderDetail(presentation) {
       ${retryingRepo === repo.id ? 'Check requested…' : 'Retry check now'}</button>` : '';
   const schedule = RepoStatus.describeSchedule(repo, menuState.power_source);
   const timing = presentation?.timing || RepoStatus.timing(repo, menuState.backup, clientFreshness);
+  const outsideLine = outsideSummary(repo.outside, repo.included_folders);
   const markup = `
     <p class="detail-context">${escape(repo.name)}</p>
     <h2 class="status-headline" data-category="${state.category}">${escape(state.headline)}</h2>
@@ -231,6 +232,10 @@ function renderDetail(presentation) {
       <span class="schedule-copy"><strong>${escape(schedule.label)}</strong>
         <small>${escape(schedule.detail)}</small></span><span aria-hidden="true">›</span>
     </button>
+    ${outsideLine ? `<button id="outside-review" type="button" class="repo-schedule" aria-label="Review items outside ${escape(repo.name)}">
+      <span class="schedule-copy"><strong>Outside this folder</strong>
+        <small>${escape(outsideLine)}</small></span><span aria-hidden="true">›</span>
+    </button>` : ''}
     <button id="report-status" type="button" class="report-status">Report this status</button>`;
   if ($('#detail').innerHTML !== markup) {
     const focused = $('#detail').contains(document.activeElement) ? document.activeElement.id : null;
@@ -263,6 +268,7 @@ function renderDetail(presentation) {
     else technicalOpen.delete(repo.id);
   };
   $('#repo-schedule').onclick = () => openSettings(repo.id);
+  if ($('#outside-review')) $('#outside-review').onclick = () => openOutside(repo.id);
   if ($('#review-missing-source')) $('#review-missing-source').onclick = () => $('#workspace-open').click();
   $('#report-status').onclick = () => {
     if (window.RepoHubReports) void window.RepoHubReports.openStatus(state);
@@ -281,6 +287,19 @@ function renderDetail(presentation) {
       setTimeout(() => {retryingRepo = null; void load();}, 1000);
     }
   };
+}
+function outsideSummary(outside, included) {
+  if (!outside || outside.state === 'unavailable') return '';
+  const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
+  const parts = [];
+  if (outside.linked_folders) parts.push(plural(outside.linked_folders, 'linked folder')
+    + (included && included.included ? ' (' + included.included + ' included)' : ''));
+  if (outside.checkouts) parts.push(plural(outside.checkouts, 'linked checkout')
+    + (included && included.checkouts ? ' (included)' : ''));
+  if (included && included.kept) parts.push(included.kept + ' kept after removal');
+  if (outside.removed_checkouts) parts.push(plural(outside.removed_checkouts, 'removed checkout'));
+  if (outside.reinstall) parts.push(plural(outside.reinstall, 'tool link'));
+  return parts.length ? parts.join(' · ') + ' · Review' : '';
 }
 function selectRepo(id) {
   const closing = selectedId === id;
@@ -459,16 +478,16 @@ let activeSettingsPage = 'home';
 function showSettingsPage(page) {
   const titles = {home: 'Settings', schedule: 'Backup schedule', notifications: 'Notifications',
     appearance: 'Menu bar appearance', updates: 'App updates',
-    help: 'Help & diagnostics', access: 'Access & permissions'};
+    help: 'Help & diagnostics', access: 'Access & permissions', outside: 'Outside this folder'};
   if (!(page in titles)) return;
   activeSettingsPage = page;
   for (const name of Object.keys(titles)) {
     const selector = name === 'home' ? '#settings-home' : '#settings-page-' + name;
     $(selector).hidden = name !== page;
   }
-  $('#settings-title').textContent = settingsRepo && page === 'schedule'
-    ? 'Schedule · ' + (menuState?.repos?.find(row => row.id === settingsRepo)?.name || 'Repository')
-    : titles[page];
+  const repoName = menuState?.repos?.find(row => row.id === settingsRepo)?.name || 'Repository';
+  $('#settings-title').textContent = settingsRepo && page === 'schedule' ? 'Schedule · ' + repoName
+    : settingsRepo && page === 'outside' ? 'Outside · ' + repoName : titles[page];
   $('#settings-back').hidden = page === 'home';
   const backLabel = settingsRepo ? 'Back to backups' : 'Back to Settings';
   $('#settings-back-label').textContent = backLabel;
@@ -477,6 +496,7 @@ function showSettingsPage(page) {
   $('#settings-content').scrollTop = 0;
   $('#settings-title').focus();
   if (page === 'appearance') void window.RepoHubMenuAppearance?.open();
+  if (page === 'outside') void window.RepoHubOutside?.open(settingsRepo);
   if (page === 'updates') {
     const native = !!window.webkit?.messageHandlers?.repoHub;
     $('#check-updates').disabled = !native;
@@ -582,6 +602,9 @@ async function leaveSettingsPage() {
   if (activeSettingsPage === 'appearance') {
     return await window.RepoHubMenuAppearance?.leave() ?? true;
   }
+  if (activeSettingsPage === 'outside') {
+    return await window.RepoHubOutside?.leave() ?? true;
+  }
   return leaveSchedule();
 }
 
@@ -655,6 +678,20 @@ async function openSettings(repoId = null, page = 'home') {
     return false;
   }
 }
+async function openOutside(repoId) {
+  if ($('#settings-dialog').open) {
+    if ($('#settings-form').hidden) {
+      if (!await window.RepoHubWorkspaces?.close(false)) return false;
+    } else if (!await leaveSettingsPage()) return false;
+  }
+  settingsRepo = repoId;
+  $('#settings-error').textContent = '';
+  $('#settings-form').hidden = false;
+  $('#workspace-form').hidden = true;
+  if (!$('#settings-dialog').open) $('#settings-dialog').showModal();
+  showSettingsPage('outside');
+  return true;
+}
 $('#settings').onclick = () => openSettings();
 $('#settings-close').onclick = closeSettings;
 $('#settings-cancel').onclick = settingsBack;
@@ -695,6 +732,11 @@ $('#settings-form').onsubmit = async event => {
 window.RepoHubSettings = {
   confirmDiscard, leaveSchedule: leaveSettingsPage,
   showHome: () => showSettingsPage('home'),
+  finishRepoPage: () => {
+    $('#settings-dialog').close();
+    $('#notice').textContent = 'Outside-item choices saved.';
+    void load();
+  },
   openAccess: async () => { if (await openSettings()) showSettingsPage('access'); },
   workspaceOpened: () => {
     $('#settings-title').textContent = 'Folders to back up';

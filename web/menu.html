@@ -232,6 +232,16 @@
           <p id="readiness-error" role="status"></p>
         </section>
       </section>
+      <section id="settings-page-outside" data-settings-page="outside" hidden>
+        <p>Items this repo points to outside its own folder. Reviewing them never changes the repo's backup status.</p>
+        <div id="outside-list"></div>
+        <p id="outside-note" class="settings-note"></p>
+        <p id="outside-error" role="alert"></p>
+        <div class="settings-actions">
+          <button type="button" id="outside-cancel">Cancel</button>
+          <button type="button" id="outside-save" class="primary" disabled>Save changes</button>
+        </div>
+      </section>
       <p id="settings-error" role="alert"></p>
       <div id="schedule-actions" class="settings-actions" hidden>
         <button type="button" id="settings-cancel">Cancel</button>
@@ -273,4 +283,5 @@
 
 <script src="/menu-appearance.js"></script>
 <script src="/update-channels.js"></script>
+<script src="/outside-items.js"></script>
 </body></html>

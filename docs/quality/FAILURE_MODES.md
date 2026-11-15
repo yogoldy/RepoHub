@@ -303,7 +303,7 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 
 **Cause / solution:** Use an independently captured manifest, trusted input identities, safe isolated extraction and Git fsck/history checks. Explicitly restore link modes without changing targets.
 
-**Required behavior:** Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts.
+**Required behavior:** Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Permit standard registered-worktree administration only after regular-file, bounded-content and shared-store checks; never follow checkout back-pointers or claim outside checkout files were restored. Restore links that leave the root as exact link text, never follow them, list them in receipts and keep Git-storage links that leave the root refused.
 
 **Diagnostic trail:** `archive_verified`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
 
@@ -315,8 +315,32 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 - `test_restore_audit.RestoreAuditTests.test_traversal_duplicate_extra_and_absolute_paths_are_rejected`
 - `test_restore_audit.RestoreAuditTests.test_input_mutation_during_restore_is_reported`
 - `test_restore_audit.RestoreAuditTests.test_restored_hooks_and_fsmonitor_are_not_executed`
+- `test_restore_worktrees.RestoreWorktreeTests.test_registered_worktree_metadata_restores_without_external_checkout`
+- `test_restore_worktrees.RestoreWorktreeTests.test_external_or_malformed_common_directory_is_rejected_before_git`
+- `test_restore_worktrees.RestoreWorktreeTests.test_tampered_archive_common_directory_fails_before_git`
+- `test_restore_worktrees.RestoreWorktreeTests.test_linked_root_git_markers_and_common_store_redirection_stay_rejected`
+- `test_restore_worktrees.RestoreWorktreeTests.test_missing_or_symlinked_administrative_files_are_rejected`
+- `test_restore_worktrees.RestoreWorktreeTests.test_invalid_registered_head_is_not_a_successful_git_audit`
+- `test_restore_audit.RestoreAuditTests.test_legacy_baseline_without_worktree_scope_still_restores`
+- `test_restore_audit.RestoreAuditTests.test_outside_link_is_reported_but_git_alternates_fail_capture`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_outside_links_restore_exactly_and_are_reported`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_forged_entry_beneath_an_outside_link_never_writes_outside`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_git_internal_outside_links_stay_rejected_before_git`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_tampered_link_report_or_target_fails`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_baseline_without_link_report_still_restores_and_discloses`
 
-**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics.
+- `test_restore_capacity.RestoreCapacityTests.test_valid_manifest_above_eight_gib_has_no_fixed_byte_ceiling`
+- `test_restore_capacity.RestoreCapacityTests.test_insufficient_capacity_fails_before_any_extracted_file`
+- `test_restore_capacity.RestoreCapacityTests.test_large_plan_uses_allocation_fragments_and_explicit_budget`
+- `test_restore_capacity.RestoreCapacityTests.test_operator_budget_and_reserve_are_recorded_on_a_real_restore`
+- `test_restore_capacity.RestoreCapacityTests.test_operator_budget_refuses_capture_and_restore_without_extraction`
+- `test_restore_capacity.RestoreCapacityTests.test_space_loss_mid_copy_retains_failure_receipt_and_unchanged_inputs`
+- `test_restore_capacity.RestoreCapacityTests.test_filesystem_space_error_never_becomes_a_pass`
+- `test_restore_capacity.RestoreCapacityTests.test_copy_uses_bounded_memory_and_detects_short_or_overlong_streams`
+- `test_restore_capacity.RestoreCapacityTests.test_invalid_budget_arguments_and_entry_guard_still_fail_closed`
+- `test_restore_capacity.RestoreCapacityTests.test_inventory_entry_limit_stops_before_building_an_unbounded_manifest`
+
+**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Root linked-worktree Git files, external shared stores, submodules and alternates still fail closed. Links that leave the root restore as link text; their targets' contents are not captured and may not exist on the receiving Mac. Captured administrative files retain original checkout back-pointers; they do not capture or rebind those outside checkouts. Large restores have no fixed byte ceiling: optional operator budgets, capacity preflight, a configurable free-space reserve and periodic checks constrain extraction. Entry-count/baseline limits remain. Capacity checks are observations, not disk reservations; partial failed outputs are retained and never reported as a pass.
 
 ### GR12 — Installation and restart must load the tested release
 
@@ -998,3 +1022,63 @@ Reviewed source removals retire their active notification episodes even when the
 last backup receipt still contains a historical error for that source. The error
 receipt is retained; global operation errors continue to notify. GR15 checks this
 through `test_removed_source_retires_alert_but_keeps_failure_history`.
+
+## GR27 — Outside items are reviewed explicitly
+
+Each scan lists links that leave a repo and Git worktree registrations without following them. Linked folders can be reviewed; links to single files and installed tools are listed for reinstalling. Choices are saved per repo in a revision-checked file; detection and link-only choices never change backup status. Sizes and uncommitted-change counts are measured only when the review opens, and incomplete totals are shown as lower bounds. Diagnostics record only `outside_review` with a repo alias.
+
+**Regression tests:**
+
+- `test_outside_items.DetectionTests.test_links_are_classified_without_following_and_git_internals_are_skipped`
+- `test_outside_items.DetectionTests.test_linked_checkouts_follow_git_registrations_and_removed_folders`
+- `test_outside_items.DetectionTests.test_malformed_registration_is_reported_invalid_not_followed`
+- `test_outside_items.DetectionTests.test_folder_size_reports_incomplete_totals_as_lower_bounds`
+- `test_outside_items.OutsideHubTests.test_scan_counts_outside_items_and_choices_never_change_backup_need`
+- `test_outside_items.OutsideHubTests.test_review_defaults_and_revision_checked_saves`
+- `test_outside_items.OutsideHubTests.test_http_routes_keep_token_origin_and_revision_guards`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** Installed and live-device review remain unobserved. Included folders are covered by GR28.
+
+## GR28 — Included linked folders are separate verified archives
+
+A linked folder whose saved choice is include is archived on its own, beside its repo's backup in `linked/<link path>/`. Links inside it are stored as links and never followed, and the repo archive format is unchanged. The repo's index entry records the set. RepoHub asks macOS about every archive in the set and reports one combined upload state, so **Backed up** appears only when each archive is verified and confirmed uploaded for that exact archive. Changed folder contents mark the repo for backup; a timestamp-only change reuses the verified archive. Superseded folder archives are pruned only after the whole new set uploads and never from a stale copy of the set.
+
+Folders that overlap a monitored repo, a backup destination, RepoHub data, a system or top-level location, or another included link are refused when choices are saved. If a link changes later, the backup reports the refusal for that repo and keeps the last verified archive referenced. Setup layout changes move folder archives with their repo after checksum verification. Restore receipts name included archives by link path and checksum (`--include LINK=SHA256`); each folder archive is audited with its own capture and verify run. Diagnostics record repo aliases and reason codes through `included_folder_archived`, `included_folder_refused` and `included_folder_failed`, never outside paths or contents.
+
+**Regression tests:**
+
+- `test_included_folders.IncludedFolderTests.test_included_folder_gets_its_own_verified_archive_and_restore_receipt`
+- `test_included_folders.IncludedFolderTests.test_backed_up_requires_every_archive_in_the_set_to_upload`
+- `test_included_folders.IncludedFolderTests.test_upload_helper_is_asked_about_every_archive`
+- `test_included_folders.IncludedFolderTests.test_included_folder_changes_mark_the_repo_for_backup`
+- `test_included_folders.IncludedFolderTests.test_superseded_folder_archives_are_pruned_only_after_the_whole_set_uploads`
+- `test_included_folders.IncludedFolderTests.test_unsafe_or_duplicate_inclusions_are_refused`
+- `test_included_folders.IncludedFolderTests.test_a_link_retargeted_after_review_is_reported_and_keeps_the_last_archive`
+- `test_included_folders.IncludedFolderTests.test_setup_layout_change_moves_folder_archives_with_their_repo`
+- `test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** Moving restored folder contents back to their original location is a later guided step. Linked checkouts and the 30-day keep window are covered by GR29. Installed native behavior and live iCloud upload of folder archives are not yet observed.
+
+## GR29 — Linked checkouts follow Git; removed items are kept for 30 days
+
+When a repo includes checkouts, every present checkout in Git's registration list is archived on its own, beside the repo's backup in `checkouts/<registration name>/`, and joins the repo's uploaded set. New checkouts are backed up without another review. A checkout nested inside the repo is already in the repo archive. Checkouts in refused locations, such as a backup destination, are reported for the repo.
+
+A checkout or included linked folder that is gone or no longer included is not an error. Its last verified archive moves to a keep window shown as **Removed checkout · kept until <date>** or **No longer included · kept until <date>**, and it rejoins the set if the folder returns. Kept items are not required for **Backed up**. Under latest-only retention their archives are deleted after 30 days, or sooner through **Remove now**, which needs a second click, the exact kept archive reference, the token-guarded route and no running backup. Keep-all retention never deletes on a timer. This is the narrow automatic-deletion exception recorded in AGENTS.md.
+
+Setup layout changes move checkout and kept archives with their repo. Restore receipts name included checkouts with `--checkout NAME=SHA256`. Diagnostics record `outside_item_kept` and `outside_item_deleted` with repo aliases and reason codes only.
+
+**Regression tests:**
+
+- `test_linked_checkouts.LinkedCheckoutTests.test_included_checkout_is_its_own_verified_archive_and_restore_receipt`
+- `test_linked_checkouts.LinkedCheckoutTests.test_new_checkouts_are_followed_and_a_removed_one_is_kept_for_30_days`
+- `test_linked_checkouts.LinkedCheckoutTests.test_a_temporarily_missing_checkout_is_kept_and_rejoins_when_it_returns`
+- `test_linked_checkouts.LinkedCheckoutTests.test_keep_window_expires_after_30_days_and_remove_now_deletes_on_request`
+- `test_linked_checkouts.LinkedCheckoutTests.test_nested_refused_and_excluded_checkouts`
+- `test_linked_checkouts.LinkedCheckoutTests.test_upload_and_pruning_require_the_whole_set_including_checkouts`
+- `test_linked_checkouts.LinkedCheckoutTests.test_upload_helper_is_asked_about_checkout_archives`
+- `test_linked_checkouts.LinkedCheckoutTests.test_setup_layout_change_moves_checkout_and_kept_archives`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** The keep window starts at the first backup after an item disappears. A checkout archive restores beside the repo and is reattached with Git as a later guided step; the audit tool refuses it on its own because its root `.git` is a file. Installed native behavior and live iCloud upload are not yet observed.

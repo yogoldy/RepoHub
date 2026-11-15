@@ -4,7 +4,7 @@
 
 - This is the app foundation. Source repos and saved workspace JSON are user data; never change or commit their contents as part of app development.
 - Keep the backend on loopback. Maintain Host/Origin/token write checks, safe path resolution, and revision checks.
-- Preserve all existing backups. Do not introduce automatic retention deletion without Leo's authorization.
+- Preserve all existing backups. Do not introduce automatic retention deletion without Leo's authorization. One narrow exception is authorized (GR29): under latest-only retention, backups of linked checkouts and included linked folders that were removed or are no longer included are kept for 30 days, then deleted automatically. **Remove now** deletes one sooner only at the user's request. No other backup is deleted on a timer.
 - Status JSON must report observed timestamps and backup results. Never claim an archive has uploaded to iCloud from local verification alone.
 - Keep new modules separate from repository monitoring and backups. Prefer explicit adapters over arbitrary filesystem APIs.
 - Use one task branch and commit your own changes before reporting completion. Report branch/SHA, unfinished work and deliberate skips. Never absorb unrelated working-tree changes.
