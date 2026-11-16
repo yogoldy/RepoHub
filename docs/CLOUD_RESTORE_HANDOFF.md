@@ -26,7 +26,7 @@ We can control and disclose known variables; no test can guarantee that unknown 
 
 ## Local source-baseline preparation
 
-This runs on Leo's Mac, **not in the cloud**. Select a particular backup receipt and its repo. The source must still represent that backup's content point in time. If it has changed, do not manufacture a historical baseline from the archive: choose an unchanged repo or coordinate a new backup and independent capture while editing is paused. Finder-only differences are real differences for this audit; there is no `.DS_Store` exception here.
+This runs on Leo's Mac, **not in the cloud**. Select a particular backup receipt and its repo. The source must still represent that backup's content point in time. If it has changed, do not manufacture a historical baseline from the archive: choose an unchanged repo or coordinate a new backup and independent capture while editing is paused. Finder-only differences are real differences for this audit; there is no `.DS_Store` exception here. The one Finder allowance is in Git's strict check: Finder can leave `.DS_Store` or `._*` files inside `.git/refs`, which `git fsck --strict` reports as bad references. The verifier accepts that only when fsck reports reference errors alone and every one names such a Finder file; the files are still restored and compared byte for byte, and any other fsck error fails.
 
 Choose a new private directory outside monitored repos, the source folder and the tracked checkout. Capture all regular-file bytes, permissions, directories and symlink targets, including `.git`, ignored files and uncommitted files:
 

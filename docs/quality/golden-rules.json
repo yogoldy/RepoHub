@@ -265,6 +265,7 @@
       "required_behavior": "Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Accept only validated contained registered-worktree metadata and disclose that linked checkout contents are not verified. Restore links that leave the root as exact link text without following them, list them in capture and restore receipts, and keep outside links within Git storage refused. Plan restore capacity from verified manifest sizes, retain a free-space reserve, bound copies and refuse exhausted capacity without altering inputs.",
       "test_ids": [
         "test_restore_audit.RestoreAuditTests.test_full_restore_with_ignored_uncommitted_git_and_log_receipts",
+        "test_restore_audit.RestoreAuditTests.test_finder_files_in_git_refs_are_tolerated_but_other_fsck_errors_fail",
         "test_restore_audit.RestoreAuditTests.test_symlink_mode_survives_different_receiver_umask_without_changing_target",
         "test_restore_audit.RestoreAuditTests.test_corrupt_archive_and_wrong_manifest_identity_fail_before_extraction",
         "test_restore_audit.RestoreAuditTests.test_traversal_duplicate_extra_and_absolute_paths_are_rejected",

@@ -324,6 +324,36 @@ def worktree_metadata(root, entries):
             'linked_checkout_contents_verified': False}
 
 
+# git fsck sets only this exit bit (ERROR_REFS) for reference problems. Any other bit
+# is an object, pack, connectivity or graph failure and always fails the audit.
+REF_ERRORS_ONLY = 8
+FINDER_REF = re.compile(r'error: (refs/(?:[^/\n]+/)*(?:\.DS_Store|\._[^/\n]*)): (?:badRefName|badRefContent): .*')
+
+
+def finder_refs_only(root, completed):
+    """Return Finder files under .git/refs when they are fsck's only complaint, else None.
+
+    Finder writes .DS_Store and ._* files into folders it displays, including .git/refs.
+    Strict fsck reports them as bad references although no object or real ref is damaged.
+    The files are still restored and compared byte for byte like every other entry.
+    """
+    if completed.returncode != REF_ERRORS_ONLY:
+        return None
+    paths = set()
+    for line in completed.stderr.decode('utf-8', 'replace').splitlines():
+        if not line.strip():
+            continue
+        match = FINDER_REF.fullmatch(line)
+        if not match:
+            return None
+        paths.add(match.group(1))
+    for path in paths:
+        item = Path(root) / '.git' / path
+        if item.is_symlink() or not item.is_file():
+            return None
+    return sorted(paths) or None
+
+
 def git_facts(root, evidence):
     if not (root/'.git').exists():return None
     if (root/'.git').is_symlink() or not (root/'.git').is_dir():raise AuditError('external_git_layout')
@@ -348,7 +378,11 @@ def git_facts(root, evidence):
         return completed
     version=subprocess.run([executable,'--version'],env=env,capture_output=True,check=True,timeout=10)
     evidence.emit('git_tool',version=version.stdout.decode().strip())
-    run('fsck','--full','--strict')
+    fsck=run('fsck','--full','--strict',allowed=(0,REF_ERRORS_ONLY))
+    if fsck.returncode:
+        finder=finder_refs_only(root,fsck)
+        if finder is None:raise AuditError('git_check_failed')
+        evidence.emit('finder_refs_ignored',count=len(finder))
     head=run('rev-parse','--verify','HEAD',allowed=(0,128))
     if head.returncode!=0 and (root/'.git/objects').is_dir():
         # Only permit an unborn HEAD; a broken committed HEAD fails fsck above.

@@ -77,6 +77,37 @@ class RestoreAuditTests(unittest.TestCase):
         self.assertEqual(restored.joinpath('script.sh').stat().st_mode & 0o777,0o755)
         self.assertEqual(audit.manifest(restored),audit.manifest(self.root))
 
+    def snapshot_capture(self, name):
+        archive=Path(snapshot(self.root,self.base/(name+'-archives'),self.base/(name+'-stage'))['archive'])
+        out=self.base/(name+'-capture')
+        code=audit.main(['capture','--source',str(self.root),'--archive-sha256',audit.digest(archive),'--out',str(out)])
+        return code,archive,out
+
+    def test_finder_files_in_git_refs_are_tolerated_but_other_fsck_errors_fail(self):
+        # Finder writes these into folders it shows; strict fsck calls them bad refs.
+        (self.root/'.git/refs/.DS_Store').write_bytes(b'\x00\x00\x00\x01Bud1\x00Finder view')
+        (self.root/'.git/refs/heads/._main').write_bytes(b'\x00\x05\x16\x07AppleDouble')
+        code,archive,out=self.snapshot_capture('finder')
+        self.assertEqual(code,0)
+        self.archive,self.expected=archive,out/'expected.json'
+        self.assertEqual(self.verify('finder-verify'),0)
+        self.assertEqual(self.result('finder-verify')['git_history'],'verified')
+        restored=self.base/'finder-verify/restored'
+        self.assertEqual((restored/'.git/refs/.DS_Store').read_bytes(),(self.root/'.git/refs/.DS_Store').read_bytes())
+        self.assertIn('finder_refs_ignored',(self.base/'finder-verify/events.jsonl').read_text())
+        # A malformed ref that is not a Finder file still fails, even beside Finder files.
+        (self.root/'.git/refs/notes-backup').write_text('not a ref')
+        code,_,out=self.snapshot_capture('other-ref')
+        self.assertEqual(code,1)
+        self.assertEqual(json.loads((out/'result.json').read_text())['reason'],'git_check_failed')
+        (self.root/'.git/refs/notes-backup').unlink()
+        # Object damage always fails, whatever Finder files are present.
+        loose=next(p for p in (self.root/'.git/objects').glob('[0-9a-f][0-9a-f]/*') if p.is_file())
+        os.chmod(loose,0o644);loose.write_bytes(b'corrupt object')
+        code,_,out=self.snapshot_capture('corrupt')
+        self.assertEqual(code,1)
+        self.assertEqual(json.loads((out/'result.json').read_text())['reason'],'git_check_failed')
+
     def test_corrupt_archive_and_wrong_manifest_identity_fail_before_extraction(self):
         self.archive.write_bytes(b'corrupt')
         self.assertEqual(self.verify(),1)
