@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 import math
@@ -22,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer as StandardThreadingHTTPServer
 from socketserver import TCPServer
 from urllib.parse import unquote, urlparse
+import urllib.request
 from backup_policy import BackupScheduler, default_settings, validate_settings, power_source, project_schedule
 from status_health import annotate_health, ProblemTracker, age, backup_location
 from diagnostics import DiagnosticLog, diagnostic_ref
@@ -1795,6 +1797,38 @@ class ThreadingHTTPServer(StandardThreadingHTTPServer):
         self.server_port = self.server_address[1]
 
 
+
+def port_conflict(hub, port, own):
+    """Describe whatever holds the helper port without changing it."""
+    reason, other = "port_in_use", None
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open("http://127.0.0.1:%d/api/status" % port, timeout=2) as response:
+            status = json.load(response)
+        if isinstance(status, dict) and isinstance(status.get("repos"), list):
+            reason = "another_copy_running"
+            release = status.get("application_release")
+            if isinstance(release, dict) and isinstance(release.get("build"), str):
+                other = release["build"][:16]
+    except (OSError, ValueError):
+        pass
+    record = {"reason": reason, "port": port, "own_build": (own or {}).get("build"),
+              "other_build": other, "detected_at": utc_now()}
+    atomic_json(hub.state_dir / "helper-conflict.json", record)
+    hub.diagnostics.emit("helper_conflict", result="failed", reason=reason, severity="error")
+    return record
+
+
+def watch_parent(hub, parent, getppid=os.getppid, interval=2.0, stop=None):
+    """A bundled helper belongs to the app that started it; never outlive it holding the port."""
+    stop = stop or (lambda: os._exit(0))
+    while getppid() == parent:
+        time.sleep(interval)
+    hub.backup_lock.acquire()  # An in-flight archive publication finishes first.
+    hub.diagnostics.emit("helper_parent_exited", result="complete", reason="parent_exited")
+    stop()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
@@ -1828,7 +1862,22 @@ def main():
             hub.diagnostics.emit("update_checkpoint", result="complete", reason="helper_stopped")
             raise SystemExit(0)
         signal.signal(signal.SIGTERM, stop_for_update)
-    server = ThreadingHTTPServer(("127.0.0.1", config.get("port", 8767)), Handler)
+    port = config.get("port", 8767)
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError as error:
+        if error.errno != errno.EADDRINUSE:
+            raise
+        # Another RepoHub copy (or another program) owns the port. Record it for the
+        # app and the update watchdog instead of exiting with an unexplained traceback.
+        conflict = port_conflict(hub, port, getattr(hub, "application_release", None))
+        print("Helper port %d is in use (%s); this helper is exiting." % (port, conflict["reason"]), flush=True)
+        raise SystemExit(75)
+    if args.bundled:
+        (hub.state_dir / "helper-conflict.json").unlink(missing_ok=True)
+        parent = os.getppid()
+        if parent != 1:
+            threading.Thread(target=watch_parent, args=(hub, parent), daemon=True).start()
     server.hub = hub
     def scans():
         while True:

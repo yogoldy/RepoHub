@@ -18,6 +18,7 @@ EVENTS = EVENTS | {'menu_bar_presented', 'menu_bar_disagreement'}
 EVENTS = EVENTS | {'setup_review', 'setup_applied', 'setup_continued', 'setup_recovery', 'git_discovery', 'outside_review'}
 EVENTS = EVENTS | {'included_folder_archived', 'included_folder_refused', 'included_folder_failed'}
 EVENTS = EVENTS | {'outside_item_kept', 'outside_item_deleted'}
+EVENTS = EVENTS | {'helper_conflict', 'helper_parent_exited'}
 BOOLEANS = frozenset("after_edits archive_dataless copying has_error has_backup ignored_finder_only backup_required cached needs_backup metadata_changed fresh scan_running backup_running native".split())
 ENUMS = {
     'update_phase': UPDATE_PHASES,
@@ -58,6 +59,7 @@ ENUMS['category'] |= {value[0] for value in PRESENTATION_TEXT.values()}
 ENUMS['reason'] |= {'not_a_directory', 'too_broad', 'system_location', 'app_state', 'backup_destination',
                      'inside_monitored_repo', 'duplicate_target', 'included_folder_changed'}
 ENUMS['reason'] |= {'removed', 'excluded', 'keep_window_expired', 'user_removed', 'previous_destination'}
+ENUMS['reason'] |= {'another_copy_running', 'port_in_use', 'parent_exited'}
 FREQUENCIES = {0,15,30,60,120,240}
 DELAYS = {2,5,10,15,30}
 ERROR_CODES = frozenset(errno.errorcode) | {4354,4355}

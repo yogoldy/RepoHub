@@ -5,7 +5,8 @@ PHASES = frozenset({'checking', 'waiting', 'downloading', 'installing', 'relaunc
 REASONS = frozenset({'user_requested', 'scheduled_check', 'backup_busy', 'helper_shutdown', 'helper_stopped',
                      'verified_update', 'update_available', 'sparkle_aborted',
                      'component_mismatch', 'matching_helper', 'recovery_unavailable',
-                     'no_update', 'user_cancelled', 'check_finished', 'channel_changed', 'channel_mismatch'})
+                     'no_update', 'user_cancelled', 'check_finished', 'channel_changed', 'channel_mismatch',
+                     'another_copy_running'})
 
 
 def update_evidence(value, release):

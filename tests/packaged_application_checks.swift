@@ -91,6 +91,20 @@ import CryptoKit
             let result = UpdateCycleOutcome.result(isSparkle: sparkle, isBackupBusy: busy, code: code)
             precondition(result.0 == phase && result.1 == reason)
         }
+        let conflictURL = application.stateDirectory.appendingPathComponent("helper-conflict.json")
+        precondition(application.helperConflict() == nil)
+        try JSONSerialization.data(withJSONObject: ["reason": "another_copy_running", "own_build": "100",
+                                                    "other_build": "99"]).write(to: conflictURL)
+        precondition(application.helperConflict()?["other_build"] as? String == "99")
+        try JSONSerialization.data(withJSONObject: ["reason": "another_copy_running", "own_build": "99"]).write(to: conflictURL)
+        precondition(application.helperConflict() == nil)
+        try JSONSerialization.data(withJSONObject: ["reason": "port_in_use", "own_build": "100"]).write(to: conflictURL)
+        precondition(application.helperConflict() == nil)
+        try FileManager.default.removeItem(at: conflictURL)
+        let elsewhere = application.stateDirectory.appendingPathComponent("elsewhere.json")
+        try JSONSerialization.data(withJSONObject: ["reason": "another_copy_running", "own_build": "100"]).write(to: elsewhere)
+        try FileManager.default.createSymbolicLink(at: conflictURL, withDestinationURL: elsewhere)
+        precondition(application.helperConflict() == nil)
         print("Native package identity and altered/missing/foreign/escaping-resource checks passed")
     }
 }

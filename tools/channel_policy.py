@@ -11,6 +11,7 @@ DEV_CHECKS = (
     'test_local_dev.py',
     'test_selected_actions.py', 'test_rescan.py',
     'test_policy_health.py', 'test_workspace_registry.py',
+    'test_helper_conflict.py',
 )
 ACCEPTANCE_CASES = {'permissions', 'configuration', 'install_update', 'backup', 'channels'}
 
