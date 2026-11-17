@@ -199,6 +199,19 @@ class HubTests(unittest.TestCase):
         info = git_info(self.repo)
         self.assertEqual((info["staged_files"], info["unstaged_files"], info["untracked_files"]), (1, 1, 1))
 
+    def test_scanning_never_runs_a_command_from_the_repos_git_config(self):
+        # core.fsmonitor in .git/config names a command Git would run on every status.
+        marker = self.base / "fsmonitor-ran"
+        repo = self.base / "real-git"
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        (repo / "file.txt").write_text("content")
+        subprocess.run(["git", "-C", str(repo), "config", "core.fsmonitor",
+                        "touch '" + str(marker) + "'; false"], check=True)
+        info = git_info(repo)
+        self.assertTrue(info["is_git"])
+        self.assertIsNotNone(info["changed_files"])
+        self.assertFalse(marker.exists(), "Scanning ran a command from the repo's Git config")
+
     def test_deleted_archive_is_pending_and_can_be_recreated(self):
         self.hub.backup()
         key = workspace_id("Example")

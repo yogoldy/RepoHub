@@ -292,6 +292,7 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 
 - `test_hub.HubTests.test_http_json_conflicts_origin_host_and_view_boundaries`
 - `test_hub.HubTests.test_data_and_views_cannot_escape`
+- `test_hub.HubTests.test_scanning_never_runs_a_command_from_the_repos_git_config`
 - `test_report_preview.ReportPreviewTests.test_http_preview_requires_existing_origin_and_token_checks`
 - `test_report_preview.ReportPreviewTests.test_bad_inputs_and_destination_injection_rejected`
 

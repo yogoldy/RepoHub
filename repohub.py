@@ -309,9 +309,16 @@ def cloud_status(raw):
 
 
 def git_info(root):
+    # A repo's own .git/config could name a command for Git to run (core.fsmonitor runs
+    # on every status). Turn those off so scanning a repo never runs code from it, and drop
+    # inherited GIT_* variables that could point Git somewhere else.
+    environment = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    environment.update(GIT_OPTIONAL_LOCKS="0", GIT_TERMINAL_PROMPT="0")
+    safety = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull]
+
     def run(*args):
-        result = subprocess.run(["/usr/bin/git", "-C", str(root), *args], capture_output=True,
-                                timeout=12, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+        result = subprocess.run(["/usr/bin/git", *safety, "-C", str(root), *args], capture_output=True,
+                                timeout=12, env=environment)
         if result.returncode:
             return None
         return result.stdout.decode("utf-8", "replace").rstrip("\n")
