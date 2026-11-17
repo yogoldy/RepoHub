@@ -360,6 +360,9 @@ def finder_refs_only(root, completed):
 
 
 def git_facts(root, evidence):
+    # Git receives both --git-dir and -C. A relative root would be applied twice,
+    # so Git would look in the wrong folder and report "not a git repository".
+    root=Path(root).absolute()
     if not (root/'.git').exists():return None
     if (root/'.git').is_symlink() or not (root/'.git').is_dir():raise AuditError('external_git_layout')
     executable=shutil.which('git')
@@ -684,7 +687,7 @@ def main(argv=None):
         if args.action=='capture':
             source=Path(args.source).resolve()
             if output==source or source in output.parents:raise AuditError('output_inside_source')
-        evidence = Evidence(args.out, max_bytes=args.max_bytes,
+        evidence = Evidence(output, max_bytes=args.max_bytes,
                             reserve_bytes=getattr(args, 'reserve_bytes', DEFAULT_FREE_RESERVE))
         if args.action=='capture':capture(args.source,args.archive_sha256,evidence,args.include,args.checkout)
         else:verify(args.archive,args.expected,args.manifest_sha256,evidence)

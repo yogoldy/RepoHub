@@ -224,6 +224,21 @@ class RestoreAuditTests(unittest.TestCase):
         self.assertEqual(self.verify(),0)
         self.assertFalse(marker.exists())
 
+    def test_relative_output_and_source_paths_still_verify_git(self):
+        # Git gets both --git-dir and -C; a relative root used to be applied twice,
+        # so Git reported "not a git repository" and a good restore failed.
+        previous=os.getcwd()
+        try:
+            os.chdir(self.base)
+            self.assertEqual(audit.main(['capture','--source','Sample','--archive-sha256',audit.digest(self.archive),
+                                         '--out','relative-capture']),0)
+            expected=Path('relative-capture/expected.json')
+            self.assertEqual(audit.main(['verify','--archive',str(self.archive),'--expected',str(expected),
+                                         '--manifest-sha256',audit.digest(expected),'--out','relative-verify']),0)
+        finally:
+            os.chdir(previous)
+        self.assertEqual(self.result('relative-verify')['git_history'],'verified')
+
     def test_legacy_baseline_without_worktree_scope_still_restores(self):
         baseline = json.loads(self.expected.read_text())
         baseline.pop('worktree_metadata', None)
