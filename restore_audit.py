@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import platform
+import posixpath
 import re
 import shutil
 import stat
@@ -233,7 +234,9 @@ def link_receipt(links, included=None):
             'included_archives': [{'path': path, 'archive_sha256': included[path]} for path in sorted(included)]}
 
 
-def validate_entries(entries, max_bytes=None):
+def validate_entries(entries, max_bytes=None, contained=None):
+    """Check manifest shape; contained maps nested .git files to their worktree names."""
+    contained = contained or {}
     if not isinstance(entries,dict) or len(entries)>MAX_ENTRIES:raise AuditError('invalid_manifest')
     total=0
     for relative,item in entries.items():
@@ -268,8 +271,13 @@ def validate_entries(entries, max_bytes=None):
         if PurePosixPath(relative).name=='.git' and item['kind']!='directory':
             # An empty marker below the top level cannot point to Git data elsewhere (package
             # caches such as uv write one). The app backs it up as an ordinary file, so it
-            # restores and compares byte for byte. Pointer files and a top-level .git file stay refused.
-            if not (relative!='.git' and item['kind']=='file' and item['size']==0):
+            # restores and compares byte for byte. A pointer file is accepted only for a checkout
+            # of this same repo that capture paired with its registration (see contained_checkouts).
+            # Any other pointer file and a top-level .git file stay refused.
+            empty_marker = relative!='.git' and item['kind']=='file' and item['size']==0
+            paired = (relative!='.git' and item['kind']=='file' and relative in contained
+                      and 0 < item['size'] <= 4096)
+            if not (empty_marker or paired):
                 raise AuditError('external_git_layout')
         if PurePosixPath(relative).name=='.gitmodules':raise AuditError('submodules_not_in_scope')
         if '.git' in PurePosixPath(relative).parts and relative.endswith('/commondir'):
@@ -282,6 +290,103 @@ def validate_entries(entries, max_bytes=None):
         if '.git' in PurePosixPath(relative).parts and (relative.endswith('/objects/info/alternates') or relative.endswith('/objects/info/http-alternates')):
             raise AuditError('git_alternates_not_in_scope')
     return total
+
+
+def read_small_text(root, entries, relative, invalid='invalid_worktree_metadata'):
+    """Read one short, single-line Git metadata file and check it against the manifest."""
+    item = entries.get(relative, {})
+    if item.get('kind') != 'file' or not 0 < item.get('size', 0) <= 4096:
+        raise AuditError(invalid)
+    fd = os.open(Path(root) / relative, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, 'rb') as source:
+        raw = source.read(4097)
+    if len(raw) != item['size'] or hashlib.sha256(raw).hexdigest() != item['sha256']:
+        raise AuditError('worktree_metadata_changed')
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError:
+        raise AuditError(invalid) from None
+    value = text.removesuffix('\n')
+    if not value or any(character in value for character in ('\n', '\r', '\x00', '\\')):
+        raise AuditError(invalid)
+    return value
+
+
+def nested_git_files(entries):
+    """Non-empty .git files below the top level: possible pointers to Git data."""
+    return sorted(relative for relative, item in entries.items()
+                  if relative != '.git' and PurePosixPath(relative).name == '.git'
+                  and item['kind'] == 'file' and item.get('size', 0) > 0)
+
+
+def contained_checkouts(root, entries, source_root=None):
+    """Pair each checkout kept inside this repo with its registration, or refuse.
+
+    Tools such as Claude Code put worktrees in folders inside the repo, so their files
+    are already in this archive and compared byte for byte. Their .git file names
+    .git/worktrees/<name> of this same repo, and that registration's gitdir names
+    the .git file back. Both may be absolute (the original location) or relative.
+    Absolute ones must share one original location; at capture that must be the
+    source itself. Anything else would point at Git data elsewhere and is refused.
+    """
+    pairs = {}
+    origins = set()
+    used = set()
+    for relative in nested_git_files(entries):
+        relative_path(relative)
+        text = read_small_text(root, entries, relative, invalid='external_git_layout')
+        if not text.startswith('gitdir: '):
+            raise AuditError('external_git_layout')
+        pointer = PurePosixPath(text[len('gitdir: '):])
+        checkout = PurePosixPath(relative).parent
+        if pointer.is_absolute():
+            if len(pointer.parts) < 4 or pointer.parts[-3:-1] != ('.git', 'worktrees'):
+                raise AuditError('external_git_layout')
+            name = pointer.name
+            origin = PurePosixPath(*pointer.parts[:-3])
+        else:
+            joined = posixpath.normpath((checkout / pointer).as_posix())
+            parts = PurePosixPath(joined).parts
+            if len(parts) != 3 or parts[:2] != ('.git', 'worktrees'):
+                raise AuditError('external_git_layout')
+            name = parts[2]
+            origin = None
+        registration = '.git/worktrees/' + name
+        if name in ('', '.', '..') or name in used or entries.get(registration, {}).get('kind') != 'directory':
+            raise AuditError('external_git_layout')
+        back = PurePosixPath(read_small_text(root, entries, registration + '/gitdir'))
+        if origin is not None:
+            if back != origin / relative:
+                raise AuditError('external_git_layout')
+            origins.add(origin)
+        elif back.is_absolute() or posixpath.normpath((PurePosixPath(registration) / back).as_posix()) != relative:
+            raise AuditError('external_git_layout')
+        used.add(name)
+        pairs[relative] = name
+    if len(origins) > 1:
+        raise AuditError('external_git_layout')
+    if source_root is not None and origins:
+        # Git records the resolved path (macOS /var is /private/var), so accept either form.
+        here = {PurePosixPath(Path(source_root).absolute()), PurePosixPath(Path(source_root).resolve())}
+        if not origins <= here:
+            raise AuditError('external_git_layout')
+    return pairs
+
+
+def checked_contained(baseline):
+    """Read the capture-time pairing from a baseline before anything is extracted."""
+    recorded = baseline.get('contained_checkouts', {})
+    if not isinstance(recorded, dict):
+        raise AuditError('invalid_contained_checkouts')
+    entries = baseline['entries']
+    for relative, name in recorded.items():
+        if (not isinstance(relative, str) or not isinstance(name, str) or relative not in entries
+                or PurePosixPath(relative).name != '.git' or relative == '.git'
+                or entries.get('.git/worktrees/' + name, {}).get('kind') != 'directory'):
+            raise AuditError('invalid_contained_checkouts')
+    if len(set(recorded.values())) != len(recorded):
+        raise AuditError('invalid_contained_checkouts')
+    return recorded
 
 
 def worktree_metadata(root, entries):
@@ -298,22 +403,7 @@ def worktree_metadata(root, entries):
             registrations.append(relative)
 
     def read_admin_file(relative):
-        item = entries.get(relative, {})
-        if item.get('kind') != 'file' or not 0 < item.get('size', 0) <= 4096:
-            raise AuditError('invalid_worktree_metadata')
-        fd = os.open(Path(root) / relative, os.O_RDONLY | os.O_NOFOLLOW)
-        with os.fdopen(fd, 'rb') as source:
-            raw = source.read(4097)
-        if len(raw) != item['size'] or hashlib.sha256(raw).hexdigest() != item['sha256']:
-            raise AuditError('worktree_metadata_changed')
-        try:
-            text = raw.decode('utf-8')
-        except UnicodeDecodeError:
-            raise AuditError('invalid_worktree_metadata') from None
-        value = text.removesuffix('\n')
-        if not value or any(character in value for character in ('\n', '\r', '\x00', '\\')):
-            raise AuditError('invalid_worktree_metadata')
-        return value
+        return read_small_text(root, entries, relative)
 
     for registration in sorted(registrations):
         # Git writes ../.. here: the shared object store is this same .git directory.
@@ -433,17 +523,24 @@ def capture(source, checksum, evidence, included_values=None, checkout_values=No
     if source.is_symlink() or not source.is_dir():raise AuditError('invalid_source_root')
     relative_path(source.name)
     evidence.enter('independent_source_capture')
-    expected=manifest(source);validate_entries(expected, evidence.max_bytes)
+    expected=manifest(source)
+    contained = contained_checkouts(source, expected, source_root=source)
+    validate_entries(expected, evidence.max_bytes, contained)
     links = outside_links(expected, source)
     evidence.emit('outside_links_reported', count=len(links))
     included = included_map(included_values or [], links)
     checkouts = checkout_map(checkout_values or [], expected)
     scope = worktree_metadata(source, expected)
+    if contained:
+        # These checkouts live inside the repo, so their files are in this archive.
+        scope['checkouts_inside_repo'] = len(contained)
     git=git_facts(source,evidence)
     if expected!=manifest(source):raise AuditError('source_changed_during_git_checks')
     baseline={'schema_version':SCHEMA,'root_name':source.name,'archive_sha256':checksum,
               'entries':expected,'git':git,'worktree_metadata':scope,'outside_links':links,'included_contents':included,'included_checkouts':checkouts,'captured_at':datetime.now(timezone.utc).isoformat(),
               'provenance':'live_source_inventory_not_archive_derived'}
+    if contained:
+        baseline['contained_checkouts'] = contained
     write_private(evidence.output/'expected.json',baseline)
     evidence.finish('captured',manifest_sha256=digest(evidence.output/'expected.json'),entries=len(expected),
                     worktree_metadata=scope, outside_links=link_receipt(links, included),
@@ -453,10 +550,10 @@ def capture(source, checksum, evidence, included_values=None, checkout_values=No
 
 class RestoreBudget:
     """Plan destination allocation and recheck capacity as bounded copies progress."""
-    def __init__(self, destination, entries, evidence):
+    def __init__(self, destination, entries, evidence, contained=None):
         self.directory = Path(destination).parent
         self.evidence = evidence
-        self.remaining_bytes = validate_entries(entries, evidence.max_bytes)
+        self.remaining_bytes = validate_entries(entries, evidence.max_bytes, contained)
         self.reserve_bytes = evidence.reserve_bytes
         if type(self.reserve_bytes) is not int or self.reserve_bytes < 0:
             raise AuditError('invalid_space_reserve')
@@ -597,14 +694,15 @@ def verify(archive, expected, manifest_sha256, evidence):
     if baseline.get('schema_version')!=SCHEMA or baseline.get('provenance')!='live_source_inventory_not_archive_derived':raise AuditError('invalid_baseline_provenance')
     relative_path(baseline['root_name'])
     if '/' in baseline['root_name']:raise AuditError('invalid_root_name')
-    validate_entries(baseline['entries'], evidence.max_bytes)
+    contained = checked_contained(baseline)
+    validate_entries(baseline['entries'], evidence.max_bytes, contained)
     links = checked_outside_links(baseline)
     evidence.emit('outside_links_reported', count=len(links))
     included = checked_included(baseline, links)
     checkouts = checked_checkouts(baseline)
     destination = evidence.output / 'restored'
     evidence.enter('capacity_preflight')
-    budget = RestoreBudget(destination, baseline['entries'], evidence)
+    budget = RestoreBudget(destination, baseline['entries'], evidence, contained)
     evidence.enter('archive_identity')
     actual_archive = digest(archive)
     evidence.emit('input_hashes', archive_sha256=actual_archive,
@@ -621,6 +719,10 @@ def verify(archive, expected, manifest_sha256, evidence):
     evidence.emit('manifest_verified',entries=len(actual),manifest_content_sha256=hashlib.sha256(canonical(actual)).hexdigest())
     evidence.enter('git_history_verification')
     scope = worktree_metadata(destination, actual)
+    if contained_checkouts(destination, actual) != contained:
+        raise AuditError('worktree_metadata_mismatch')
+    if contained:
+        scope['checkouts_inside_repo'] = len(contained)
     default_scope = {'registered_worktrees': 0, 'linked_checkout_contents_verified': False}
     if scope != baseline.get('worktree_metadata', default_scope):
         raise AuditError('worktree_metadata_mismatch')
