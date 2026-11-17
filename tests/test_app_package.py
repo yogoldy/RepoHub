@@ -25,7 +25,6 @@ class AppPackageTests(unittest.TestCase):
         web.mkdir()
         for name in EXPECTED_WEB_ASSETS:
             (web / name).write_text('asset:' + name)
-        (root / 'install.py').write_text("for name in ('repohub.py',): pass\n")
         (root / 'repohub.py').write_text('# synthetic helper\n')
         return web
 
@@ -42,6 +41,7 @@ class AppPackageTests(unittest.TestCase):
         # The production build still selects, copies and inventories its resources.
         output = root / 'Built.app'
         with patch('tools.package_app.ROOT', root), \
+                patch('tools.package_app.RUNTIME_MODULES', ('repohub.py',)), \
                 patch('tools.package_app.platform.system', return_value='Darwin'), \
                 patch('tools.package_app.platform.machine', return_value='arm64'), \
                 patch('tools.package_app.dependency', return_value=root / 'dependency.tar'), \

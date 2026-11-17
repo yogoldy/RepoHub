@@ -25,17 +25,15 @@ class ReleaseGateTests(unittest.TestCase):
     def test_new_runtime_import_does_not_silently_escape_package_contract(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
-            (root/'install.py').write_text("for name in ('repohub.py',): pass\n")
             (root/'repohub.py').write_text('import new_module\nroutes={}\n')
             (root/'new_module.py').write_text('')
-            with self.assertRaisesRegex(ValueError,'Unpackaged'):packaging_contract(root)
+            with self.assertRaisesRegex(ValueError,'Unpackaged'):packaging_contract(root, modules=('repohub.py',))
 
     def test_served_web_asset_must_be_declared_in_bundle_allowlist(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            (root / 'install.py').write_text("for name in ('repohub.py',): pass\n")
             (root / 'repohub.py').write_text("routes={'/candidate.js': 'candidate.js'}\n")
             (root / 'web').mkdir()
             (root / 'web/candidate.js').write_text('// not declared for packaging\n')
             with self.assertRaisesRegex(ValueError, 'Unpackaged web asset'):
-                packaging_contract(root)
+                packaging_contract(root, modules=("repohub.py",))

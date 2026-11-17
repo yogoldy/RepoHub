@@ -7,6 +7,7 @@ import tarfile
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from change_evidence import change_reason, repo_facts
 from diagnostics import read_events
@@ -205,6 +206,36 @@ class IncludedFolderTests(unittest.TestCase):
         self.assertIn('another included link', str(caught.exception))
         self.assertEqual(self.hub.outside_status(self.key)['revision'], status['revision'], 'Refused choices are not saved')
         self.assertNotIn(str(other), self.logs())
+
+    def test_unreachable_folder_keeps_its_backup_without_a_countdown(self):
+        # An unplugged drive must not look like a deleted folder: no 30-day deletion clock.
+        self.include()
+        self.hub.backup()
+        first = json.loads(json.dumps(self.linked()))
+        hidden = self.base / 'outside-unplugged'
+        self.outside.rename(hidden)
+        with patch('repohub.source_unreachable', return_value=True):
+            self.hub.backup()
+        self.assertEqual(self.linked(), first, 'The last verified folder archive stays in the set')
+        self.assertNotIn('removed', self.hub.index[self.key])
+        self.assertTrue(Path(first['archive']).exists())
+        errors = self.hub.status['backup']['errors']
+        self.assertEqual([error['repo_id'] for error in errors], [self.key])
+        self.assertIn('unavailable', errors[0]['error'])
+        self.assertIn('outside_item_unavailable', self.logs())
+        # Once the folder is reachable again it is simply backed up as before.
+        hidden.rename(self.outside)
+        self.hub.backup()
+        self.assertEqual(self.hub.status['backup']['errors'], [])
+        self.assertIn('node_modules', self.hub.index[self.key]['linked'])
+
+    def test_unreachable_means_unmounted_volume_or_unreadable_not_deleted(self):
+        from repohub import source_unreachable
+        self.assertTrue(source_unreachable('/Volumes/RepoHub-test-volume-that-is-not-mounted/data'))
+        gone = self.base / 'deleted-folder'
+        self.assertFalse(source_unreachable(str(gone)), 'A deleted folder on a present disk is removed')
+        self.assertFalse(source_unreachable(str(self.outside)))
+        self.assertFalse(source_unreachable(None))
 
     def test_a_link_retargeted_after_review_is_reported_and_keeps_the_last_archive(self):
         self.include()

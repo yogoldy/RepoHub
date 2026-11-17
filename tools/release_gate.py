@@ -19,7 +19,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools.package_app import WEB_ASSETS
+from tools.package_app import RUNTIME_MODULES, WEB_ASSETS
 
 REGISTER = ROOT / 'docs/quality/golden-rules.json'
 
@@ -57,12 +57,8 @@ def assess_rules(rules, outcomes):
              'remaining_gap':rule['remaining_gap']} for rule in rules]
 
 
-def packaging_contract(root):
-    tree = ast.parse((root / 'install.py').read_text())
-    groups = [n.iter for n in ast.walk(tree) if isinstance(n, ast.For) and isinstance(n.target, ast.Name)
-              and n.target.id == 'name' and isinstance(n.iter, (ast.Tuple, ast.List))]
-    groups = [ast.literal_eval(g) for g in groups]
-    packaged = next((set(g) for g in groups if 'repohub.py' in g), set())
+def packaging_contract(root, modules=RUNTIME_MODULES):
+    packaged = set(modules) if 'repohub.py' in modules else set()
     if not packaged:
         raise ValueError('Missing runtime package declaration')
     for name in packaged:

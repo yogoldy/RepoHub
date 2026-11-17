@@ -8,8 +8,8 @@ reliably. "Productizable" refers to usable setup, clear explanations, coherent
 UI, meaningful diagnostics, continuous integration and stable update delivery;
 it is not a monetization requirement. These are continuing product principles,
 not a separate redesign or an instruction to add unnecessary infrastructure.
-The repository is public. License selection remains an owner decision: GitHub
-reported no detected license and no project license file was found on October 20.
+The repository is public and released under the MIT License (`LICENSE`),
+chosen by Leo on November 17, 2026.
 
 ## Scope and status — updated October 22, 2026
 

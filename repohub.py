@@ -52,6 +52,27 @@ KEPT_FIELDS = {"kind", "name", "reason", "removed_at", "keep_until"}
 KEEP_WINDOW = timedelta(days=30)  # Authorized automatic deletion window for removed outside items.
 
 
+def source_unreachable(path):
+    """True when an outside folder can't be reached now, as opposed to having been deleted.
+
+    A folder on a drive under /Volumes that isn't mounted, or one that exists but can't be
+    read, may come back. Its last backup must not start the deletion countdown: an
+    unplugged or failed drive is exactly when that backup matters.
+    """
+    if not path:
+        return False
+    try:
+        os.stat(path)
+    except FileNotFoundError:
+        parts = Path(path).parts
+        if len(parts) > 2 and parts[1] == "Volumes":
+            return not os.path.ismount(os.path.join("/", parts[1], parts[2]))
+        return False
+    except OSError:
+        return True  # Present but unreadable (permissions, I/O error): not deleted.
+    return False
+
+
 def set_outside(entry, outside):
     """Record a repo's included linked folders, checkouts and kept items on its index entry."""
     for field in ("linked", "checkouts", "removed"):
@@ -288,9 +309,16 @@ def cloud_status(raw):
 
 
 def git_info(root):
+    # A repo's own .git/config could name a command for Git to run (core.fsmonitor runs
+    # on every status). Turn those off so scanning a repo never runs code from it, and drop
+    # inherited GIT_* variables that could point Git somewhere else.
+    environment = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    environment.update(GIT_OPTIONAL_LOCKS="0", GIT_TERMINAL_PROMPT="0")
+    safety = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull]
+
     def run(*args):
-        result = subprocess.run(["/usr/bin/git", "-C", str(root), *args], capture_output=True,
-                                timeout=12, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+        result = subprocess.run(["/usr/bin/git", *safety, "-C", str(root), *args], capture_output=True,
+                                timeout=12, env=environment)
         if result.returncode:
             return None
         return result.stdout.decode("utf-8", "replace").rstrip("\n")
@@ -1049,6 +1077,16 @@ class Hub:
             for name, entry in saved[group].items():
                 if (group, name) in planned:
                     continue
+                if name not in present[group] and source_unreachable(entry.get("source")):
+                    # Can't reach it right now (for example an unplugged drive): keep the last
+                    # verified archive in the set, start no countdown, and report the problem.
+                    result[group][name] = entry
+                    label = ("Included folder " if group == "linked" else "Linked checkout ") + name
+                    failures.append({"repo": root.name, "repo_id": key,
+                                     "error": label + " is unavailable (is its drive connected?). "
+                                              "Its last backup is kept."})
+                    self.lifecycle.emit("outside_item_unavailable", key=key, run_id=run_id, result="kept")
+                    continue
                 reason = "excluded" if name in present[group] else "removed"
                 removed[KEPT[group] + name] = {
                     **entry, "kind": group, "name": name, "reason": reason, "removed_at": now.isoformat(),
@@ -1289,10 +1327,12 @@ class Hub:
         if not obsolete:
             self.lifecycle.transition("retention_decision", key=key, current=current, reason="no_superseded_archives", result="kept")
             return
-        if (self.config.get("require_upload_before_prune", False)
-                and self.cloud_for(key, current).get("state") != "uploaded"):
+        # Always keep the previous copy until macOS confirms the replacement reached the cloud.
+        # This is not configurable: an older or hand-written config must never lose the only
+        # uploaded copy. The require_upload_before_prune key is still accepted but ignored.
+        if self.cloud_for(key, current).get("state") != "uploaded":
             self.lifecycle.transition("retention_decision", key=key, current=current, reason="awaiting_upload", result="kept")
-            return  # Keep the previously uploaded copy until its replacement reaches iCloud.
+            return
         for _, retained, digest in groups:
             if sha256(retained) != digest:
                 raise RuntimeError("Current archive failed verification; older backups were kept")
@@ -1613,7 +1653,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send({"error": str(e)}, 400)
 
     def view_csp(self):
-        return f"default-src 'none'; script-src 'unsafe-inline' {self.origin}; style-src 'unsafe-inline' {self.origin}; img-src data: blob: {self.origin}; font-src {self.origin}; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'; frame-ancestors {self.origin}"
+        # Views are repo-supplied HTML. "sandbox allow-scripts" gives them an opaque origin,
+        # so their scripts can't use the app's address, open its pages or read its write token.
+        return f"sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' {self.origin}; style-src 'unsafe-inline' {self.origin}; img-src data: blob: {self.origin}; font-src {self.origin}; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'; frame-ancestors {self.origin}"
 
     def serve_view(self, path):
         parts = path.split("/", 3)

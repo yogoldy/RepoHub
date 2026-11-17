@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Build a new coordinated bundle; never install it or run personal migrations."""
 import argparse
-import ast
 import base64
 import hashlib
 import json
@@ -24,6 +23,31 @@ except ModuleNotFoundError:
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = ROOT / 'tools/update-dependencies.json'
+# Python modules copied into the app bundle's runtime. This list is the single source of
+# truth: the release gate checks that every local import is covered by it.
+RUNTIME_MODULES = (
+    'helper_launch.py',
+    'update_evidence.py',
+    'update_recovery.py',
+    'repohub.py',
+    'access_checks.py',
+    'workspace_registry.py',
+    'backup_layout.py',
+    'destination_policy.py',
+    'git_discovery.py',
+    'outside_items.py',
+    'setup_service.py',
+    'backup_changes.py',
+    'backup_lifecycle.py',
+    'backup_policy.py',
+    'status_health.py',
+    'diagnostics.py',
+    'change_evidence.py',
+    'diagnostics_report.py',
+    'diagnostic_export.py',
+    'report_preview.py',
+    'report_delivery.py',
+)
 NATIVE = ('RepoHub.swift', 'HelperLaunch.swift', 'BackupReadiness.swift',
           'ProblemAlerts.swift', 'MenuBridge.swift', 'GitHubConnection.swift',
           'PackagedApplication.swift', 'AppUpdates.swift', 'MenuAppearance.swift')
@@ -92,13 +116,7 @@ def extract(archive, destination):
 
 
 def runtime_modules():
-    tree = ast.parse((ROOT / 'install.py').read_text())
-    for node in ast.walk(tree):
-        if isinstance(node, ast.For) and isinstance(node.iter, (ast.Tuple, ast.List)):
-            values = ast.literal_eval(node.iter)
-            if 'repohub.py' in values:
-                return values
-    raise ValueError('missing_runtime_modules')
+    return RUNTIME_MODULES
 
 
 def copy_web_assets(source, destination):

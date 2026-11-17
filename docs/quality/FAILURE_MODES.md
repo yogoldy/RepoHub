@@ -292,6 +292,7 @@ See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
 
 - `test_hub.HubTests.test_http_json_conflicts_origin_host_and_view_boundaries`
 - `test_hub.HubTests.test_data_and_views_cannot_escape`
+- `test_hub.HubTests.test_scanning_never_runs_a_command_from_the_repos_git_config`
 - `test_report_preview.ReportPreviewTests.test_http_preview_requires_existing_origin_and_token_checks`
 - `test_report_preview.ReportPreviewTests.test_bad_inputs_and_destination_injection_rejected`
 
@@ -1065,6 +1066,8 @@ Folders that overlap a monitored repo, a backup destination, RepoHub data, a sys
 - `test_included_folders.IncludedFolderTests.test_superseded_folder_archives_are_pruned_only_after_the_whole_set_uploads`
 - `test_included_folders.IncludedFolderTests.test_unsafe_or_duplicate_inclusions_are_refused`
 - `test_included_folders.IncludedFolderTests.test_a_link_retargeted_after_review_is_reported_and_keeps_the_last_archive`
+- `test_included_folders.IncludedFolderTests.test_unreachable_folder_keeps_its_backup_without_a_countdown`
+- `test_included_folders.IncludedFolderTests.test_unreachable_means_unmounted_volume_or_unreadable_not_deleted`
 - `test_included_folders.IncludedFolderTests.test_setup_layout_change_moves_folder_archives_with_their_repo`
 - `test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims`
 - `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
