@@ -52,6 +52,27 @@ KEPT_FIELDS = {"kind", "name", "reason", "removed_at", "keep_until"}
 KEEP_WINDOW = timedelta(days=30)  # Authorized automatic deletion window for removed outside items.
 
 
+def source_unreachable(path):
+    """True when an outside folder can't be reached now, as opposed to having been deleted.
+
+    A folder on a drive under /Volumes that isn't mounted, or one that exists but can't be
+    read, may come back. Its last backup must not start the deletion countdown: an
+    unplugged or failed drive is exactly when that backup matters.
+    """
+    if not path:
+        return False
+    try:
+        os.stat(path)
+    except FileNotFoundError:
+        parts = Path(path).parts
+        if len(parts) > 2 and parts[1] == "Volumes":
+            return not os.path.ismount(os.path.join("/", parts[1], parts[2]))
+        return False
+    except OSError:
+        return True  # Present but unreadable (permissions, I/O error): not deleted.
+    return False
+
+
 def set_outside(entry, outside):
     """Record a repo's included linked folders, checkouts and kept items on its index entry."""
     for field in ("linked", "checkouts", "removed"):
@@ -1048,6 +1069,16 @@ class Hub:
         for group in ("linked", "checkouts"):
             for name, entry in saved[group].items():
                 if (group, name) in planned:
+                    continue
+                if name not in present[group] and source_unreachable(entry.get("source")):
+                    # Can't reach it right now (for example an unplugged drive): keep the last
+                    # verified archive in the set, start no countdown, and report the problem.
+                    result[group][name] = entry
+                    label = ("Included folder " if group == "linked" else "Linked checkout ") + name
+                    failures.append({"repo": root.name, "repo_id": key,
+                                     "error": label + " is unavailable (is its drive connected?). "
+                                              "Its last backup is kept."})
+                    self.lifecycle.emit("outside_item_unavailable", key=key, run_id=run_id, result="kept")
                     continue
                 reason = "excluded" if name in present[group] else "removed"
                 removed[KEPT[group] + name] = {

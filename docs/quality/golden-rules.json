@@ -724,6 +724,8 @@
         "test_included_folders.IncludedFolderTests.test_superseded_folder_archives_are_pruned_only_after_the_whole_set_uploads",
         "test_included_folders.IncludedFolderTests.test_unsafe_or_duplicate_inclusions_are_refused",
         "test_included_folders.IncludedFolderTests.test_a_link_retargeted_after_review_is_reported_and_keeps_the_last_archive",
+        "test_included_folders.IncludedFolderTests.test_unreachable_folder_keeps_its_backup_without_a_countdown",
+        "test_included_folders.IncludedFolderTests.test_unreachable_means_unmounted_volume_or_unreadable_not_deleted",
         "test_included_folders.IncludedFolderTests.test_setup_layout_change_moves_folder_archives_with_their_repo",
         "test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims",
         "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
