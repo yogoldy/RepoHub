@@ -16,7 +16,7 @@
 - Preserve the work toward clear setup, permissions guidance, status explanations, useful diagnostics/reporting, coherent interface behavior, CI and safe updates. Favor sensible defaults and recovery that ordinary users can understand without knowing the implementation. Do not add service infrastructure solely because a more elaborate design is possible.
 - Ordinary installations follow Stable. Dev offers are deliberately enabled locally for Leo's Pro and Air; keep experimental controls out of the ordinary settings flow. Public source and publicly downloadable experimental packages are acceptable. Offer isolation is not access control: do not add private hosting, device authentication, hardware allowlists or download credentials for this requirement. Never embed Apple/Sparkle private signing keys in a client.
 - Keep normal update delivery seamless and preserve the tested-package promotion and acceptance checks. A channel preference must not redefine backup readiness or introduce a competing status classifier.
-- License selection remains Leo's decision. Public visibility was verified on October 20, but no project license file was found; do not silently select a license or imply that this choice is settled.
+- RepoHub is released under the MIT License (see `LICENSE`), chosen by Leo on November 17, 2026. Third-party components bundled in the app keep their own licenses.
 
 ## Golden-rule release contract
 
