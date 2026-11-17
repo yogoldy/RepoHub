@@ -265,7 +265,12 @@ def validate_entries(entries, max_bytes=None):
             raise AuditError('byte_budget_exceeded')
     # Git files outside this root, submodules and alternates need a separate protocol.
     for relative,item in entries.items():
-        if PurePosixPath(relative).name=='.git' and item['kind']!='directory':raise AuditError('external_git_layout')
+        if PurePosixPath(relative).name=='.git' and item['kind']!='directory':
+            # An empty marker below the top level cannot point to Git data elsewhere (package
+            # caches such as uv write one). The app backs it up as an ordinary file, so it
+            # restores and compares byte for byte. Pointer files and a top-level .git file stay refused.
+            if not (relative!='.git' and item['kind']=='file' and item['size']==0):
+                raise AuditError('external_git_layout')
         if PurePosixPath(relative).name=='.gitmodules':raise AuditError('submodules_not_in_scope')
         if '.git' in PurePosixPath(relative).parts and relative.endswith('/commondir'):
             parts = PurePosixPath(relative).parts

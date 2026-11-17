@@ -108,6 +108,30 @@ class RestoreAuditTests(unittest.TestCase):
         self.assertEqual(code,1)
         self.assertEqual(json.loads((out/'result.json').read_text())['reason'],'git_check_failed')
 
+    def test_empty_nested_git_marker_restores_but_pointer_files_still_fail(self):
+        # Package caches such as uv leave an empty .git marker; the app backs it up as a file.
+        cache=self.root/'ignored/cache';cache.mkdir()
+        (cache/'.git').write_bytes(b'')
+        code,archive,out=self.snapshot_capture('marker')
+        self.assertEqual(code,0)
+        self.archive,self.expected=archive,out/'expected.json'
+        self.assertEqual(self.verify('marker-verify'),0)
+        self.assertEqual(self.result('marker-verify')['git_history'],'verified')
+        marker=self.base/'marker-verify/restored/ignored/cache/.git'
+        self.assertTrue(marker.is_file());self.assertEqual(marker.stat().st_size,0)
+        # A baseline claiming a non-empty nested .git file is refused before extraction.
+        baseline=json.loads(self.expected.read_text())
+        baseline['entries']['ignored/cache/.git']['size']=5
+        self.expected.write_text(json.dumps(baseline))
+        self.assertEqual(self.verify('marker-tampered'),1)
+        self.assertEqual(self.result('marker-tampered')['reason'],'external_git_layout')
+        self.assertFalse((self.base/'marker-tampered/restored').exists())
+        # A nested pointer file still means Git data stored elsewhere.
+        (cache/'.git').write_text('gitdir: /elsewhere/.git\n')
+        code,_,out=self.snapshot_capture('pointer')
+        self.assertEqual(code,1)
+        self.assertEqual(json.loads((out/'result.json').read_text())['reason'],'external_git_layout')
+
     def test_corrupt_archive_and_wrong_manifest_identity_fail_before_extraction(self):
         self.archive.write_bytes(b'corrupt')
         self.assertEqual(self.verify(),1)
