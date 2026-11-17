@@ -578,6 +578,13 @@ class RestoreBudget:
         if available < required:
             raise AuditError('restore_capacity_insufficient')
 
+    def replan(self, data_bytes, entries):
+        """Use the archive's actual sizes once allowed Finder differences are known."""
+        self.remaining_bytes = data_bytes
+        self.remaining_entries = entries
+        self.initial_bytes = data_bytes
+        self.check(record=True)
+
     def created_entry(self):
         self.remaining_entries -= 1
 
@@ -609,8 +616,20 @@ def copy_member(source, target, size, budget):
     budget.check()
 
 
-def extract_checked(archive, baseline, destination, evidence, budget):
+def finder_only_path(relative):
+    """RepoHub's Finder rule: a file named .DS_Store, never anything inside .git."""
+    path=PurePosixPath(relative)
+    return path.name=='.DS_Store' and '.git' not in path.parts
+
+
+def extract_checked(archive, baseline, destination, evidence, budget, allow_finder=False):
+    """Restore the archive; with allow_finder, .DS_Store files may differ from the baseline.
+
+    Returns the Finder paths whose archive copy was allowed to differ: restored from the
+    archive, or absent from it. Every other entry must match the baseline exactly.
+    """
     expected=baseline['entries'];root_name=baseline['root_name'];members={};root_member=None
+    finder=set();file_plan={}
     evidence.enter('archive_preflight')
     with tarfile.open(archive,'r:gz') as stored:
         total=0
@@ -621,8 +640,26 @@ def extract_checked(archive, baseline, destination, evidence, budget):
                 root_member=member;continue
             if path.parts[0]!=root_name or len(path.parts)<2:raise AuditError('unexpected_archive_root')
             relative='/'.join(path.parts[1:])
-            if relative in members or relative not in expected:raise AuditError('duplicate_or_unexpected_entry')
-            item=expected[relative]
+            if relative in members:raise AuditError('duplicate_or_unexpected_entry')
+            item=expected.get(relative)
+            if (allow_finder and finder_only_path(relative) and member.isfile()
+                    and (item is None or item['kind']=='file')):
+                # The archive keeps an older Finder file on purpose. Its bytes are
+                # authentic (the archive checksum matched); only its content may differ.
+                parent=str(PurePosixPath(relative).parent)
+                if item is None and parent!='.' and expected.get(parent,{}).get('kind')!='directory':
+                    raise AuditError('duplicate_or_unexpected_entry')
+                mode=member.mode if item is None else item['mode']
+                if member.mode!=mode or not 0<=mode<=0o777:raise AuditError('entry_type_or_mode_mismatch')
+                finder.add(relative);file_plan[relative]=(member.size,mode)
+                total+=member.size
+                if len(members) >= MAX_ENTRIES:
+                    raise AuditError('resource_limit')
+                if evidence.max_bytes is not None and total > evidence.max_bytes:
+                    raise AuditError('byte_budget_exceeded')
+                members[relative]=member
+                continue
+            if item is None:raise AuditError('duplicate_or_unexpected_entry')
             kind='file' if member.isfile() or member.islnk() else 'directory' if member.isdir() else 'symlink' if member.issym() else 'unsupported'
             if kind!=item['kind'] or member.mode!=item['mode']:raise AuditError('entry_type_or_mode_mismatch')
             if kind=='symlink' and member.linkname!=item['target']:raise AuditError('symlink_mismatch')
@@ -632,13 +669,22 @@ def extract_checked(archive, baseline, destination, evidence, budget):
                 if target.parts[0]!=root_name or key not in members or not members[key].isfile():raise AuditError('unsafe_hardlink')
                 if expected[key]['size']!=item['size'] or expected[key]['sha256']!=item['sha256']:raise AuditError('hardlink_mismatch')
             elif kind=='file' and member.size!=item['size']:raise AuditError('file_size_mismatch')
+            if kind=='file':file_plan[relative]=(item['size'],item['mode'])
             total+=item.get('size',0)
             if len(members) >= MAX_ENTRIES:
                 raise AuditError('resource_limit')
             if evidence.max_bytes is not None and total > evidence.max_bytes:
                 raise AuditError('byte_budget_exceeded')
             members[relative]=member
-        if root_member is None or members.keys()!=expected.keys():raise AuditError('missing_archive_entries')
+        missing=expected.keys()-members.keys()
+        for relative in missing:
+            # Only a Finder file the archive never held may be absent, and only when allowed.
+            if not (allow_finder and finder_only_path(relative) and expected[relative]['kind']=='file'):
+                raise AuditError('missing_archive_entries')
+            finder.add(relative)
+        if root_member is None:raise AuditError('missing_archive_entries')
+        if finder:
+            budget.replan(total, len(members)+1)
         budget.check()
         destination.mkdir(mode=0o700)
         budget.created_entry()
@@ -649,13 +695,14 @@ def extract_checked(archive, baseline, destination, evidence, budget):
             (destination/relative).mkdir(mode=0o700)
             budget.created_entry()
         for relative,member in members.items():
-            if expected[relative]['kind']!='file':continue
+            if relative not in file_plan:continue
+            size,mode=file_plan[relative]
             budget.check()
             fd=os.open(destination/relative,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
             budget.created_entry()
             with os.fdopen(fd,'wb') as target,stored.extractfile(member) as source:
-                copy_member(source, target, expected[relative]['size'], budget)
-                os.fchmod(target.fileno(),expected[relative]['mode'])
+                copy_member(source, target, size, budget)
+                os.fchmod(target.fileno(),mode)
         for relative,item in expected.items():
             if item['kind']=='symlink':
                 link=destination/relative
@@ -677,9 +724,10 @@ def extract_checked(archive, baseline, destination, evidence, budget):
             raise AuditError('restore_budget_mismatch')
         budget.check()
         evidence.emit('extraction_finished',entries=len(members),bytes=total)
+    return finder
 
 
-def verify(archive, expected, manifest_sha256, evidence):
+def verify(archive, expected, manifest_sha256, evidence, allow_finder=False):
     archive,expected=Path(archive),Path(expected)
     for path in (archive,expected):
         if path.is_symlink() or not path.is_file():raise AuditError('missing_or_nonregular_input')
@@ -709,13 +757,24 @@ def verify(archive, expected, manifest_sha256, evidence):
                   manifest_sha256=actual_manifest, archive_bytes=archive.stat().st_size)
     if actual_archive != baseline['archive_sha256']:
         raise AuditError('archive_checksum_mismatch')
-    extract_checked(archive, baseline, destination, evidence, budget)
+    finder = extract_checked(archive, baseline, destination, evidence, budget, allow_finder)
     evidence.enter('restored_manifest_comparison')
     actual=manifest(destination)
-    if actual!=baseline['entries']:
-        changed=[r for r in actual.keys()|baseline['entries'].keys() if actual.get(r)!=baseline['entries'].get(r)]
-        evidence.emit('manifest_mismatch',entries=len(changed),path_refs=[hashlib.sha256(r.encode()).hexdigest()[:16] for r in sorted(changed)[:8]])
+    entries=baseline['entries']
+    changed=[r for r in actual.keys()|entries.keys() if actual.get(r)!=entries.get(r)]
+    # Allowed Finder paths may differ, but only as a file or an absence; nothing else may.
+    unexplained=[r for r in changed if r not in finder or actual.get(r,{'kind':'file'})['kind']!='file']
+    if unexplained:
+        evidence.emit('manifest_mismatch',entries=len(unexplained),path_refs=[hashlib.sha256(r.encode()).hexdigest()[:16] for r in sorted(unexplained)[:8]])
         raise AuditError('restored_manifest_mismatch')
+    finder_report=None
+    if allow_finder:
+        finder_report={'rule':'Only regular .DS_Store files outside .git may differ; RepoHub does not re-archive them.',
+                       'changed':sum(1 for r in changed if r in actual and r in entries),
+                       'only_in_source':sum(1 for r in changed if r not in actual),
+                       'only_in_archive':sum(1 for r in changed if r not in entries)}
+        evidence.emit('finder_only_differences',**{k:v for k,v in finder_report.items() if k!='rule'},
+                      path_refs=[hashlib.sha256(r.encode()).hexdigest()[:16] for r in sorted(changed)[:8]])
     evidence.emit('manifest_verified',entries=len(actual),manifest_content_sha256=hashlib.sha256(canonical(actual)).hexdigest())
     evidence.enter('git_history_verification')
     scope = worktree_metadata(destination, actual)
@@ -732,9 +791,12 @@ def verify(archive, expected, manifest_sha256, evidence):
     evidence.enter('input_immutability')
     if any(stamp(Path(p))!=s for p,s in inputs.items()) or digest(archive)!=actual_archive or digest(expected)!=actual_manifest:
         raise AuditError('inputs_changed_during_test')
+    extra={} if finder_report is None else {'finder_only_differences':finder_report}
     evidence.finish('passed',archive_sha256=actual_archive,manifest_sha256=actual_manifest,
                     entries=len(actual),git_history='verified' if git is not None else 'not_applicable',
-                    claim='Supplied archive restores to the supplied independent source baseline.',
+                    claim='Supplied archive restores to the supplied independent source baseline.'
+                          + ('' if finder_report is None else ' Allowed .DS_Store differences are counted separately.'),
+                    **extra,
                     cloud_retrieval_tested=False, worktree_metadata=scope,
                     outside_links=link_receipt(links, included),
                     included_checkouts=checkout_receipt(checkouts),
@@ -771,6 +833,11 @@ def main(argv=None):
     verify_parser=sub.add_parser('verify');verify_parser.add_argument('--archive',required=True)
     verify_parser.add_argument('--expected',required=True);verify_parser.add_argument('--manifest-sha256',required=True)
     verify_parser.add_argument('--out',required=True)
+    verify_parser.add_argument(
+        '--allow-finder-only', action='store_true',
+        help='Let regular .DS_Store files outside .git differ, as RepoHub does not re-archive '
+             'them; every other entry must still match. The receipt counts each difference.',
+    )
     for command_parser in (capture_parser, verify_parser):
         command_parser.add_argument(
             '--max-bytes', type=positive_bytes, default=None,
@@ -792,7 +859,7 @@ def main(argv=None):
         evidence = Evidence(output, max_bytes=args.max_bytes,
                             reserve_bytes=getattr(args, 'reserve_bytes', DEFAULT_FREE_RESERVE))
         if args.action=='capture':capture(args.source,args.archive_sha256,evidence,args.include,args.checkout)
-        else:verify(args.archive,args.expected,args.manifest_sha256,evidence)
+        else:verify(args.archive,args.expected,args.manifest_sha256,evidence,args.allow_finder_only)
         return 0
     except Exception as error:
         if isinstance(error, AuditError):

@@ -239,6 +239,65 @@ class RestoreAuditTests(unittest.TestCase):
             os.chdir(previous)
         self.assertEqual(self.result('relative-verify')['git_history'],'verified')
 
+    def finder_case(self, name, change):
+        """Archive the repo, change the live source, then capture it as the baseline."""
+        self.archive=Path(snapshot(self.root,self.base/(name+'-archives'),self.base/(name+'-stage'))['archive'])
+        change()
+        out=self.base/(name+'-capture')
+        self.assertEqual(audit.main(['capture','--source',str(self.root),'--archive-sha256',audit.digest(self.archive),
+                                     '--out',str(out)]),0)
+        self.expected=out/'expected.json'
+
+    def verify_finder(self, output):
+        return audit.main(['verify','--archive',str(self.archive),'--expected',str(self.expected),
+                           '--manifest-sha256',audit.digest(self.expected),'--out',str(self.base/output),
+                           '--allow-finder-only'])
+
+    def test_finder_only_differences_pass_only_when_allowed_and_are_counted(self):
+        # RepoHub does not re-archive .DS_Store-only changes, so the archive keeps older ones.
+        (self.root/'.DS_Store').write_bytes(b'old view')
+        (self.root/'ignored/.DS_Store').write_bytes(b'removed later')
+        # A new folder is a real change the app would back up, so archive it first.
+        (self.root/'script-folder').mkdir();(self.root/'script-folder/keep.txt').write_text('real content')
+        self.archive=Path(snapshot(self.root,self.base/'f-archives',self.base/'f-stage')['archive'])
+        (self.root/'.DS_Store').write_bytes(b'newer, longer view settings')
+        (self.root/'ignored/.DS_Store').unlink()
+        (self.root/'script-folder/.DS_Store').write_bytes(b'only in source')
+        out=self.base/'f-capture'
+        self.assertEqual(audit.main(['capture','--source',str(self.root),'--archive-sha256',audit.digest(self.archive),
+                                     '--out',str(out)]),0)
+        self.expected=out/'expected.json'
+        # Strict by default.
+        self.assertEqual(self.verify('f-strict'),1)
+        self.assertFalse((self.base/'f-strict/restored').exists())
+        # Allowed and disclosed; the restored Finder files are the archive's own bytes.
+        self.assertEqual(self.verify_finder('f-allowed'),0)
+        result=self.result('f-allowed')
+        self.assertEqual(result['git_history'],'verified')
+        report=result['finder_only_differences']
+        self.assertEqual((report['changed'],report['only_in_source'],report['only_in_archive']),(1,1,1))
+        restored=self.base/'f-allowed/restored'
+        self.assertEqual((restored/'.DS_Store').read_bytes(),b'old view')
+        self.assertEqual((restored/'ignored/.DS_Store').read_bytes(),b'removed later')
+        self.assertFalse((restored/'script-folder/.DS_Store').exists())
+        self.assertEqual((restored/'script-folder/keep.txt').read_text(),'real content')
+        self.assertIn('finder_only_differences',(self.base/'f-allowed/events.jsonl').read_text())
+
+    def test_allowing_finder_files_still_catches_every_other_difference(self):
+        cases={
+            'content':lambda:(self.root/'uncommitted.txt').write_text('edited!!!!!'),
+            'appledouble':lambda:(self.root/'._uncommitted.txt').write_bytes(b'AppleDouble'),
+            'inside-git':lambda:(self.root/'.git/info/.DS_Store').write_bytes(b'Finder in Git'),
+        }
+        for name,change in cases.items():
+            with self.subTest(case=name):
+                self.finder_case(name,change)
+                self.assertEqual(self.verify_finder(name+'-verify'),1)
+                self.assertFalse(self.result(name+'-verify')['result']=='passed')
+                for extra in (self.root/'._uncommitted.txt',self.root/'.git/info/.DS_Store'):
+                    if extra.exists():extra.unlink()
+                (self.root/'uncommitted.txt').write_text('uncommitted')
+
     def test_legacy_baseline_without_worktree_scope_still_restores(self):
         baseline = json.loads(self.expected.read_text())
         baseline.pop('worktree_metadata', None)
