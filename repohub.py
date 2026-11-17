@@ -1653,7 +1653,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send({"error": str(e)}, 400)
 
     def view_csp(self):
-        return f"default-src 'none'; script-src 'unsafe-inline' {self.origin}; style-src 'unsafe-inline' {self.origin}; img-src data: blob: {self.origin}; font-src {self.origin}; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'; frame-ancestors {self.origin}"
+        # Views are repo-supplied HTML. "sandbox allow-scripts" gives them an opaque origin,
+        # so their scripts can't use the app's address, open its pages or read its write token.
+        return f"sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' {self.origin}; style-src 'unsafe-inline' {self.origin}; img-src data: blob: {self.origin}; font-src {self.origin}; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'; frame-ancestors {self.origin}"
 
     def serve_view(self, path):
         parts = path.split("/", 3)

@@ -560,6 +560,8 @@ class HubTests(unittest.TestCase):
                 self.assertTrue(raw.startswith(b'<!doctype html>'))
                 self.assertIn(b'/view-client.js', raw)
                 self.assertIn("connect-src 'none'", response.headers['Content-Security-Policy'])
+                # Repo-supplied views run in an opaque origin, never as the app itself.
+                self.assertTrue(response.headers['Content-Security-Policy'].startswith('sandbox allow-scripts;'))
             with self.assertRaises(urllib.error.HTTPError) as caught:
                 request('/views/' + view['id'] + '/.git/marker')
             self.assertEqual(caught.exception.code, 403)
