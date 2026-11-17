@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Install this local app and replace Leo's existing repo-only backup schedule."""
+"""LEGACY: the original author's one-time migration from an older personal backup script.
+
+Do not run this to install RepoHub. Install the app from a GitHub release instead.
+It rewrites an old personal LaunchAgent and script, and moves an iCloud Drive "Desktop"
+folder to the Trash. It refuses to run without --legacy-owner-migration.
+"""
 import json
 import os
 from pathlib import Path
@@ -10,6 +15,7 @@ import subprocess
 import sys
 from datetime import datetime
 from helper_launch import service_arguments
+from tools.package_app import RUNTIME_MODULES
 
 SOURCE = Path(__file__).resolve().parent
 HOME_DIR = Path.home()
@@ -93,7 +99,7 @@ def main():
 
     runtime = STATE / "runtime"
     runtime.mkdir(exist_ok=True)
-    for name in ("helper_launch.py", "update_evidence.py", "update_recovery.py", "repohub.py", "access_checks.py", "workspace_registry.py", "backup_layout.py", "destination_policy.py", "git_discovery.py", "outside_items.py", "setup_service.py", "backup_changes.py", "backup_lifecycle.py", "backup_policy.py", "status_health.py", "diagnostics.py", "change_evidence.py", "diagnostics_report.py", "diagnostic_export.py", "report_preview.py", "report_delivery.py"):
+    for name in RUNTIME_MODULES:
         shutil.copy2(SOURCE / name, runtime / name)
     shutil.copytree(SOURCE / "web", runtime / "web", dirs_exist_ok=True)
     config = {"repos_root": str(HOME_DIR / "Desktop/repos"),
@@ -145,4 +151,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--legacy-owner-migration" not in sys.argv[1:]:
+        raise SystemExit("install.py is the original author's one-time migration, not an installer. "
+                         "Install RepoHub from a GitHub release instead.")
     main()

@@ -46,7 +46,7 @@ python3 -m unittest discover -s tests -v
 python3 repohub.py --config /path/to/config.json
 ```
 
-See `install.py` for installed paths and migration. Tests use temporary synthetic repos and a temporary HTTP server. They verify archive contents, symlinks, changing-source rejection, unchanged skip, verified replacement and cleanup failure recovery, JSON persistence/conflicts/revisions, request origin and Host checks, view traversal boundaries, and JSON-data backup.
+Install RepoHub from a GitHub release. `install.py` is the original author's one-time migration from an older personal script; it is not an installer and refuses to run without an explicit flag. `tools/package_app.py` declares which Python modules ship in the app (`RUNTIME_MODULES`). Tests use temporary synthetic repos and a temporary HTTP server. They verify archive contents, symlinks, changing-source rejection, unchanged skip, verified replacement and cleanup failure recovery, JSON persistence/conflicts/revisions, request origin and Host checks, view traversal boundaries, and JSON-data backup.
 
 To restore, list an archive with `tar -tzf SNAPSHOT.tar.gz`, then extract it into a new empty folder outside the active repos. Do not overwrite an active repo or Office workbook during restoration.
 

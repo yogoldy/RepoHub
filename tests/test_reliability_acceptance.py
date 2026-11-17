@@ -1,4 +1,3 @@
-import ast
 import json
 import os
 from pathlib import Path
@@ -110,11 +109,10 @@ class AcceptanceHarnessTests(unittest.TestCase):
         self.assertIn("Actual macOS", matrix["cases"][6]["title"])
 
     def test_package_reads_only_literal_runtime_declaration(self):
+        from tools.package_app import RUNTIME_MODULES
         source = Path(__file__).resolve().parents[1]
-        groups = [ast.literal_eval(node.iter) for node in ast.walk(ast.parse((source / "install.py").read_text()))
-                  if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and node.target.id == "name"
-                  and isinstance(node.iter, (ast.Tuple, ast.List))]
-        self.assertEqual(sum("repohub.py" in group for group in groups), 1)
+        self.assertIn("repohub.py", RUNTIME_MODULES)
+        self.assertTrue(all((source / name).is_file() for name in RUNTIME_MODULES))
 
     def test_registered_native_cleanup_never_removes_foreign_or_changed_assets(self):
         with tempfile.TemporaryDirectory() as temp:

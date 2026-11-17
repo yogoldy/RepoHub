@@ -124,11 +124,8 @@ def package(source, gate_path, output):
     output.mkdir(mode=0o700)
     runtime = output / "runtime"
     runtime.mkdir()
-    groups = [ast.literal_eval(node.iter) for node in ast.walk(ast.parse((source / "install.py").read_text()))
-              if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and node.target.id == "name"
-              and isinstance(node.iter, (ast.Tuple, ast.List))]
-    modules = next(group for group in groups if "repohub.py" in group)
-    for name in modules:
+    from tools.package_app import RUNTIME_MODULES
+    for name in RUNTIME_MODULES:
         shutil.copy2(source / name, runtime / name)
     shutil.copytree(source / "web", runtime / "web")
     build = Path(next(item["log"] for item in gate["commands"] if item["check"] == "native-app-build")).parent
