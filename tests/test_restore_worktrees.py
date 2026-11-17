@@ -137,3 +137,99 @@ class RestoreWorktreeTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(json.loads((output / 'result.json').read_text())['reason'],
                          'git_check_failed')
+
+
+class ContainedCheckoutTests(unittest.TestCase):
+    """Worktrees kept in folders inside the repo, as Claude Code creates them."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.base = Path(self.temp.name)
+        self.root = self.base / 'Main'
+        self.root.mkdir()
+        self.git('init', '-q', str(self.root), cwd=self.base)
+        for key in ('maintenance.auto', 'gc.auto'):
+            self.git('config', key, '0')
+        (self.root / 'main.txt').write_text('main contents')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'main fixture')
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def git(self, *args, cwd=None):
+        return subprocess.run(
+            ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+             *args], cwd=cwd or self.root, check=True, capture_output=True,
+        )
+
+    def add_inside_checkout(self, name='feature', relative_paths=False):
+        checkout = self.root / '.claude/worktrees' / name
+        options = ['-c', 'worktree.useRelativePaths=true'] if relative_paths else []
+        self.git(*options, 'worktree', 'add', '-q', '-b', name, str(checkout))
+        (checkout / 'work.txt').write_text('uncommitted work inside the repo')
+        return checkout
+
+    def capture(self, name):
+        self.archive = Path(snapshot(self.root, self.base / (name + '-archives'),
+                                     self.base / (name + '-stage'))['archive'])
+        output = self.base / name
+        code = audit.main(['capture', '--source', str(self.root), '--archive-sha256',
+                           audit.digest(self.archive), '--out', str(output)])
+        return code, output
+
+    def verify(self, capture, name):
+        expected = capture / 'expected.json'
+        code = audit.main(['verify', '--archive', str(self.archive), '--expected', str(expected),
+                           '--manifest-sha256', audit.digest(expected), '--out', str(self.base / name)])
+        return code, json.loads((self.base / name / 'result.json').read_text())
+
+    def reason(self, output):
+        return json.loads((output / 'result.json').read_text())['reason']
+
+    def test_checkouts_inside_the_repo_restore_and_are_compared(self):
+        self.add_inside_checkout('absolute')
+        self.add_inside_checkout('relative', relative_paths=True)
+        code, output = self.capture('capture')
+        self.assertEqual(code, 0)
+        baseline = json.loads((output / 'expected.json').read_text())
+        self.assertEqual(baseline['contained_checkouts'], {
+            '.claude/worktrees/absolute/.git': 'absolute',
+            '.claude/worktrees/relative/.git': 'relative'})
+        # The checkout files are part of the archive and the byte-for-byte comparison.
+        self.assertIn('.claude/worktrees/absolute/work.txt', baseline['entries'])
+        code, result = self.verify(output, 'verify')
+        self.assertEqual(code, 0)
+        self.assertEqual(result['git_history'], 'verified')
+        self.assertEqual(result['worktree_metadata']['checkouts_inside_repo'], 2)
+        self.assertEqual(audit.manifest(self.base / 'verify/restored'), audit.manifest(self.root))
+
+    def test_pointer_to_another_repo_or_mismatched_back_pointer_is_refused(self):
+        checkout = self.add_inside_checkout()
+        pointer = checkout / '.git'
+        original = pointer.read_text()
+        # Same layout, but naming another repo's worktree registration.
+        pointer.write_text('gitdir: ' + str(self.base / 'Other/.git/worktrees/feature') + '\n')
+        code, output = self.capture('other-repo')
+        self.assertEqual(code, 1)
+        self.assertEqual(self.reason(output), 'external_git_layout')
+        pointer.write_text(original)
+        # The registration must name this exact .git file back.
+        gitdir = self.root / '.git/worktrees/feature/gitdir'
+        gitdir.write_text(str(self.root / 'somewhere-else/.git') + '\n')
+        code, output = self.capture('back-pointer')
+        self.assertEqual(code, 1)
+        self.assertEqual(self.reason(output), 'external_git_layout')
+
+    def test_baseline_without_the_pairing_is_refused_before_extraction(self):
+        self.add_inside_checkout()
+        code, output = self.capture('capture')
+        self.assertEqual(code, 0)
+        expected = output / 'expected.json'
+        baseline = json.loads(expected.read_text())
+        baseline.pop('contained_checkouts')
+        expected.write_text(json.dumps(baseline))
+        code, result = self.verify(output, 'stripped')
+        self.assertEqual(code, 1)
+        self.assertEqual(result['reason'], 'external_git_layout')
+        self.assertFalse((self.base / 'stripped/restored').exists())

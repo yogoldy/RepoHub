@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import platform
+import posixpath
 import re
 import shutil
 import stat
@@ -233,7 +234,9 @@ def link_receipt(links, included=None):
             'included_archives': [{'path': path, 'archive_sha256': included[path]} for path in sorted(included)]}
 
 
-def validate_entries(entries, max_bytes=None):
+def validate_entries(entries, max_bytes=None, contained=None):
+    """Check manifest shape; contained maps nested .git files to their worktree names."""
+    contained = contained or {}
     if not isinstance(entries,dict) or len(entries)>MAX_ENTRIES:raise AuditError('invalid_manifest')
     total=0
     for relative,item in entries.items():
@@ -268,10 +271,17 @@ def validate_entries(entries, max_bytes=None):
         if PurePosixPath(relative).name=='.git' and item['kind']!='directory':
             # An empty marker below the top level cannot point to Git data elsewhere (package
             # caches such as uv write one). The app backs it up as an ordinary file, so it
-            # restores and compares byte for byte. Pointer files and a top-level .git file stay refused.
-            if not (relative!='.git' and item['kind']=='file' and item['size']==0):
+            # restores and compares byte for byte. A pointer file is accepted only for a checkout
+            # of this same repo that capture paired with its registration (see contained_checkouts).
+            # Any other pointer file and a top-level .git file stay refused.
+            empty_marker = relative!='.git' and item['kind']=='file' and item['size']==0
+            paired = (relative!='.git' and item['kind']=='file' and relative in contained
+                      and 0 < item['size'] <= 4096)
+            if not (empty_marker or paired):
                 raise AuditError('external_git_layout')
-        if PurePosixPath(relative).name=='.gitmodules':raise AuditError('submodules_not_in_scope')
+        # Git reads .gitmodules only at the top of a work tree. Deeper copies are plain
+        # files, such as those some npm packages ship inside node_modules.
+        if relative=='.gitmodules':raise AuditError('submodules_not_in_scope')
         if '.git' in PurePosixPath(relative).parts and relative.endswith('/commondir'):
             parts = PurePosixPath(relative).parts
             # Only the main repo's standard registered-worktree layout is in scope.
@@ -282,6 +292,103 @@ def validate_entries(entries, max_bytes=None):
         if '.git' in PurePosixPath(relative).parts and (relative.endswith('/objects/info/alternates') or relative.endswith('/objects/info/http-alternates')):
             raise AuditError('git_alternates_not_in_scope')
     return total
+
+
+def read_small_text(root, entries, relative, invalid='invalid_worktree_metadata'):
+    """Read one short, single-line Git metadata file and check it against the manifest."""
+    item = entries.get(relative, {})
+    if item.get('kind') != 'file' or not 0 < item.get('size', 0) <= 4096:
+        raise AuditError(invalid)
+    fd = os.open(Path(root) / relative, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, 'rb') as source:
+        raw = source.read(4097)
+    if len(raw) != item['size'] or hashlib.sha256(raw).hexdigest() != item['sha256']:
+        raise AuditError('worktree_metadata_changed')
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError:
+        raise AuditError(invalid) from None
+    value = text.removesuffix('\n')
+    if not value or any(character in value for character in ('\n', '\r', '\x00', '\\')):
+        raise AuditError(invalid)
+    return value
+
+
+def nested_git_files(entries):
+    """Non-empty .git files below the top level: possible pointers to Git data."""
+    return sorted(relative for relative, item in entries.items()
+                  if relative != '.git' and PurePosixPath(relative).name == '.git'
+                  and item['kind'] == 'file' and item.get('size', 0) > 0)
+
+
+def contained_checkouts(root, entries, source_root=None):
+    """Pair each checkout kept inside this repo with its registration, or refuse.
+
+    Tools such as Claude Code put worktrees in folders inside the repo, so their files
+    are already in this archive and compared byte for byte. Their .git file names
+    .git/worktrees/<name> of this same repo, and that registration's gitdir names
+    the .git file back. Both may be absolute (the original location) or relative.
+    Absolute ones must share one original location; at capture that must be the
+    source itself. Anything else would point at Git data elsewhere and is refused.
+    """
+    pairs = {}
+    origins = set()
+    used = set()
+    for relative in nested_git_files(entries):
+        relative_path(relative)
+        text = read_small_text(root, entries, relative, invalid='external_git_layout')
+        if not text.startswith('gitdir: '):
+            raise AuditError('external_git_layout')
+        pointer = PurePosixPath(text[len('gitdir: '):])
+        checkout = PurePosixPath(relative).parent
+        if pointer.is_absolute():
+            if len(pointer.parts) < 4 or pointer.parts[-3:-1] != ('.git', 'worktrees'):
+                raise AuditError('external_git_layout')
+            name = pointer.name
+            origin = PurePosixPath(*pointer.parts[:-3])
+        else:
+            joined = posixpath.normpath((checkout / pointer).as_posix())
+            parts = PurePosixPath(joined).parts
+            if len(parts) != 3 or parts[:2] != ('.git', 'worktrees'):
+                raise AuditError('external_git_layout')
+            name = parts[2]
+            origin = None
+        registration = '.git/worktrees/' + name
+        if name in ('', '.', '..') or name in used or entries.get(registration, {}).get('kind') != 'directory':
+            raise AuditError('external_git_layout')
+        back = PurePosixPath(read_small_text(root, entries, registration + '/gitdir'))
+        if origin is not None:
+            if back != origin / relative:
+                raise AuditError('external_git_layout')
+            origins.add(origin)
+        elif back.is_absolute() or posixpath.normpath((PurePosixPath(registration) / back).as_posix()) != relative:
+            raise AuditError('external_git_layout')
+        used.add(name)
+        pairs[relative] = name
+    if len(origins) > 1:
+        raise AuditError('external_git_layout')
+    if source_root is not None and origins:
+        # Git records the resolved path (macOS /var is /private/var), so accept either form.
+        here = {PurePosixPath(Path(source_root).absolute()), PurePosixPath(Path(source_root).resolve())}
+        if not origins <= here:
+            raise AuditError('external_git_layout')
+    return pairs
+
+
+def checked_contained(baseline):
+    """Read the capture-time pairing from a baseline before anything is extracted."""
+    recorded = baseline.get('contained_checkouts', {})
+    if not isinstance(recorded, dict):
+        raise AuditError('invalid_contained_checkouts')
+    entries = baseline['entries']
+    for relative, name in recorded.items():
+        if (not isinstance(relative, str) or not isinstance(name, str) or relative not in entries
+                or PurePosixPath(relative).name != '.git' or relative == '.git'
+                or entries.get('.git/worktrees/' + name, {}).get('kind') != 'directory'):
+            raise AuditError('invalid_contained_checkouts')
+    if len(set(recorded.values())) != len(recorded):
+        raise AuditError('invalid_contained_checkouts')
+    return recorded
 
 
 def worktree_metadata(root, entries):
@@ -298,22 +405,7 @@ def worktree_metadata(root, entries):
             registrations.append(relative)
 
     def read_admin_file(relative):
-        item = entries.get(relative, {})
-        if item.get('kind') != 'file' or not 0 < item.get('size', 0) <= 4096:
-            raise AuditError('invalid_worktree_metadata')
-        fd = os.open(Path(root) / relative, os.O_RDONLY | os.O_NOFOLLOW)
-        with os.fdopen(fd, 'rb') as source:
-            raw = source.read(4097)
-        if len(raw) != item['size'] or hashlib.sha256(raw).hexdigest() != item['sha256']:
-            raise AuditError('worktree_metadata_changed')
-        try:
-            text = raw.decode('utf-8')
-        except UnicodeDecodeError:
-            raise AuditError('invalid_worktree_metadata') from None
-        value = text.removesuffix('\n')
-        if not value or any(character in value for character in ('\n', '\r', '\x00', '\\')):
-            raise AuditError('invalid_worktree_metadata')
-        return value
+        return read_small_text(root, entries, relative)
 
     for registration in sorted(registrations):
         # Git writes ../.. here: the shared object store is this same .git directory.
@@ -360,6 +452,9 @@ def finder_refs_only(root, completed):
 
 
 def git_facts(root, evidence):
+    # Git receives both --git-dir and -C. A relative root would be applied twice,
+    # so Git would look in the wrong folder and report "not a git repository".
+    root=Path(root).absolute()
     if not (root/'.git').exists():return None
     if (root/'.git').is_symlink() or not (root/'.git').is_dir():raise AuditError('external_git_layout')
     executable=shutil.which('git')
@@ -430,17 +525,24 @@ def capture(source, checksum, evidence, included_values=None, checkout_values=No
     if source.is_symlink() or not source.is_dir():raise AuditError('invalid_source_root')
     relative_path(source.name)
     evidence.enter('independent_source_capture')
-    expected=manifest(source);validate_entries(expected, evidence.max_bytes)
+    expected=manifest(source)
+    contained = contained_checkouts(source, expected, source_root=source)
+    validate_entries(expected, evidence.max_bytes, contained)
     links = outside_links(expected, source)
     evidence.emit('outside_links_reported', count=len(links))
     included = included_map(included_values or [], links)
     checkouts = checkout_map(checkout_values or [], expected)
     scope = worktree_metadata(source, expected)
+    if contained:
+        # These checkouts live inside the repo, so their files are in this archive.
+        scope['checkouts_inside_repo'] = len(contained)
     git=git_facts(source,evidence)
     if expected!=manifest(source):raise AuditError('source_changed_during_git_checks')
     baseline={'schema_version':SCHEMA,'root_name':source.name,'archive_sha256':checksum,
               'entries':expected,'git':git,'worktree_metadata':scope,'outside_links':links,'included_contents':included,'included_checkouts':checkouts,'captured_at':datetime.now(timezone.utc).isoformat(),
               'provenance':'live_source_inventory_not_archive_derived'}
+    if contained:
+        baseline['contained_checkouts'] = contained
     write_private(evidence.output/'expected.json',baseline)
     evidence.finish('captured',manifest_sha256=digest(evidence.output/'expected.json'),entries=len(expected),
                     worktree_metadata=scope, outside_links=link_receipt(links, included),
@@ -450,10 +552,10 @@ def capture(source, checksum, evidence, included_values=None, checkout_values=No
 
 class RestoreBudget:
     """Plan destination allocation and recheck capacity as bounded copies progress."""
-    def __init__(self, destination, entries, evidence):
+    def __init__(self, destination, entries, evidence, contained=None):
         self.directory = Path(destination).parent
         self.evidence = evidence
-        self.remaining_bytes = validate_entries(entries, evidence.max_bytes)
+        self.remaining_bytes = validate_entries(entries, evidence.max_bytes, contained)
         self.reserve_bytes = evidence.reserve_bytes
         if type(self.reserve_bytes) is not int or self.reserve_bytes < 0:
             raise AuditError('invalid_space_reserve')
@@ -477,6 +579,13 @@ class RestoreBudget:
             )
         if available < required:
             raise AuditError('restore_capacity_insufficient')
+
+    def replan(self, data_bytes, entries):
+        """Use the archive's actual sizes once allowed Finder differences are known."""
+        self.remaining_bytes = data_bytes
+        self.remaining_entries = entries
+        self.initial_bytes = data_bytes
+        self.check(record=True)
 
     def created_entry(self):
         self.remaining_entries -= 1
@@ -509,8 +618,20 @@ def copy_member(source, target, size, budget):
     budget.check()
 
 
-def extract_checked(archive, baseline, destination, evidence, budget):
+def finder_only_path(relative):
+    """RepoHub's Finder rule: a file named .DS_Store, never anything inside .git."""
+    path=PurePosixPath(relative)
+    return path.name=='.DS_Store' and '.git' not in path.parts
+
+
+def extract_checked(archive, baseline, destination, evidence, budget, allow_finder=False):
+    """Restore the archive; with allow_finder, .DS_Store files may differ from the baseline.
+
+    Returns the Finder paths whose archive copy was allowed to differ: restored from the
+    archive, or absent from it. Every other entry must match the baseline exactly.
+    """
     expected=baseline['entries'];root_name=baseline['root_name'];members={};root_member=None
+    finder=set();file_plan={}
     evidence.enter('archive_preflight')
     with tarfile.open(archive,'r:gz') as stored:
         total=0
@@ -521,8 +642,26 @@ def extract_checked(archive, baseline, destination, evidence, budget):
                 root_member=member;continue
             if path.parts[0]!=root_name or len(path.parts)<2:raise AuditError('unexpected_archive_root')
             relative='/'.join(path.parts[1:])
-            if relative in members or relative not in expected:raise AuditError('duplicate_or_unexpected_entry')
-            item=expected[relative]
+            if relative in members:raise AuditError('duplicate_or_unexpected_entry')
+            item=expected.get(relative)
+            if (allow_finder and finder_only_path(relative) and member.isfile()
+                    and (item is None or item['kind']=='file')):
+                # The archive keeps an older Finder file on purpose. Its bytes are
+                # authentic (the archive checksum matched); only its content may differ.
+                parent=str(PurePosixPath(relative).parent)
+                if item is None and parent!='.' and expected.get(parent,{}).get('kind')!='directory':
+                    raise AuditError('duplicate_or_unexpected_entry')
+                mode=member.mode if item is None else item['mode']
+                if member.mode!=mode or not 0<=mode<=0o777:raise AuditError('entry_type_or_mode_mismatch')
+                finder.add(relative);file_plan[relative]=(member.size,mode)
+                total+=member.size
+                if len(members) >= MAX_ENTRIES:
+                    raise AuditError('resource_limit')
+                if evidence.max_bytes is not None and total > evidence.max_bytes:
+                    raise AuditError('byte_budget_exceeded')
+                members[relative]=member
+                continue
+            if item is None:raise AuditError('duplicate_or_unexpected_entry')
             kind='file' if member.isfile() or member.islnk() else 'directory' if member.isdir() else 'symlink' if member.issym() else 'unsupported'
             if kind!=item['kind'] or member.mode!=item['mode']:raise AuditError('entry_type_or_mode_mismatch')
             if kind=='symlink' and member.linkname!=item['target']:raise AuditError('symlink_mismatch')
@@ -532,13 +671,22 @@ def extract_checked(archive, baseline, destination, evidence, budget):
                 if target.parts[0]!=root_name or key not in members or not members[key].isfile():raise AuditError('unsafe_hardlink')
                 if expected[key]['size']!=item['size'] or expected[key]['sha256']!=item['sha256']:raise AuditError('hardlink_mismatch')
             elif kind=='file' and member.size!=item['size']:raise AuditError('file_size_mismatch')
+            if kind=='file':file_plan[relative]=(item['size'],item['mode'])
             total+=item.get('size',0)
             if len(members) >= MAX_ENTRIES:
                 raise AuditError('resource_limit')
             if evidence.max_bytes is not None and total > evidence.max_bytes:
                 raise AuditError('byte_budget_exceeded')
             members[relative]=member
-        if root_member is None or members.keys()!=expected.keys():raise AuditError('missing_archive_entries')
+        missing=expected.keys()-members.keys()
+        for relative in missing:
+            # Only a Finder file the archive never held may be absent, and only when allowed.
+            if not (allow_finder and finder_only_path(relative) and expected[relative]['kind']=='file'):
+                raise AuditError('missing_archive_entries')
+            finder.add(relative)
+        if root_member is None:raise AuditError('missing_archive_entries')
+        if finder:
+            budget.replan(total, len(members)+1)
         budget.check()
         destination.mkdir(mode=0o700)
         budget.created_entry()
@@ -549,13 +697,14 @@ def extract_checked(archive, baseline, destination, evidence, budget):
             (destination/relative).mkdir(mode=0o700)
             budget.created_entry()
         for relative,member in members.items():
-            if expected[relative]['kind']!='file':continue
+            if relative not in file_plan:continue
+            size,mode=file_plan[relative]
             budget.check()
             fd=os.open(destination/relative,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
             budget.created_entry()
             with os.fdopen(fd,'wb') as target,stored.extractfile(member) as source:
-                copy_member(source, target, expected[relative]['size'], budget)
-                os.fchmod(target.fileno(),expected[relative]['mode'])
+                copy_member(source, target, size, budget)
+                os.fchmod(target.fileno(),mode)
         for relative,item in expected.items():
             if item['kind']=='symlink':
                 link=destination/relative
@@ -577,9 +726,10 @@ def extract_checked(archive, baseline, destination, evidence, budget):
             raise AuditError('restore_budget_mismatch')
         budget.check()
         evidence.emit('extraction_finished',entries=len(members),bytes=total)
+    return finder
 
 
-def verify(archive, expected, manifest_sha256, evidence):
+def verify(archive, expected, manifest_sha256, evidence, allow_finder=False):
     archive,expected=Path(archive),Path(expected)
     for path in (archive,expected):
         if path.is_symlink() or not path.is_file():raise AuditError('missing_or_nonregular_input')
@@ -594,30 +744,46 @@ def verify(archive, expected, manifest_sha256, evidence):
     if baseline.get('schema_version')!=SCHEMA or baseline.get('provenance')!='live_source_inventory_not_archive_derived':raise AuditError('invalid_baseline_provenance')
     relative_path(baseline['root_name'])
     if '/' in baseline['root_name']:raise AuditError('invalid_root_name')
-    validate_entries(baseline['entries'], evidence.max_bytes)
+    contained = checked_contained(baseline)
+    validate_entries(baseline['entries'], evidence.max_bytes, contained)
     links = checked_outside_links(baseline)
     evidence.emit('outside_links_reported', count=len(links))
     included = checked_included(baseline, links)
     checkouts = checked_checkouts(baseline)
     destination = evidence.output / 'restored'
     evidence.enter('capacity_preflight')
-    budget = RestoreBudget(destination, baseline['entries'], evidence)
+    budget = RestoreBudget(destination, baseline['entries'], evidence, contained)
     evidence.enter('archive_identity')
     actual_archive = digest(archive)
     evidence.emit('input_hashes', archive_sha256=actual_archive,
                   manifest_sha256=actual_manifest, archive_bytes=archive.stat().st_size)
     if actual_archive != baseline['archive_sha256']:
         raise AuditError('archive_checksum_mismatch')
-    extract_checked(archive, baseline, destination, evidence, budget)
+    finder = extract_checked(archive, baseline, destination, evidence, budget, allow_finder)
     evidence.enter('restored_manifest_comparison')
     actual=manifest(destination)
-    if actual!=baseline['entries']:
-        changed=[r for r in actual.keys()|baseline['entries'].keys() if actual.get(r)!=baseline['entries'].get(r)]
-        evidence.emit('manifest_mismatch',entries=len(changed),path_refs=[hashlib.sha256(r.encode()).hexdigest()[:16] for r in sorted(changed)[:8]])
+    entries=baseline['entries']
+    changed=[r for r in actual.keys()|entries.keys() if actual.get(r)!=entries.get(r)]
+    # Allowed Finder paths may differ, but only as a file or an absence; nothing else may.
+    unexplained=[r for r in changed if r not in finder or actual.get(r,{'kind':'file'})['kind']!='file']
+    if unexplained:
+        evidence.emit('manifest_mismatch',entries=len(unexplained),path_refs=[hashlib.sha256(r.encode()).hexdigest()[:16] for r in sorted(unexplained)[:8]])
         raise AuditError('restored_manifest_mismatch')
+    finder_report=None
+    if allow_finder:
+        finder_report={'rule':'Only regular .DS_Store files outside .git may differ; RepoHub does not re-archive them.',
+                       'changed':sum(1 for r in changed if r in actual and r in entries),
+                       'only_in_source':sum(1 for r in changed if r not in actual),
+                       'only_in_archive':sum(1 for r in changed if r not in entries)}
+        evidence.emit('finder_only_differences',**{k:v for k,v in finder_report.items() if k!='rule'},
+                      path_refs=[hashlib.sha256(r.encode()).hexdigest()[:16] for r in sorted(changed)[:8]])
     evidence.emit('manifest_verified',entries=len(actual),manifest_content_sha256=hashlib.sha256(canonical(actual)).hexdigest())
     evidence.enter('git_history_verification')
     scope = worktree_metadata(destination, actual)
+    if contained_checkouts(destination, actual) != contained:
+        raise AuditError('worktree_metadata_mismatch')
+    if contained:
+        scope['checkouts_inside_repo'] = len(contained)
     default_scope = {'registered_worktrees': 0, 'linked_checkout_contents_verified': False}
     if scope != baseline.get('worktree_metadata', default_scope):
         raise AuditError('worktree_metadata_mismatch')
@@ -627,9 +793,12 @@ def verify(archive, expected, manifest_sha256, evidence):
     evidence.enter('input_immutability')
     if any(stamp(Path(p))!=s for p,s in inputs.items()) or digest(archive)!=actual_archive or digest(expected)!=actual_manifest:
         raise AuditError('inputs_changed_during_test')
+    extra={} if finder_report is None else {'finder_only_differences':finder_report}
     evidence.finish('passed',archive_sha256=actual_archive,manifest_sha256=actual_manifest,
                     entries=len(actual),git_history='verified' if git is not None else 'not_applicable',
-                    claim='Supplied archive restores to the supplied independent source baseline.',
+                    claim='Supplied archive restores to the supplied independent source baseline.'
+                          + ('' if finder_report is None else ' Allowed .DS_Store differences are counted separately.'),
+                    **extra,
                     cloud_retrieval_tested=False, worktree_metadata=scope,
                     outside_links=link_receipt(links, included),
                     included_checkouts=checkout_receipt(checkouts),
@@ -666,6 +835,11 @@ def main(argv=None):
     verify_parser=sub.add_parser('verify');verify_parser.add_argument('--archive',required=True)
     verify_parser.add_argument('--expected',required=True);verify_parser.add_argument('--manifest-sha256',required=True)
     verify_parser.add_argument('--out',required=True)
+    verify_parser.add_argument(
+        '--allow-finder-only', action='store_true',
+        help='Let regular .DS_Store files outside .git differ, as RepoHub does not re-archive '
+             'them; every other entry must still match. The receipt counts each difference.',
+    )
     for command_parser in (capture_parser, verify_parser):
         command_parser.add_argument(
             '--max-bytes', type=positive_bytes, default=None,
@@ -684,10 +858,10 @@ def main(argv=None):
         if args.action=='capture':
             source=Path(args.source).resolve()
             if output==source or source in output.parents:raise AuditError('output_inside_source')
-        evidence = Evidence(args.out, max_bytes=args.max_bytes,
+        evidence = Evidence(output, max_bytes=args.max_bytes,
                             reserve_bytes=getattr(args, 'reserve_bytes', DEFAULT_FREE_RESERVE))
         if args.action=='capture':capture(args.source,args.archive_sha256,evidence,args.include,args.checkout)
-        else:verify(args.archive,args.expected,args.manifest_sha256,evidence)
+        else:verify(args.archive,args.expected,args.manifest_sha256,evidence,args.allow_finder_only)
         return 0
     except Exception as error:
         if isinstance(error, AuditError):
