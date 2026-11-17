@@ -155,13 +155,20 @@ final class AppUpdates: NSObject {
             }
             semaphore.signal()
         }.resume()
-        guard semaphore.wait(timeout: .now() + 4) == .success, let value = box.value,
-              application.matches(value) else { throw PackagedApplication.Failure.helperUnavailable }
+        guard semaphore.wait(timeout: .now() + 4) == .success, let value = box.value else {
+            throw PackagedApplication.Failure.helperUnavailable
+        }
         return value
     }
 
+    /// Block an update only while an answering helper reports a backup in progress.
+    /// A crashed, broken or mismatched helper must not block the update that may fix it:
+    /// with no helper answering, nothing can be writing a backup.
     private func requireIdle() throws {
-        let value = try status()
+        guard let value = try? status() else {
+            record("checking", reason: "helper_unavailable")
+            return
+        }
         guard let backup = value["backup"] as? [String: Any], backup["running"] as? Bool == false else {
             record("waiting", reason: "backup_busy")
             throw NSError(domain: "RepoHubUpdate", code: 1,
