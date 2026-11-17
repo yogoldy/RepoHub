@@ -28,6 +28,12 @@ final class PackagedApplication {
     let testMode: Bool
     var helper: Process?
     private var logHandle: FileHandle?
+    // Helper supervision. The app stops the helper on quit and before an update; any other
+    // exit is a crash and is restarted with a growing delay, so backups don't silently stop.
+    private let supervision = NSLock()
+    private var stopping = false
+    private var restartAttempts = 0
+    private var helperStarted = Date()
 
     static var enabled: Bool { Bundle.main.object(forInfoDictionaryKey: "RepoHubPackaged") as? Bool == true }
 
@@ -152,6 +158,7 @@ final class PackagedApplication {
     func startHelper() throws {
         guard let executable = bundle.executableURL else { throw Failure.packageInvalid }
         try? FileManager.default.removeItem(at: stateDirectory.appendingPathComponent("helper-conflict.json"))
+        try? logHandle?.close()  // A restart reopens the log.
         let log = stateDirectory.appendingPathComponent("packaged-helper.log")
         if !FileManager.default.fileExists(atPath: log.path) {
             FileManager.default.createFile(atPath: log.path, contents: nil, attributes: [.posixPermissions: 0o600])
@@ -163,8 +170,15 @@ final class PackagedApplication {
         process.arguments = ["--bundled-helper"]
         process.standardOutput = logHandle
         process.standardError = logHandle
+        process.terminationHandler = { [weak self] exited in
+            DispatchQueue.main.async { self?.helperExited(exited) }
+        }
+        supervision.lock()
+        stopping = false
+        supervision.unlock()
         try process.run()
         helper = process
+        helperStarted = Date()
         let processes = ["app_pid": Int(ProcessInfo.processInfo.processIdentifier),
                          "helper_pid": Int(process.processIdentifier)]
         if let data = try? JSONSerialization.data(withJSONObject: processes) {
@@ -193,7 +207,41 @@ final class PackagedApplication {
         return guardProcess
     }
 
+    /// Restart a helper that exited without the app asking it to, unless another copy of
+    /// RepoHub holds the port (restarting would only fail again) or the app is stopping it.
+    private func helperExited(_ exited: Process) {
+        supervision.lock()
+        let intentional = stopping
+        supervision.unlock()
+        guard !intentional, exited === helper, helperConflict() == nil else { return }
+        // A helper that ran for a while starts the backoff over; quick repeated exits wait longer.
+        if Date().timeIntervalSince(helperStarted) > 300 { restartAttempts = 0 }
+        let note = "RepoHub: helper exited (status \(exited.terminationStatus)); restarting.\n"
+        try? logHandle?.write(contentsOf: Data(note.utf8))
+        scheduleRestart(replacing: exited)
+    }
+
+    private func scheduleRestart(replacing exited: Process) {
+        restartAttempts += 1
+        let delay = min(300.0, pow(2.0, Double(min(restartAttempts, 9))))  // 2 s, 4 s ... 5 min
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self = self else { return }
+            self.supervision.lock()
+            let stillWanted = !self.stopping
+            self.supervision.unlock()
+            guard stillWanted, self.helper === exited else { return }
+            do {
+                try self.startHelper()
+            } catch {
+                self.scheduleRestart(replacing: exited)  // Keep trying; the panel shows the helper as unavailable.
+            }
+        }
+    }
+
     func stopHelper() {
+        supervision.lock()
+        stopping = true
+        supervision.unlock()
         guard let helper = helper, helper.isRunning else { return }
         helper.terminate()
         // The helper has no shutdown work once the backup-idle guard has passed.
