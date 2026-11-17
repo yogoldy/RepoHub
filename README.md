@@ -52,7 +52,7 @@ To restore, list an archive with `tar -tzf SNAPSHOT.tar.gz`, then extract it int
 
 The last-file-change display excludes Git internals, `.DS_Store`, and AppleDouble metadata; those files are still included in backups. The menu bar shows upload progress, pending changes, and the newest snapshot time. “Backup notifications” controls macOS completion and persistent-problem notifications. Permission is requested from macOS; if denied, no notification can be delivered. Notifications require verified hashes and upload acknowledgement for the same exact current archive. Delivered archive/hash receipts are saved in app preferences to prevent duplicate notices across polls/restarts. Multiple completions in one poll share a notification.
 
-Installed configuration sets `retention` to `latest`, `require_upload_before_prune` to true, and `verification_seconds` to 900. Older/custom configurations that omit this field retain all archives until explicitly migrated.
+Installed configuration sets `retention` to `latest` and `verification_seconds` to 900. Under latest-only retention, a previous archive is deleted only after its replacement is verified and macOS confirms the replacement uploaded; this safeguard is always on and cannot be turned off by configuration. Configurations that omit `retention` keep all archives.
 
 ## Independent cloud verification
 

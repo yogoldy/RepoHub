@@ -208,6 +208,12 @@ class HubTests(unittest.TestCase):
         self.hub.backup()
         self.assertTrue(Path(self.hub.index[key]["archive"]).is_file())
 
+    def confirm_upload_and_retain(self, key):
+        """Simulate macOS confirming the current archive's upload, then run cleanup."""
+        current = self.hub.index[key]
+        self.hub.cloud_states[key] = {"archive": current["archive"], "state": "uploaded", "checked_at": utc_now()}
+        self.hub.retain_current(key, current)
+
     def test_unchanged_skip_and_changed_replaces_old_snapshot(self):
         self.hub.backup()
         key = workspace_id("Example")
@@ -217,6 +223,9 @@ class HubTests(unittest.TestCase):
         (self.repo / "work.txt").write_text("newer work")
         self.hub.backup()
         self.assertNotEqual(self.hub.index[key]["archive"], first)
+        # The old copy stays until the replacement's upload is confirmed.
+        self.assertTrue(Path(first).exists())
+        self.confirm_upload_and_retain(key)
         self.assertFalse(Path(first).exists())
         self.assertEqual(len(list((self.backups / key).glob("*.tar.gz"))), 1)
         with tarfile.open(self.hub.index[key]["archive"]) as archive:
@@ -244,11 +253,13 @@ class HubTests(unittest.TestCase):
         unknown = current.parent / "manual-backup.tar.gz"
         unknown.write_text("unmanaged")
         current.write_bytes(b"corrupt")
+        # Even with the upload confirmed, a corrupt current archive must block cleanup.
         with self.assertRaisesRegex(RuntimeError, "verification"):
-            self.hub.retain_current(key, self.hub.index[key])
+            self.confirm_upload_and_retain(key)
         self.assertTrue(older.is_file())
         self.assertTrue(unknown.is_file())
         shutil.copy2(older, current)
+        # The repaired archive's upload is already confirmed, so this backup may clean up.
         self.hub.backup()
         self.assertFalse(older.exists())
         self.assertTrue(unknown.is_file())
@@ -387,7 +398,8 @@ class HubTests(unittest.TestCase):
         self.assertEqual(cloud_status({"error": "unreachable", "error_domain": "NSCocoaErrorDomain", "error_code": 4355})["reason"], "connection")
 
     def test_old_copy_kept_until_replacement_upload_is_confirmed(self):
-        self.hub.config["require_upload_before_prune"] = True
+        # The safeguard applies whatever the config says, including older configs without it.
+        self.hub.config.pop("require_upload_before_prune", None)
         self.hub.backup()
         key = workspace_id("Example")
         old = self.hub.index[key]["archive"]
@@ -476,6 +488,8 @@ class HubTests(unittest.TestCase):
         self.assertTrue(previous.is_file())
         self.assertEqual(len(list(previous.parent.glob("*.tar.gz"))), 2)
         self.hub.backup()
+        self.assertTrue(previous.exists())
+        self.confirm_upload_and_retain(key)
         self.assertFalse(previous.exists())
         self.assertEqual(len(list(previous.parent.glob("*.tar.gz"))), 1)
         self.assertFalse(self.hub.status["backup"]["errors"])

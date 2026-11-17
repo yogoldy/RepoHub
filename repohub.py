@@ -1289,10 +1289,12 @@ class Hub:
         if not obsolete:
             self.lifecycle.transition("retention_decision", key=key, current=current, reason="no_superseded_archives", result="kept")
             return
-        if (self.config.get("require_upload_before_prune", False)
-                and self.cloud_for(key, current).get("state") != "uploaded"):
+        # Always keep the previous copy until macOS confirms the replacement reached the cloud.
+        # This is not configurable: an older or hand-written config must never lose the only
+        # uploaded copy. The require_upload_before_prune key is still accepted but ignored.
+        if self.cloud_for(key, current).get("state") != "uploaded":
             self.lifecycle.transition("retention_decision", key=key, current=current, reason="awaiting_upload", result="kept")
-            return  # Keep the previously uploaded copy until its replacement reaches iCloud.
+            return
         for _, retained, digest in groups:
             if sha256(retained) != digest:
                 raise RuntimeError("Current archive failed verification; older backups were kept")
