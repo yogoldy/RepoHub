@@ -279,7 +279,9 @@ def validate_entries(entries, max_bytes=None, contained=None):
                       and 0 < item['size'] <= 4096)
             if not (empty_marker or paired):
                 raise AuditError('external_git_layout')
-        if PurePosixPath(relative).name=='.gitmodules':raise AuditError('submodules_not_in_scope')
+        # Git reads .gitmodules only at the top of a work tree. Deeper copies are plain
+        # files, such as those some npm packages ship inside node_modules.
+        if relative=='.gitmodules':raise AuditError('submodules_not_in_scope')
         if '.git' in PurePosixPath(relative).parts and relative.endswith('/commondir'):
             parts = PurePosixPath(relative).parts
             # Only the main repo's standard registered-worktree layout is in scope.

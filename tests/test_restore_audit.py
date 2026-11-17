@@ -239,6 +239,22 @@ class RestoreAuditTests(unittest.TestCase):
             os.chdir(previous)
         self.assertEqual(self.result('relative-verify')['git_history'],'verified')
 
+    def test_gitmodules_inside_a_dependency_restores_but_top_level_submodules_fail(self):
+        # Some npm packages ship a .gitmodules file; inside node_modules it is just data.
+        package=self.root/'ignored/node_modules/sanitize-filename';package.mkdir(parents=True)
+        (package/'.gitmodules').write_text('[submodule "vendor"]\n\tpath = vendor\n')
+        code,archive,out=self.snapshot_capture('package')
+        self.assertEqual(code,0)
+        self.archive,self.expected=archive,out/'expected.json'
+        self.assertEqual(self.verify('package-verify'),0)
+        restored=self.base/'package-verify/restored/ignored/node_modules/sanitize-filename/.gitmodules'
+        self.assertEqual(restored.read_text(),(package/'.gitmodules').read_text())
+        # A top-level .gitmodules means real submodules, which stay out of scope.
+        (self.root/'.gitmodules').write_text('[submodule "vendor"]\n\tpath = vendor\n')
+        code,_,out=self.snapshot_capture('submodules')
+        self.assertEqual(code,1)
+        self.assertEqual(json.loads((out/'result.json').read_text())['reason'],'submodules_not_in_scope')
+
     def finder_case(self, name, change):
         """Archive the repo, change the live source, then capture it as the baseline."""
         self.archive=Path(snapshot(self.root,self.base/(name+'-archives'),self.base/(name+'-stage'))['archive'])
