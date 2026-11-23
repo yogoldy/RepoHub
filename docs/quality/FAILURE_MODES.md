@@ -1,0 +1,1049 @@
+# Failure modes and golden rules
+
+This is RepoHub’s domain-specific release contract, not a replacement for a language type checker. Each rule connects a vulnerable boundary, its diagnostic evidence, the required response and executable regression tests. Diagnostic receipts explain observed behavior; tests exercise controlled counterexamples. Neither makes unsupported cases safe by assertion.
+
+The strongest release invariants are: preserve complete supported source bytes; keep old backups until a verified exact-archive upload acknowledgement; treat unavailable reads separately from corruption; scope work to the correct repo; and disclose only approved diagnostic facts. Freshness, scheduling, UI presentation, restore integrity and deployment connect these boundaries. A small state/identity mistake can undermine several rules at once.
+
+`golden-rules.json` is the machine-readable register. The gate requires every referenced test to actually pass; renaming/removing/skipping one fails its rule. Full test discovery also catches failures outside this register. Tests do not become unnecessary just because a known issue was fixed.
+
+Public entries describe source policy and synthetic reproductions. Actual private repo identities, archives, alias keys and diagnostic case reports remain outside Git.
+
+## Working a new failure
+
+1. Record the observed symptom, affected archive/run/observation references and expected behavior. Use the shareable export first; access a private alias key only when locally authorized and necessary.
+2. Separate a measured cause from a hypothesis. Trace source classification → schedule selection → archive/index stages → upload observation → rendered status. Check dropped events, stale receipts and missing views before drawing conclusions.
+3. Reproduce with an isolated small fixture. Make a failing test before fixing the policy; preserve failed receipts privately. Never use personal source files as fault-injection targets.
+4. Apply the narrow fix, test recovery as well as failure, and add/update a rule with the exact test ID and remaining limits. A green test is not a reason to erase the incident or its uncertainty.
+5. Run the release gate and required manual checks. Keep the evidence tied to the exact source revision. Do not carry a previous version’s passing receipt forward as new evidence.
+
+## Rule register
+
+### Menu bar appearance must reuse repository presentations
+
+The menu bar previously interpreted raw `needs_backup` and verification fields
+separately from the cards. That missed the documented Finder-only backed-up
+exception. Menu-bar counts now aggregate the existing `RepoStatus.present` results;
+Swift executes that same shipped policy in the owned WebKit page. It contains no
+repository-state classifier. The waiting count includes existing backup-pending
+statuses; confirmed changes count the existing confirmed file/Git/metadata labels.
+First backups and unclassified differences are not confirmed changes.
+
+The preference is stored per Mac in the app's UserDefaults only after Save changes.
+Navigation guards unsaved drafts, conflicts preserve them, and a pending save
+cannot be duplicated or interrupted. Native bridge requests retain exact-page,
+main-frame, fixed-mode and request-ID checks.
+
+`menu_bar_presented` records a bounded mode, count and symbol read back after the
+native title is set. Independent diagnostics reuse the existing status oracle to
+detect wrong counts or symbols; `menu_bar_disagreement` is a failure, not evidence
+that the cards themselves changed. Exports contain fixed enums and capped counts,
+never tooltip prose. GR06 and GR22 register the regression tests. Browser preview
+cannot save native preferences. Installed menu-bar layout and restart behavior
+require separate native checks.
+
+### Source-change recovery through Rescan now
+
+The failure occurs when `SourceChanged` is recorded as both `verification_deferred` and
+`repo_backup_failed`. Rescan now refreshed verification, but the old backup
+error still took precedence in the shared presentation and problem tracker.
+This produced a persistent “Needs attention — failure” for retryable source
+activity. A scan cannot make an
+actively written source stable or replace a backup.
+
+The typed exception now records `backup.deferred` and a `verification_deferred`
+event linked to the attempt's run/repo/archive. An otherwise successful run ends
+as `deferred`; mixed genuine errors still end as `failed`. The current verification
+becomes `changing`, which the existing shared renderer, diagnostics and menu-bar
+aggregation already understand. No new readiness classifier, message matching,
+source exclusions, schedule change or immediate backup retry is introduced.
+The previous archive/index stay intact. The deferred attempt remains historical
+when a later successful scan replaces the live verification state.
+
+The regression for the persistent error
+exercises the guarded `/api/scan` route through ongoing writes, matched contents
+and newly detected edits, confirming no backup call or archive/index change.
+Synthetic exact-archive upload evidence is explicit; it is not a real iCloud
+observation. A second case retains a genuine permission failure beside a
+source-change deferral after rescan, including the menu warning. Typed export
+keeps the deferred reason and attempt history. Both tests are registered in GR02
+and discovered by the existing GitHub workflow/full gate and focused Dev suite.
+Verify recovery manually in the installed native app.
+
+
+### GR01 — Preserve complete contained workspace bytes
+
+**Susceptible boundary:** Hidden, ignored and uncommitted files silently omitted; archive member handling loses directories or modes.
+
+**Cause / solution:** Git status is not a file inventory. Archive contained filesystem entries and verify their contents before publication.
+
+**Required behavior:** Include ignored/uncommitted bytes and ordinary contained Git history; do not follow external links.
+
+**Diagnostic trail:** `archive_stage`, `archive_verified`, `repo_backup_finished`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_hub.HubTests.test_complete_archive_includes_hidden_ignored_and_symlink_without_following`
+- `test_hub.HubTests.test_archive_content_verification_includes_hardlinks_and_empty_directories`
+- `test_scoped_backups.ScopedBackupTests.test_appledouble_and_hidden_ignored_files_are_still_protected`
+- `test_hub.HubTests.test_sockets_and_named_pipes_never_block_a_backup`
+- `test_hub.HubTests.test_startup_removes_only_stale_staging_archives`
+
+**Remaining exposure:** Live databases and unsaved application memory are not atomic snapshots. External Git directories/worktrees/submodules require explicit support.
+
+### GR02 — Hashes decide meaningful changes
+
+**Susceptible boundary:** Equal-size edits restore their mtime, or source content changes during archive construction.
+
+**Cause / solution:** Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members.
+
+**Required behavior:** Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits. Source changes during verification appear as “Files changing,” with another check on the next scan and a scoped menu-bar retry. Archive mutation or corruption remains an error. A scoped retry never creates an archive or refreshes the global scan timestamp.
+
+**Diagnostic trail:** `repo_checked`, `archive_stage`, `repo_backup_failed`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_hub.HubTests.test_same_size_same_mtime_edit_is_detected_and_replaced`
+- `test_hub.HubTests.test_timestamp_only_changes_match_hashes_and_do_not_replace_backup`
+- `test_hub.HubTests.test_metadata_preserving_change_during_snapshot_is_rejected`
+- `test_hub.HubTests.test_source_mutation_is_transient_and_retry_is_scoped`
+- `test_hub.HubTests.test_archive_mutation_is_not_source_mutation`
+- `test_hub.HubTests.test_change_during_backup_does_not_publish`
+
+**Remaining exposure:** Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided.
+
+**Fixture isolation:** Git background maintenance can remove `objects/maintenance.lock` between inventory and hashing in a restore fixture. All committing unit-test fixtures now disable automatic maintenance/GC before committing; the same background writer also changed a read-only monitoring fixture. Production concurrent-write rejection remains intact; an idle synthetic fixture must not silently depend on the runner’s Git defaults.
+
+### GR03 — Finder-only hints cannot cause broad replacements
+
+**Susceptible boundary:** Repeated .DS_Store writes look like edits; a whole-schedule check rebuilds unchanged repos.
+
+**Cause / solution:** Classify Finder/Git/project differences separately; ignore only ordinary .DS_Store trigger changes while retaining honest full-match status.
+
+**Required behavior:** No replacement for Finder-only writes; build only selected meaningfully changed/new/damaged repos.
+
+**Diagnostic trail:** `repo_checked`, `schedule_decision`, `archive_reused`, `repo_backup_finished`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_scoped_backups.ScopedBackupTests.test_repeated_finder_writes_do_not_replace_archives_or_rewrite_cloud_index`
+- `test_scoped_backups.ScopedBackupTests.test_only_meaningfully_changed_repo_gets_archive_when_schedule_checks_every_repo`
+- `test_scoped_backups.ScopedBackupTests.test_targeted_backup_cannot_copy_another_repo_even_if_it_changed`
+- `test_scoped_backups.ScopedBackupTests.test_finder_exception_cannot_hide_corrupt_archive`
+
+**Remaining exposure:** Other metadata such as AppleDouble remains protected. Never generalize this exception to arbitrary hidden files.
+
+### GR04 — Unavailable verification is not corruption
+
+**Susceptible boundary:** iCloud placeholders/timeouts/permissions produce read failures and can trigger unnecessary rebuilds.
+
+**Cause / solution:** Separate OSError availability from checksum/archive-format failures; defer unavailable reads instead of rebuilding.
+
+**Required behavior:** Keep index/archive intact on unavailable reads, disclose the failure, then reuse or replace after recovery.
+
+**Diagnostic trail:** `verification_deferred`, `repo_backup_failed`, `archive_repair_needed`, `archive_reused`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_scoped_backups.ScopedBackupTests.test_unavailable_archive_is_reported_without_replacement_and_recovery_reuses_it`
+- `test_scoped_backups.ScopedBackupTests.test_read_failure_defers_changed_repo_until_verification_can_recover`
+- `test_hub.HubTests.test_corrupted_archive_detected_and_repaired`
+
+**Remaining exposure:** Conservative deferral also delays genuinely changed sources. Other RuntimeError classifications and real provider races remain review points.
+
+### GR05 — Retain old backup until exact replacement is safe
+
+**Susceptible boundary:** Copy/index errors, stale cloud receipts or 100% progress lead to premature deletion.
+
+**Cause / solution:** Persist a verified replacement; gate pruning on fresh acknowledgement for its exact archive identity.
+
+**Required behavior:** Never prune on progress alone, missing/old receipts or failed publication; preserve unknown/legacy files.
+
+**Diagnostic trail:** `archive_verified`, `retention_decision`, `retention_verified`, `prune_started`, `prune_finished`, `retention_failed`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_hub.HubTests.test_failed_replacement_preserves_previous_copy`
+- `test_hub.HubTests.test_old_copy_kept_until_replacement_upload_is_confirmed`
+- `test_hub.HubTests.test_progress_and_retry_error_do_not_confirm_or_prune`
+- `test_hub.HubTests.test_index_publication_failure_keeps_old_copy_and_retries_cleanup`
+- `test_policy_health.SettingsHTTPTests.test_stale_upload_receipt_keeps_previous_backup`
+
+**Remaining exposure:** Network outage, quota exhaustion and full-disk behavior need controlled live fault runs; mocked transitions are not provider guarantees.
+
+### GR06 — Display decisions need fresh evidence
+
+Post-sleep recovery can briefly leave scan/hash evidence stale while the helper
+catches up. Treating that wait as “can’t get current backup status” sounded like
+a failed backup. Policy `status-clarity-7` uses “Waiting for fresh checks” and
+“Waiting for fresh backup status.” The underlying stale phase, false readiness,
+freshness thresholds and persistent-problem notifications are unchanged. The
+summary describes missing fresh status rather than implying every backup is lost.
+Technical details retain the observed reasons; the display does not claim sleep
+caused a particular case without evidence. Old policy wording remains valid for
+historical receipts.
+
+The menu's Rescan now uses the existing guarded `/api/scan` endpoint. Acceptance
+means a request was accepted, not that the scan or a backup completed. The actual
+controller test covers fresh tokens, duplicate requests and failed requests; an
+isolated HTTP regression verifies origin/Host/token guards, a real forced scan,
+preserved archive bytes/index and no call to backup. Actual card/detail mutations
+and stale-to-fresh recovery remain subject to the independent diagnostic oracle.
+Keep sleep and diagnostic case records outside Git. During a long scan,
+completed per-repository observations are published independently. Their scan
+freshness is measured from the start of each repository check, not the end of a
+long verification; a pending or expired check is never made fresh by another
+repository. A full scan that is making progress can delay scan-only alerts,
+but the existing episode persists and alerts after at most ten minutes; stalled
+scans and unrelated stale evidence retain the shorter alert delay. Missing sources
+remain selected until an explicit reviewed save;
+reviewing the existing home selection lists removals and preserves archives.
+See `test_scan_publishes_completed_repo_without_refreshing_pending_repo`,
+`test_completed_repo_check_is_independent_of_an_older_scan`, and
+`test_reviewing_home_removes_missing_source_without_deleting_backup`.
+
+**Susceptible boundary:** Green check uses old archive data, stale hashes, missing upload flags or an unavailable helper.
+
+**Cause / solution:** Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts.
+
+**Required behavior:** Green requires fresh content verification plus exact-archive upload acknowledgement. Display policy 5 also permits the ordinary .DS_Store-only exception when project files and Git match. Keep the raw different comparison and Finder-only reason; absent view receipts do not prove agreement.
+
+**Diagnostic trail:** `status_repo`, `ui_presented`, `presentation_input_disagreement`, `presentation_disagreement`, `upload_stale`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation`
+- `test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success`
+- `test_backup_lifecycle.LifecycleTests.test_green_icon_with_missing_upload_is_logged_as_input_disagreement`
+- `test_change_evidence.EvidenceTests.test_no_record_of_second_view_is_not_claimed_as_agreement`
+- `test_change_evidence.EvidenceTests.test_both_views_are_correlated_and_disagreement_is_reported`
+
+**Remaining exposure:** Rendered progress percentages, selected-card visibility, pixels and clickability still lack full diagnostic acceptance coverage.
+
+### GR07 — Schedule and power policy stay per repo
+
+**Susceptible boundary:** A power transition pauses incorrectly, resets unrelated timers or starts all repos after one edit.
+
+**Cause / solution:** Track effective per-repo settings and cadence; recheck power before automatic work and preserve unattempted clocks.
+
+**Required behavior:** Battery defaults have no after-edit backups; manual-only works; a selected automatic plan cannot force unrelated repos.
+
+**Diagnostic trail:** `schedule_decision`, `backup_deferred`, `backup_paused`, `backup_finished`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_policy_health.PolicyTests.test_battery_default_is_no_after_edits_and_manual_only_is_supported`
+- `test_policy_health.SettingsHTTPTests.test_after_edit_plan_only_archives_selected_repo`
+- `test_policy_health.SettingsHTTPTests.test_power_change_finishes_current_archive_and_stops_next_repo`
+- `test_policy_health.SettingsHTTPTests.test_partial_automatic_run_does_not_advance_unattempted_repo_clock`
+- `test_policy_health.SettingsHTTPTests.test_repo_cadence_survives_restart_and_only_backs_up_due_repo`
+- `test_policy_health.SettingsHTTPTests.test_failed_periodic_backup_retries_in_five_minutes_not_a_full_interval`
+
+**Remaining exposure:** Physical battery transitions, full sleep/wake and logout/login cycles still require hardware smoke tests.
+
+### GR08 — Diagnostics cannot break or mutate backups
+
+**Susceptible boundary:** Full disk, partial records, rotation or logging recursion stops backups or produces fake edits.
+
+**Cause / solution:** Bound private JSONL storage; tolerate write loss; exclude diagnostics from monitored/saved data. Record unobserved gaps honestly.
+
+**Required behavior:** Backup operation survives log failure; malformed records are bounded; diagnostic activity creates no backup changes.
+
+**Diagnostic trail:** `heartbeat`, `runtime_gap`, `helper_started`, `backup_interrupted`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_diagnostics.DiagnosticTests.test_full_disk_failure_recovers_and_records_loss`
+- `test_diagnostics.DiagnosticTests.test_partial_write_survives_restart_without_poisoning_next_event`
+- `test_diagnostics.DiagnosticTests.test_logging_failure_does_not_stop_backup_or_enter_backup_data`
+- `test_change_evidence.EvidenceTests.test_diagnostic_activity_does_not_create_repo_or_saved_data_changes`
+- `test_backup_lifecycle.LifecycleTests.test_restart_discloses_incomplete_run_without_claiming_recovery`
+
+**Remaining exposure:** The app cannot observe while powered off. Missing records are evidence gaps, not successful recovery.
+
+### GR09 — Shared diagnostics have an explicit type contract
+
+**Susceptible boundary:** A new log field, raw error, nested payload or exact timestamp leaks through the export.
+
+**Cause / solution:** Use separately reviewed field-specific enums/types, fresh aliases and bounded relative measurements; reject unknown events and values.
+
+**Required behavior:** No names/paths/raw hashes/arbitrary text/exact dates/exact sizes; exclude private alias key from previews.
+
+**Diagnostic trail:** `verification_deferred`, `repo_checked`, `ui_presented`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_diagnostic_export.ExportTests.test_enums_are_field_specific_and_not_a_global_word_list`
+- `test_diagnostic_export.ExportTests.test_unknown_events_and_unknown_nested_fields_fail_closed`
+- `test_diagnostic_export.ExportTests.test_no_wall_clock_raw_sizes_hashes_or_free_text`
+- `test_diagnostic_export.ExportTests.test_adversarial_types_and_huge_numbers_do_not_escape_or_crash`
+- `test_diagnostic_export.ExportTests.test_namespaces_are_fresh_and_relative_order_preserved`
+- `test_report_preview.ReportPreviewTests.test_bug_has_exact_share_files_and_private_local_draft`
+- `test_diagnostic_export.ExportTests.test_reports_carry_the_running_apps_version_but_never_free_text`
+
+**Remaining exposure:** Operational patterns remain bounded facts. User-written report prose is separate; a preview and confidentiality reminder cannot guarantee it contains no personal information.
+
+### GR10 — Local HTML APIs cannot widen filesystem access
+
+**Susceptible boundary:** Untrusted origin/frame/path or stale JSON revision changes files outside its scope.
+
+**Cause / solution:** Keep loopback Host/Origin/token and revision guards; resolve allowed paths; native bridge accepts fixed actions and valid repo IDs.
+
+**Required behavior:** Reject cross-origin and arbitrary path/payload requests; report previews cannot redirect their destination.
+
+**Diagnostic trail:** `presentation_input_disagreement`, `runtime_error`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_hub.HubTests.test_http_json_conflicts_origin_host_and_view_boundaries`
+- `test_hub.HubTests.test_data_and_views_cannot_escape`
+- `test_hub.HubTests.test_backup_request_reports_when_nothing_will_start`
+- `test_hub.HubTests.test_scanning_never_runs_a_command_from_the_repos_git_config`
+- `test_hub.HubTests.test_scanning_never_runs_a_repos_git_filter_command`
+- `test_report_preview.ReportPreviewTests.test_http_preview_requires_existing_origin_and_token_checks`
+- `test_report_preview.ReportPreviewTests.test_bad_inputs_and_destination_injection_rejected`
+
+**Remaining exposure:** Credential-backed GitHub delivery and other cloud destinations are unimplemented and need their own threat model/tests.
+
+### GR11 — Restore audit must independently verify every supported entry
+
+**Susceptible boundary:** Archive corruption/path traversal, input mutation or receiving umask hides a broken restore.
+
+**Cause / solution:** Use an independently captured manifest, trusted input identities, safe isolated extraction and Git fsck/history checks. Explicitly restore link modes without changing targets.
+
+**Required behavior:** Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Permit standard registered-worktree administration only after regular-file, bounded-content and shared-store checks; never follow checkout back-pointers or claim outside checkout files were restored. Restore links that leave the root as exact link text, never follow them, list them in receipts and keep Git-storage links that leave the root refused.
+
+**Diagnostic trail:** `archive_verified`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_restore_audit.RestoreAuditTests.test_full_restore_with_ignored_uncommitted_git_and_log_receipts`
+- `test_restore_audit.RestoreAuditTests.test_finder_files_in_git_refs_are_tolerated_but_other_fsck_errors_fail`
+- `test_restore_audit.RestoreAuditTests.test_empty_nested_git_marker_restores_but_pointer_files_still_fail`
+- `test_restore_audit.RestoreAuditTests.test_relative_output_and_source_paths_still_verify_git`
+- `test_restore_audit.RestoreAuditTests.test_named_pipes_in_the_source_are_not_part_of_the_restore`
+- `test_restore_audit.RestoreAuditTests.test_finder_only_differences_pass_only_when_allowed_and_are_counted`
+- `test_restore_audit.RestoreAuditTests.test_allowing_finder_files_still_catches_every_other_difference`
+- `test_restore_audit.RestoreAuditTests.test_gitmodules_inside_a_dependency_restores_but_top_level_submodules_fail`
+- `test_restore_audit.RestoreAuditTests.test_symlink_mode_survives_different_receiver_umask_without_changing_target`
+- `test_restore_audit.RestoreAuditTests.test_corrupt_archive_and_wrong_manifest_identity_fail_before_extraction`
+- `test_restore_audit.RestoreAuditTests.test_traversal_duplicate_extra_and_absolute_paths_are_rejected`
+- `test_restore_audit.RestoreAuditTests.test_input_mutation_during_restore_is_reported`
+- `test_restore_audit.RestoreAuditTests.test_restored_hooks_and_fsmonitor_are_not_executed`
+- `test_restore_worktrees.RestoreWorktreeTests.test_registered_worktree_metadata_restores_without_external_checkout`
+- `test_restore_worktrees.RestoreWorktreeTests.test_external_or_malformed_common_directory_is_rejected_before_git`
+- `test_restore_worktrees.RestoreWorktreeTests.test_tampered_archive_common_directory_fails_before_git`
+- `test_restore_worktrees.RestoreWorktreeTests.test_linked_root_git_markers_and_common_store_redirection_stay_rejected`
+- `test_restore_worktrees.RestoreWorktreeTests.test_missing_or_symlinked_administrative_files_are_rejected`
+- `test_restore_worktrees.RestoreWorktreeTests.test_invalid_registered_head_is_not_a_successful_git_audit`
+- `test_restore_worktrees.ContainedCheckoutTests.test_checkouts_inside_the_repo_restore_and_are_compared`
+- `test_restore_worktrees.ContainedCheckoutTests.test_pointer_to_another_repo_or_mismatched_back_pointer_is_refused`
+- `test_restore_worktrees.ContainedCheckoutTests.test_baseline_without_the_pairing_is_refused_before_extraction`
+- `test_restore_audit.RestoreAuditTests.test_legacy_baseline_without_worktree_scope_still_restores`
+- `test_restore_audit.RestoreAuditTests.test_outside_link_is_reported_but_git_alternates_fail_capture`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_outside_links_restore_exactly_and_are_reported`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_forged_entry_beneath_an_outside_link_never_writes_outside`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_git_internal_outside_links_stay_rejected_before_git`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_tampered_link_report_or_target_fails`
+- `test_restore_outside_links.RestoreOutsideLinkTests.test_baseline_without_link_report_still_restores_and_discloses`
+
+- `test_restore_capacity.RestoreCapacityTests.test_valid_manifest_above_eight_gib_has_no_fixed_byte_ceiling`
+- `test_restore_capacity.RestoreCapacityTests.test_insufficient_capacity_fails_before_any_extracted_file`
+- `test_restore_capacity.RestoreCapacityTests.test_large_plan_uses_allocation_fragments_and_explicit_budget`
+- `test_restore_capacity.RestoreCapacityTests.test_operator_budget_and_reserve_are_recorded_on_a_real_restore`
+- `test_restore_capacity.RestoreCapacityTests.test_operator_budget_refuses_capture_and_restore_without_extraction`
+- `test_restore_capacity.RestoreCapacityTests.test_space_loss_mid_copy_retains_failure_receipt_and_unchanged_inputs`
+- `test_restore_capacity.RestoreCapacityTests.test_filesystem_space_error_never_becomes_a_pass`
+- `test_restore_capacity.RestoreCapacityTests.test_copy_uses_bounded_memory_and_detects_short_or_overlong_streams`
+- `test_restore_capacity.RestoreCapacityTests.test_invalid_budget_arguments_and_entry_guard_still_fail_closed`
+- `test_restore_capacity.RestoreCapacityTests.test_inventory_entry_limit_stops_before_building_an_unbounded_manifest`
+
+**Remaining exposure:** Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Root linked-worktree Git files, external shared stores, submodules and alternates still fail closed. Links that leave the root restore as link text; their targets' contents are not captured and may not exist on the receiving Mac. Captured administrative files retain original checkout back-pointers; they do not capture or rebind those outside checkouts. Large restores have no fixed byte ceiling: optional operator budgets, capacity preflight, a configurable free-space reserve and periodic checks constrain extraction. Entry-count/baseline limits remain. Capacity checks are observations, not disk reservations; partial failed outputs are retained and never reported as a pass.
+
+### GR12 — Installation and restart must load the tested release
+
+**Susceptible boundary:** Missing runtime module/route, stale native web view or launch-job reload fails after copying new code.
+
+**Cause / solution:** Validate package/asset dependencies; retain old runtime; restart existing registered jobs; verify installed hashes and helper build identity before considering deployment complete.
+
+**Required behavior:** Compiled native sources and packaged modules/routes must agree; local diagnostics must disclose interrupted runs.
+
+**Diagnostic trail:** `helper_started`, `backup_interrupted`, `heartbeat`. Join repo/run/archive/observation aliases; event presence alone is not proof of a successful outcome.
+
+**Regression tests:**
+
+- `test_backup_lifecycle.LifecycleTests.test_restart_discloses_incomplete_run_without_claiming_recovery`
+- `test_backup_lifecycle.LifecycleTests.test_creation_reuse_and_render_reason_share_archive_run_identity`
+
+**Remaining exposure:** Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration.
+
+
+### GR13 — A report sends only its exact consented payload once
+
+**Susceptible boundary:** Timeouts, double-clicks, crashes, account switches or unsafe preview/destination changes can publish the wrong report or duplicate it.
+
+**Cause / solution:** Freeze and hash the exact public preview; require explicit Send/account confirmation; persist sending before POST under a process-safe lock; reconcile ambiguous outcomes against exact authored issue bytes without automatically reposting. Credentials remain in native Keychain/backend memory.
+
+**Required behavior:** Fixed product tracker and approved diagnostic text only. Durable exact-identity receipts, retained drafts, no background sending, no token/prose in operational logs or HTML credential handling.
+
+**Diagnostic trail:** `report_delivery`, with report-local aliases and approved state/reason codes only. No titles, prose, account names, issue URLs or credentials.
+
+**Regression tests:**
+
+- `test_report_delivery.ReportDeliveryTests.test_exact_preview_receipt_and_repeat_send_never_duplicates`
+- `test_report_delivery.ReportDeliveryTests.test_lost_post_response_recovers_existing_issue_without_second_post`
+- `test_report_delivery.ReportDeliveryTests.test_absent_issue_after_ambiguous_send_is_not_permission_to_repost`
+- `test_report_delivery.ReportDeliveryTests.test_process_interruption_leaves_durable_uncertain_identity`
+- `test_report_delivery.ReportDeliveryTests.test_double_click_while_posting_is_serialized`
+- `test_report_delivery.ReportDeliveryTests.test_client_cannot_change_destination_payload_or_consent`
+- `test_report_delivery.ReportDeliveryTests.test_foreign_or_malformed_receipt_never_becomes_sent`
+- `test_report_delivery.ReportDeliveryTests.test_delivery_diagnostics_contain_only_codes_and_aliased_identity`
+- `test_report_delivery.ReportDeliveryTests.test_sender_api_uses_existing_origin_and_token_boundary`
+- `test_report_labels.ReportLabelTests.test_issue_text_never_selects_other_labels_or_commands`
+- `test_report_delivery.ReportDeliveryTests.test_failed_durable_intent_flush_cannot_start_a_post`
+
+**Remaining exposure:** GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. Check Keychain prompts and independent connection setup on each Mac. Issue categorization runs from the default branch.
+
+### GR14 — Reporting must be reachable in the menu bar
+
+**Susceptible boundary:** Backend/syntax tests pass while the primary menu-bar UI omits reporting controls.
+
+**Cause / solution:** The main app had reporting controls and the menu only had connection setup. Both shipped pages now load the same report controller and styles, with reporting controls in settings.
+
+**Required behavior:** Bug and feature entry points, separate drafts, exact previews and explicit sends work on both surfaces. An absent or duplicate controller element fails the regression.
+
+**Diagnostic trail:** `report_delivery`. Compose and preview remain local; no event is proof of an actual GitHub acceptance.
+
+**Regression tests:**
+
+- `test_report_entry.ReportEntryTests.test_both_surfaces_support_report_compose_preview_and_explicit_send`
+
+**Remaining exposure:** The automated DOM/API harness does not prove native WebKit layout, modal focus, token onboarding or live GitHub behavior. Check layout and focus in the installed menu.
+
+### GR15 — Workspace selection preserves identity and copy scope
+
+**Susceptible boundary:** A new source mode changes existing IDs, aliases duplicate a source, missing folders publish empty replacements, or configuration changes race backup source selection.
+
+**Cause / solution:** Persist a canonical source registry with inactive identity records, retain legacy IDs and validate overlaps/protected locations. Saves require a matching revision and idle scan/backup locks. Take the backup source snapshot under that same lock. Check an approved directory's canonical location before scanning/copying it.
+
+**Required behavior:** Migration preserves backups, saved JSON, schedules and per-repo settings. Same-named folders remain distinct. Removal stops monitoring without deleting sources/current archives. Unavailable/retargeted sources fail safely, and saved manual selections no longer depend on the obsolete home setting. Invalid/stale/busy/failed saves retain the old selection.
+
+**Diagnostic trail:** `workspace_configuration`, `repo_checked`, `repo_backup_failed`, `repo_backup_finished`, `status_repo`, `ui_presented`. Successful configuration events contain only mode/result/count; subsequent repo/run/archive aliases explain copy outcomes. Exporting source paths/names is forbidden.
+
+**Controlled counterexample:** The new interleaving regression was run against the parent implementation's backup method and failed because configuration saving was allowed between taking the old source list and acquiring the backup lock. The fixed implementation rejects that concurrent save. The duplicate-name diagnostic regression also fails against the earlier name-based projection: both same-named rows are falsely marked as copying. Backup activity, errors, UI status and problem episodes now use workspace IDs, with legacy-name fallback only when the ID field is absent. The shared JavaScript policy checks that the other same-named card stays ready and receives no unrelated error. These are synthetic findings, not evidence of personal backup incidents. Private reproduction logs remain outside Git.
+
+**Regression tests:** All 16 `test_workspace_registry.WorkspaceTests` methods are required by [golden-rules.json](golden-rules.json), including migration/persistence, alias/collision handling, source availability, revision/lock/write failures, the controlled interleaving, API authorization and sanitized configuration diagnostics. The macOS gate separately runs the native bridge executable's manual-path approval/rejection checks.
+
+**Remaining exposure:** Native URL checks do not prove actual Finder/picker interaction. Separate-volume remounts, inaccessible-volume recovery, concurrent filesystem replacement and source relocation still need live coverage. Destination migration, folder naming and setup UI have separate coverage under GR23 and GR24. See [the configuration contract](../WORKSPACE_CONFIGURATION.md).
+
+## GitHub sign-in and issue-write permission
+
+A token can authenticate as the tracker owner while issue submission returns `failed / github_access_denied`. The generic UI error did not explain that sign-in and permission to create an issue are separate checks. The receipt alone does not identify a permission change.
+
+The UI identifies access denial and directs the reporter to check token validity, selected RepoHub access and Issues read/write; it does not claim that a 401/403 proves missing permissions. Draft bytes and preview identity survive rejection and explicit retry. Operational diagnostics export only the existing enumerated denial code and aliased report identity. No credential or provider error prose is exported.
+
+GR13 additionally requires `test_report_delivery.ReportDeliveryTests.test_sign_in_success_does_not_grant_post_permission_and_retry_keeps_draft`. GR14's existing both-surface controller regression now exercises a successful account check followed by denied submission, actionable feedback, a connection check that does not resend, and explicit retry of the same preview. Native rendering of the denial message and onboarding on a fresh installation require separate checks.
+
+## Source-picker and review boundary (GR16)
+
+A repo-home child may appear between review and save, or a late/cancelled native picker callback may belong to an obsolete draft. The native bridge accepts only fixed directory-picker actions with a typed correlation ID on the exact main menu frame. Draft cancellation invalidates that ID. The backend preview validates paths without saving; a reviewed save rechecks both registry revision and the entire candidate fingerprint under the configuration/backup lock. Conflict preserves the approved configuration and asks for a fresh review. `workspace_review` logs bounded outcomes/mode/count, never raw folder paths. Live native focus, cancellation, multi-selection and visible exact-path review require manual testing in the native app.
+
+A second top-level modal can be inaccessible: visually rendered controls were absent from WebKit accessibility. Reuse the existing settings dialog for the setup form; require live accessibility and picker checks, not screenshots or diagnostics alone. Rejected configuration saves produce a bounded failed event without path/prose.
+
+## Client startup freshness — GR06
+
+The menu changed cached backend health when local requests failed or a 20-second timer expired. It then reported stale icons against a fresh original observation. Both HTML surfaces now retain the original snapshot and render a separate client freshness projection. Typed request-failed, timeout and cache-expired contexts explain conservative stale displays; false green still raises disagreement. Check startup, timeout and recovery separately in the native app.
+
+## Access denial and unavailable storage — GR17
+
+Actual mode-bit restrictions exercise denied root and nested-file reads, denied archive writes and revocation between archive creation and validation. Existing verified bytes/index remain unchanged; accessible independent repos continue and restore of access recovers. Typed errno-based outcomes do not diagnose TCC. macOS privacy prompts require a native test.
+
+## Source substitution — GR18
+
+Canonical path and workspace ID alone cannot distinguish a replacement folder/volume. Add directory file ID and volume UUID when accessible; retain existing IDs. Recheck before reads and publication, block mismatches and require an explicit reviewed selection. Remount testing uses a disposable disk image; physical hot-unplug is not simulated proof.
+
+In an HFS+ disk-image test, unmount retained the prior archive/index, a replacement directory at the former mount path was rejected, and remount of the original HFS+ image recovered with the same volume/directory identity and reused the verified archive. Disk-image tests cover separate-volume identity. Physical disconnection and privacy prompts require separate checks.
+
+## Permission readiness — GR19
+
+Settings shows helper-probed source/destination access, actual notification authorization and installation-matched login registration. An explicit Check access action probes all selected regular files without following links and creates/removes only its own destination test file; it does not verify archives or uploads. Notification requests are contextual, not automatic at every launch. An asynchronous check keeps large trees from timing out the settings request. Use a separate test identity for macOS privacy and notification checks to preserve existing permission grants.
+
+Volume checking initially used repeated diskutil subprocesses, making the full regression run unacceptably slow. The helper now reads Apple's persistent volume UUID directly with Core Foundation using a fresh URL for each check, retaining remount/substitution protection without process startup.
+
+Freshness delivery retains at most one unavailable frame in memory and retries it after reconnect before the current frame. Expired backend observations remain unobserved gaps. Server event timestamps are receipt times, including deferred delivery; they are not proof of the moment pixels changed. Both request timeouts and cache expiry have explicit typed contexts.
+
+### Native picker pathname aliases
+
+The simultaneous-folder picker returned `/tmp/...` for a previously stored
+`/private/tmp/...` folder. The draft deduplicated strings, so both appeared before
+review despite referring to the same directory. Native picker results now use
+POSIX realpath, matching helper canonicalization. Finder resolution uses the same
+comparison for approved registry paths. Native bridge checks cover both aliases
+and a directory symlink; simultaneous selection also requires a native picker check.
+
+### Notification request is separate from permission
+
+The native readiness screen can remain `notDetermined` after an explicit
+request. Without an observed grant or refusal, this state is not evidence
+of a macOS permission decision. Calling a request must not continue to display
+“not requested”: the native app now records pending/completed/failed request states
+without exception prose and suppresses duplicate requests while one is pending.
+Only the OS authorization state can say allowed or denied. Readiness JavaScript
+regressions cover those combinations; grant and refusal require native permission tests.
+
+The bounded offline-frame slot is also compare-and-clear: completion of an older
+POST cannot erase a newer freshness frame queued while that request was in flight.
+A JavaScript concurrency counterexample is required by the gate's delivery suite.
+
+## Native picker obscured by the menu
+
+A floating menu popover can obscure the NSOpenPanel. Helper/API operation and draft-only removals were intact. This is a native window-order failure rather than a backup failure. Close the popover before showing the independent picker and reopen its retained WebKit draft on choose/cancel. Check that picker controls are unobscured and the draft survives both selection and cancellation. Verify window order in the running native app.
+
+## Remote login and background-helper permissions
+
+In an isolated account, the
+background helper can receive EPERM for a Desktop source that the SSH
+caller could read it. A native Terminal re-bootstrap of the same owned launch job
+reproduced the denial. Source review failed without changing the saved registry.
+A helper-specific folder-access prompt or entry can be absent. A GUI session
+can exist without the account owning the physical console. Console ownership is a
+variable to eliminate, not a diagnosis that console activation will necessarily
+fix the helper's privacy attribution.
+
+Keep caller/picker/background-helper access evidence separate. EPERM alone does
+not prove a user explicitly refused TCC; a successful picker does not grant the
+helper equivalent access. Release testing must verify prompt refusal and restoration
+using an isolated session and test identity. Preserve
+existing TCC grants and avoid broad access.
+Restore any services stopped for testing before changing login sessions.
+GR17/GR19 regressions establish fail-closed read handling and optional notification
+behavior, but do not replace this native evidence.
+
+Native test coverage includes notification consent, revocation, restart and
+with successful backup after revocation. A failed initial request is
+not a proved explicit refusal. Record request lifecycle and observed authorization
+separately; do not infer a user decision from the banner or disabled switch.
+
+
+Apple's [responsible-code guidance](https://developer.apple.com/forums/thread/678819)
+identifies bundle association as relevant to attribution. The system-Python helper launch
+agents currently have no `AssociatedBundleIdentifiers`. Inspecting that omission
+is not proof that adding it fixes the missing prompt. Preserve the failing helper
+observation, distinguish GUI session membership from physical-console ownership,
+and require an actual isolated helper refusal/restoration test after any change.
+Repeat the required installed-build checks for each candidate whose packaging changes.
+
+
+## Background Python shim lost app attribution — GR19
+
+A native attribution test isolated the missing
+Desktop prompt. Local console activation did not resolve the original helper
+EPERM. Adding AssociatedBundleIdentifiers alone did not resolve it; neither did
+launching the same Python version directly. Narrowly filtered system logs
+attributed access to Apple's Python/tool shim, rather than RepoHub. The denied
+review left the saved registry unchanged. EPERM still must not be described as a
+user refusal without actual OS evidence.
+
+A native launcher with a distinct test identity entered the unchanged Python helper
+via execv. The actual macOS Desktop prompt appeared for that probe identity.
+Clicking Don't Allow blocked the helper's review; restoring only that test
+identity's Desktop switch through System Settings recovered the same review.
+Restoring permission can require local authentication. A system-wide TCC reset and Full
+Disk Access were unnecessary. This test covers helper attribution only.
+
+
+The fix enters helper mode through the app's native executable before any menu
+initialization, retaining the interpreter, config, environment and launchd PID.
+execv avoids a supervisor orphaning Python when its job stops. The production
+installer and both guarded staging paths use the same command builder. The gate
+checks strict arguments, inherited environment, exit/failure propagation and
+same-PID SIGTERM ownership. Detached watchdogs include the builder dependency.
+These checks prevent lifecycle/packaging regressions; only actual native reads
+can prove TCC permission behavior. Repeat the required native permission checks
+on each required release host, including refusal, restoration and restart.
+
+
+## Status wording must not become backup evidence
+
+Presentation grouping can accidentally promote a Finder-only exception, a stale
+frame or a different archive's upload into success. Keep the existing internal
+policy intact; independently validate the new category and sentence against the
+original observation. GR06 and GR09 require cross-language mapping/counterexample
+and export-privacy regressions. Unknown evidence stays unknown. Native pixel,
+wrapping and installed-menu checks remain separate from diagnostic agreement.
+
+
+## Information guide title overlaps scrolling text
+
+A sticky heading inside a padded scrolling dialog left an exposed strip above
+it. Separating the full-width header from the guide scroll container removes
+that overlap. Keyboard focus can also scroll an overflow-hidden ancestor when
+descendant content contributes to its scroll area: layout/paint containment on
+the guide body prevents that second failure. Browser keyboard-to-bottom evidence
+kept the outer dialog at scroll zero. Native WebKit scrolling, narrow-window
+wrapping, keyboard navigation and Escape require installed-app checks.
+
+
+
+## Timing evidence must agree without destroying observation identity
+
+Secondary location/due/date/countdown claims now have independent selected-repo
+receipts. Private date strings are compared against the original observation;
+only fixed codes and bounded whole minutes enter logs/exports. Unknown types,
+missing selected receipts and arbitrary dates fail closed. GR06/GR07/GR09 name
+the regressions, which CI discovers automatically.
+
+Including each poll's observed_at in snapshot identity risks
+breaking cross-view correlation even when meaningful evidence was unchanged.
+Drop that sampling field and bucket remaining time to displayed whole minutes
+for identity; retain original snapshots unchanged. Periodic due dates use the
+saved wall-clock anchor directly, avoiding floating subtraction drift.
+Native countdown readability and actual sleep/power behavior remain unproven.
+
+
+### Whole-minute countdown boundary
+
+A nominal 30-minute wait could display as 31 minutes. Tiny
+monotonic/wall-clock floating-point conversion noise rounded upward twice: once
+to seconds and again to minutes. Derive remaining seconds from the projected
+wall due time and remove sub-millisecond noise before the existing upward
+rounding. A deterministic fractional-clock counterexample protects the boundary;
+scheduler eligibility itself is unchanged.
+
+
+## GR20 — coordinated app replacement
+
+An ad-hoc native replacement lost its prior macOS permission requirement and
+rolled back, while a browser preview continued serving newer web assets against
+an older helper. A working source build did not mean that the installed app had
+updated. The new bundle builder pins Python and Sparkle, includes web/helper
+resources in one manifest, and checks that the connected helper reports the
+same release before loading the menu. Test bundles use a disposable identity,
+state and port. Native integrity and complete Sparkle package builds now run
+inside the existing macOS gate; the workflow invokes that gate already.
+
+The web-resource boundary now uses an explicit list in `tools/package_app.py`.
+A controlled build using the former whole-directory copy included injected
+`.env`, Finder metadata, scratch files and a symlink target in its valid resource
+manifest. Hashing that manifest did not establish that the files belonged in a
+release. The builder now copies only declared regular web files, rejecting a
+missing required asset or a linked source file/directory. All 17 existing served
+assets remain; this does not remove the dashboard or retained notes route.
+The gate rejects a served route omitted from the package list. GR20 registers
+the actual-build resource-selection regressions and the omitted-route
+counterexample. Compilation/signing are stubbed only for the synthetic selection
+tests; the macOS gate separately compiles and builds the complete native bundle.
+Private local files are excluded, not deleted. No new runtime diagnostic event
+or status rule is required for this build-time boundary.
+
+A SIGTERM to a bundled helper waits for the actual backup lock, covering a
+backup that begins after a native idle check. The updater never sends SIGKILL.
+Signed upgrades and failure recovery require installed-build tests. Production
+signing, notarization and permission continuity are not established by ad-hoc
+test signatures.
+
+
+### Loopback startup must not depend on hostname resolution
+
+A synthetic helper can time out during startup even when
+scheduler and proxy inputs are isolated. A child-process stack trace
+showed `HTTPServer.server_bind` blocking in `socket.getfqdn` under
+Python 3.15. Bind with TCPServer and assign the fixed loopback name/actual port;
+no resolver is needed. A deterministic regression makes getfqdn raise, confirms
+the standard server counterexample, and requires the RepoHub server to bind.
+Wildcard binding is rejected. Changes to server startup require native
+updater checks on the revised package.
+
+
+### Permission identity across signed updates (GR20)
+
+An update from ad-hoc signing to Developer ID signing can request
+Desktop consent again. The ad-hoc app's designated
+requirement was a binary hash with no Team ID. The Developer ID package uses the persistent
+Developer ID requirement for Team `LJM5FKB7DY`. This is evidence of a signing-identity
+transition, not a reproduced signed-to-signed permission failure.
+
+`tools/signing_identity.py` records the reference app, Python helper and cloud tool
+identifiers and designated requirements from the first Developer ID package. Both Developer ID packaging and archive
+preparation reject another team, changed helper identity, custom/hash-only
+requirements and escaping component links. Counterexamples include a valid
+signature with an incompatible declared requirement; notarization is insufficient
+for this contract. The identity check is read-only and no
+privacy setting is reset or edited. A subsequent signed Sparkle update must still
+demonstrate retained consent and helper-observed source access independently.
+
+Apple documents designated requirements and privacy-resource sharing in
+[TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+
+
+## GR21 — verified main revisions and atomic release availability
+
+A feature-branch or pull-request gate cannot qualify a release from main. Publication
+requires the successful main-push workflow and job for the checked-out exact SHA;
+a new main commit during upload prevents that draft from publishing. Tests inject
+upload failure, altered downloaded assets and superseding source, and require no
+publication or package deletion. Latest-release uncertainty or a bad historical
+receipt prevents all cleanup. Cleanup retains current plus three prior managed
+packages and preserves tags and unrelated releases. The workflow is syntax-checked
+by pinned actionlint inside the macOS Golden Gate. Live Apple service and GitHub
+publication require credentialed checks separate from the gate.
+
+### GitHub drafts do not yet create their Git tag
+
+A GitHub draft release can identify its exact target before its tag exists.
+An immediate
+`commits/<tag>` verification would therefore stop every first publication. Check
+for conflicting existing tags before creating the draft; validate the draft's
+exact target SHA, and resolve the tag after publication. The regression includes
+a missing-tag normal case, foreign tag collision and moving-branch draft target.
+For a disposable draft, compare uploaded and downloaded fixture bytes before removing its assets.
+
+
+### Explicit personal delivery before Apple signing
+
+Apple distribution readiness was incorrectly made a dependency of personal
+Sparkle delivery. An explicit personal_adhoc mode preserves HTTPS, bundle identity,
+archive authentication, exact-main acceptance and retention guards while omitting
+Apple submission. Conflicting app/manifest distribution flags are rejected.
+Background discovery uses Sparkle's actual SUScheduledCheckInterval key and
+one-hour minimum; the native settings check reads the built bundle through
+SPUUpdaterSettings. Silent installation remains disabled. Developer ID mode keeps
+its original certificate/notary requirements.
+
+### Legacy Homebrew interpreter responsibility identity
+
+For a Homebrew installation, the configured bin
+interpreter executes the framework’s Python.app binary. Comparing only the bin
+symlink’s target falsely rejected the legitimate service before any stop. Resolve
+the real process path by probing exactly the configured interpreter in isolated
+mode, then retain the same strict libproc PID-path comparison. The regression
+requires the configured interpreter and rejects malformed probe paths; no name-only
+process matching or generic Python termination is introduced.
+
+### Register a replaced bundle before loading its login agent
+
+A migration that encounters `launchctl bootstrap` EIO (5) should automatically
+restore the previous app and helper with matching protected-file hashes. The same
+published executable loaded its argument guard normally and both disposable
+launchd tests passed, so an executable-loading fault was not established. Refreshing
+the replacement bundle through Apple’s lsregister before bootstrapping the unchanged
+frontend plist allowed the matching packaged app to start with its configuration preserved.
+The regression fixes this ordering and retains future bootstrap stderr only in the
+private migration journal. Successful registration before bootstrap
+does not establish launchd’s undocumented internal reason for the earlier EIO.
+
+### Settings navigation must not silently consume an unsaved draft
+
+Opening another page, native permission-readiness entry, Close and Escape are not
+save actions. Keep a canonical draft baseline, ask before discarding actual edits,
+and serialize the existing token/revision-checked save. Failed requests preserve
+editable values and do not claim confirmed persistence. Native access entry must
+honor a declined discard decision before fetching/replacing the schedule form.
+
+The menu and full status page share the folder controller. Exercise both interfaces. Review
+must not save; busy saves block duplicate submits and navigation; conflicts keep
+the selected draft and offer explicit reload. Only a successful reviewed save
+returns to Settings home. GR22 registers the actual controller regressions. Native
+picker, privacy prompts and installed WebKit behavior are separate acceptance cases.
+
+### Moving technical details must preserve repository identity
+
+A technical disclosure outside the summary still belongs to the selected repo.
+Include that identity in its markup, keep open/closed state per repo, and ignore
+queued toggle events from detached nodes. Otherwise identical technical text can
+reuse another repo's disclosure state. The isolated information-controller
+regression exercises switching, late toggles, refresh and an empty selection;
+GR06 registers it. Browser checks also cover the fixed About header, Back,
+Escape and the existing Show me action. Installed WebKit behavior requires a native check.
+
+### Finder view settings may share the Backed up display
+
+The normal Backed up card, green check and headline for the existing
+ordinary .DS_Store-only exception. Earlier presentation policies used an information icon
+for this case. The raw comparison stays different, the
+legacy internal view stays background/not-ready, and backup eligibility, archive
+verification and retention remain unchanged. Policy status-clarity-5 describes the
+new display; versions 1–4 keep their original diagnostic interpretation.
+
+Diagnostics independently require fresh source verification, the same verified
+archive, no pending backup/failure/active creation, and upload acknowledgement for
+that archive. They retain finder_only_project_match instead of claiming exact
+current byte equality. Technical details disclose the .DS_Store difference. GR06
+registers positive, conservative, legacy-version and real temporary-backup/export
+regressions. Rendered appearance requires a separate installed-app check.
+
+## A correct expanded time does not prove a compact card displayed it
+
+The collapsed card overview adds a second timing location. Policies 4 and 5
+check only the selected expanded receipt, so they cannot establish that every
+card showed its time. Policy 6 requires each card's scheduler receipt and a
+small DOM observation of its compact meaning, date attribute and actual text.
+The horizontal overview always supplies all card receipts. When a repo is
+selected it adds exactly one expanded-line observation; a collapsed overview
+uses a null selection. Only the actively selected repo has technical details.
+The presentation is computed once
+per repo per render and shared by both locations. Diagnostic expectations remain
+independent of the renderer. Missing, hidden or incorrect card lines are tested
+without using the expanded line as their evidence. Earlier policies retain their
+original contracts.
+
+Only the fixed card/detail surface code and existing bounded timing facts enter
+logs and shareable exports; exact dates remain in the private comparison request.
+GR06 and GR09 register the regressions. Existing Python discovery runs them in
+GitHub Actions automatically. Browser layout and native WebKit acceptance
+remain separate from these DOM-observation and evidence-contract tests.
+
+## First-run setup, destinations and discovery
+
+GR23 requires a fresh package to start without a personal configuration and remain
+idle until an exact reviewed draft passes helper-owned access checks. Setup saves
+share the backup/scan/configuration locks and journal their directory moves and
+metadata writes. A prepared journal blocks operation until recovery succeeds;
+revision, identity and archive checks do not become optional during recovery.
+Native checks compile the app, exercise a unique test bootstrap and restrict the
+welcome bridge to its exact trusted web view/page/port. UI controller and HTTP
+tests distinguish review from save and explicit first-backup requests.
+
+Draft reload could fail in the native view when an unhosted
+JavaScript confirm silently refused the action. The real controller regression
+models that refusal, proves reload restores saved selections without calling
+apply, and checks that discovery/access/completion UI cannot leak from the old
+draft. Reload is an explicit draft discard and uses no browser dialog; it waits
+for native picking or discovery to finish.
+
+GR24 keeps stable IDs in metadata and names backup folders after sources, grouping
+duplicate leaf names by their distinguishing parent paths. Existing paths change
+only on reviewed apply. Hashes guard migration; uploaded observations cannot be
+reused after a path changes. Switching destinations leaves old archives in place
+and requires a new copy. A missing or replaced destination is never recreated or
+silently rebound. General provider support is outside this release.
+
+The native Repository Backups action previously used a path
+hard-coded to the legacy collection. It now resolves only the helper's fresh
+selected root, with configured/canonical/existing-directory checks and no default
+fallback. The macOS bridge regression covers changing the selected root,
+unconfigured or malformed status, redirected/file/missing targets and no path
+creation. Its trusted page action still accepts no path or URL from JavaScript.
+
+GR25 makes recursive Git discovery a bounded, cancellable candidate scan. It does
+not save selections or run backups. Git markers are validated, Git internal and
+protected folders are excluded, and unsupported external history is disclosed.
+Ordinary folders and repo-home mode keep their existing behavior. Source paths,
+names and review fingerprints stay out of the typed setup/discovery diagnostics.
+
+Git discovery has a cancellation race if completion is published after the last
+traversal check: an accepted request could publish complete instead of cancelled.
+The regression now pauses the worker at its final identity check with events,
+accepts cancellation, then releases completion. It fails reliably before the
+fix. Final publication checks cancellation under the same lock, retaining
+incomplete results and a partial diagnostic rather than claiming a full scan.
+
+See the [getting started guide](../GETTING_STARTED.md) for the first-run flow and the
+remaining native permission, iCloud and installed-update checks. The macOS PR,
+main and publication workflows all execute the same complete Golden Gate; new
+Python/JS wrappers are discovered automatically, with registered test IDs failing
+the gate if absent, skipped or unsuccessful.
+
+## GR26 — Staged updates preserve Stable and package identity
+
+A single-host exception requires explicit release approval, an exact candidate
+acceptance record and a separate exact-tag CLI flag. Default promotion still
+requires both configured host records. All checks for `pro`, GitHub qualification, the protected-main check and the
+archive/signature requirement remains. Public proof and notes disclose the
+exception and identify the omitted host checks. Counterexamples reject another tag,
+a missing exception, incomplete required-host checks and missing `air` results without the exception flag.
+
+### Repeatable local Dev credentials
+
+A one-use publishing launcher discarded its signing inputs and
+could not support repeat publication. A failed draft lookup
+consumed the launcher and prevented a retry. This affected
+release publishing only.
+
+`tools/local_dev.py` now separates one-time secure setup from repeatable explicit
+Dev publication. Setup checks the original public key against repository
+configuration, verifies private/public continuity and Apple credentials, and
+saves the existing material in Keychain only after success. The Developer-ID-
+signed helper trusts its own code identity; no allow-all ACL or silent credential
+replacement is used. Bounded pipe input is read completely rather than assuming
+one read returns the entire credential bundle. No signer is shipped to app users.
+
+The gate runs without signing credentials; source drift or a failed gate prevents
+loading them. Missing/locked/cancelled Keychain access and an untrusted helper
+stop before release mutation. A failure records its actual stage and permits a
+new run of the same command. Child signing output is not persisted or echoed;
+errors expose typed reasons only. These developer run records are private, not
+backup readiness evidence or shareable application diagnostics.
+
+Fixtures exercise two publications without secret prompts, gate/source failure,
+locked access, publisher failure/retry, existing-item refusal, configured-key
+mismatch, secret-free errors, unsigned-helper refusal and a disposable Keychain
+roundtrip without changing the user's search list. Fixture UI is explicitly
+disabled so a locked-item test cannot wait for a consent dialog. Real Keychain
+provisioning requires secure credential entry. A subsequent signed Sparkle
+update requires a separate check of Desktop permission continuity.
+
+Signed-helper preparation can fail with an inline-requirement syntax
+error missed by the mocked command fixture: `codesign -R` interpreted bare text
+as a filename. Prefix the predicate with `=`; the Security framework's string
+API still takes bare text. A real ad-hoc-signed temporary binary now reproduces
+the pre-fix rejection, passes the corrected expected identifier and fails a
+foreign identifier. The regression needs neither a production signing key nor an installed copy of RepoHub.
+
+
+A single GitHub latest feed made every accepted main release visible to every
+installation. The two-channel contract separates Dev and Stable; exact-package metadata records
+local checks, full GitHub qualification and installed acceptance in that order. Stable remains the default on each Mac. Native
+actions accept only fixed channel names and exact owned menu-page requests;
+revision conflicts and an active update/backup prevent an ambiguous save.
+
+A saved Dev preference previously worked without a separate deliberate opt-in,
+and every installation showed experimental choices. An explicit Boolean local
+preference now enables those choices only after restarting the app. Missing,
+false or malformed enablement forces effective Stable selection even when a Dev
+preference remains on disk. Native saves reject experimental channels without
+that opt-in; page messages cannot enable it. The launch-time policy snapshot
+prevents an external preference change from switching policy midway through an
+update session. Tests use disposable preference domains and a second process to
+check persistence and revocation without modifying installed app preferences.
+The shipped controller hides choices until a valid native response enables them;
+forged DOM selection or contradictory replies cannot enable saving. The page
+must not imply confirmed Stable settings when loading failed: it shows
+settings as unavailable and disables its update action until a valid reply loads.
+Diagnostics preserve the effective channel and a bounded enabled/disabled policy, rejecting
+contradictory disabled/experimental combinations independently of the UI.
+Shared flex-row styling can override
+the action container's `hidden` attribute. Scoped hidden selectors now force
+both experimental containers to `display: none`. Browser checks verify
+the computed style and the absence of channel Save/Cancel controls.
+That preview has no native bridge and cannot verify channel changes in the installed app.
+
+Counterexamples cover wrong channels, missing/skipped/stale checks, corrupt
+archives, uploaded-byte mismatches, foreign/failing GitHub runs, incomplete
+installed-build checks for each required host label, missing Stable approval and a substituted publisher lock.
+Promotion changes feed/proof metadata while preserving the signed archive. A
+public-key RFC fixture passes cryptographic verification; altered bytes with a
+matching rewritten checksum still fail signature verification. Interrupted
+promotion can be explicitly resumed only after its requirements are checked
+again. Candidate/prerelease feed publication must not move public latest.
+
+Dev publication can fail after the focused
+gate, credential preflight and draft reservation succeed. GitHub's
+release-by-tag REST endpoint returned 404 for that unpublished draft; the
+draft-aware `gh release view` returned the expected metadata. Candidate creation
+now uses the draft-aware lookup and checks the exact tag, source, draft and
+prerelease flags. The regression first reproduces the 404, then rejects foreign
+targets/tags, published releases, missing prerelease flags and reserved tags.
+A failed draft's build number remains reserved and unpublished, with no assets; the next attempt must
+use a higher build and fresh clean-source gate. Failure at draft lookup must not
+build or install a package, change a channel feed or move Stable.
+
+Shareable diagnostics add bounded update_channel and experimental_channels enums and typed reasons;
+an update ready state is not repository readiness or confirmed cloud upload.
+Live channel publication, Apple services and installed channel/permission
+continuity require live release and installation checks.
+
+The optional manual `validate_signing` workflow input exercises real Apple
+credentials only after the complete clean-source gate. Counterexamples reject
+push/PR/fork invocation, stale or skipped gate evidence, a changed source digest,
+corrupt artifacts and failed independent archive signatures. Validation packages
+use a deliberately non-promotable receipt. The workflow has read-only repository
+permissions, never publishes or installs, and records bounded failure evidence
+while cleaning temporary packages and signing material. Verification against Apple services
+still requires an actual successful run; these counterexamples do not imply it.
+
+## Explicit action scope
+
+Expanded repo details own their backup and rescan buttons. The overview opens an
+unchecked chooser; selecting all requires an explicit action. The new guarded
+`/api/actions/backup` and `/api/actions/scan` routes require distinct current IDs
+and a current workspace revision. Admission reserves operation locks before
+worker creation. Selected scans preserve unselected receipts. Missing sources
+cannot be backed up; a rescan can re-observe their availability. A direct folder
+review action preserves existing archives and uses the existing removal review.
+The legacy dashboard routes remain compatible; the menu uses explicit routes.
+Native installed acceptance and actual cloud upload remain separate from fixture
+and browser results. `test_selected_actions` supplies the scope/guard regressions;
+`tests/rescan.cjs` and `tests/menu-cards.cjs` exercise the real menu controller.
+
+Reviewed source removals retire their active notification episodes even when the
+last backup receipt still contains a historical error for that source. The error
+receipt is retained; global operation errors continue to notify. GR15 checks this
+through `test_removed_source_retires_alert_but_keeps_failure_history`.
+
+## GR27 — Outside items are reviewed explicitly
+
+Each scan lists links that leave a repo and Git worktree registrations without following them. An absolute link whose path stays inside the repo, such as a build tree linking to its own source folder, is not an outside item. Counting internal absolute links can substantially inflate the outside-item count. Linked folders can be reviewed; links to single files and installed tools are listed for reinstalling. Choices are saved per repo in a revision-checked file; detection and link-only choices never change backup status. Sizes and uncommitted-change counts are measured only when the review opens, and incomplete totals are shown as lower bounds. Diagnostics record only `outside_review` with a repo alias.
+
+**Regression tests:**
+
+- `test_outside_items.DetectionTests.test_links_are_classified_without_following_and_git_internals_are_skipped`
+- `test_outside_items.DetectionTests.test_linked_checkouts_follow_git_registrations_and_removed_folders`
+- `test_outside_items.DetectionTests.test_malformed_registration_is_reported_invalid_not_followed`
+- `test_outside_items.DetectionTests.test_folder_size_reports_incomplete_totals_as_lower_bounds`
+- `test_outside_items.DetectionTests.test_absolute_links_that_stay_inside_the_repo_are_not_outside_items`
+- `test_outside_items.OutsideHubTests.test_scan_counts_outside_items_and_choices_never_change_backup_need`
+- `test_outside_items.OutsideHubTests.test_review_defaults_and_revision_checked_saves`
+- `test_outside_items.OutsideHubTests.test_http_routes_keep_token_origin_and_revision_guards`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** Review of live outside folders in the installed app lacks native test coverage. Included folders are covered by GR28.
+
+## GR28 — Included linked folders are separate verified archives
+
+A linked folder whose saved choice is include is archived on its own, beside its repo's backup in `linked/<link path>/`. Links inside it are stored as links and never followed, and the repo archive format is unchanged. The repo's index entry records the set. RepoHub asks macOS about every archive in the set and reports one combined upload state, so **Backed up** appears only when each archive is verified and confirmed uploaded for that exact archive. Changed folder contents mark the repo for backup; a timestamp-only change reuses the verified archive. Superseded folder archives are pruned only after the whole new set uploads and never from a stale copy of the set.
+
+Folders that overlap a monitored repo, a backup destination, RepoHub data, a system or top-level location, or another included link are refused when choices are saved. If a link changes later, the backup reports the refusal for that repo and keeps the last verified archive referenced. Setup layout changes move folder archives with their repo after checksum verification. Restore receipts name included archives by link path and checksum (`--include LINK=SHA256`); each folder archive is audited with its own capture and verify run. Diagnostics record repo aliases and reason codes through `included_folder_archived`, `included_folder_refused` and `included_folder_failed`, never outside paths or contents.
+
+**Regression tests:**
+
+- `test_included_folders.IncludedFolderTests.test_included_folder_gets_its_own_verified_archive_and_restore_receipt`
+- `test_included_folders.IncludedFolderTests.test_backed_up_requires_every_archive_in_the_set_to_upload`
+- `test_included_folders.IncludedFolderTests.test_upload_helper_is_asked_about_every_archive`
+- `test_included_folders.IncludedFolderTests.test_included_folder_changes_mark_the_repo_for_backup`
+- `test_included_folders.IncludedFolderTests.test_superseded_folder_archives_are_pruned_only_after_the_whole_set_uploads`
+- `test_included_folders.IncludedFolderTests.test_unsafe_or_duplicate_inclusions_are_refused`
+- `test_included_folders.IncludedFolderTests.test_a_link_retargeted_after_review_is_reported_and_keeps_the_last_archive`
+- `test_included_folders.IncludedFolderTests.test_unreachable_folder_keeps_its_backup_without_a_countdown`
+- `test_included_folders.IncludedFolderTests.test_unreachable_means_unmounted_volume_or_unreadable_not_deleted`
+- `test_included_folders.IncludedFolderTests.test_setup_layout_change_moves_folder_archives_with_their_repo`
+- `test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** Returning restored folder contents to their original location is a separate operation outside the audit. Linked checkouts and the 30-day keep window are covered by GR29. The tests do not cover installed native behavior or live iCloud upload of folder archives.
+
+## GR29 — Linked checkouts follow Git; removed items are kept for 30 days
+
+When a repo includes checkouts, every present checkout in Git's registration list is archived on its own, beside the repo's backup in `checkouts/<registration name>/`, and joins the repo's uploaded set. New checkouts are backed up without another review. A checkout nested inside the repo is already in the repo archive. Checkouts in refused locations, such as a backup destination, are reported for the repo.
+
+A checkout or included linked folder that is gone or no longer included is not an error. Its last verified archive moves to a keep window shown as **Removed checkout · kept until <date>** or **No longer included · kept until <date>**, and it rejoins the set if the folder returns. Kept items are not required for **Backed up**. Under latest-only retention their archives are deleted after 30 days, or sooner through **Remove now**, which needs a second click, the exact kept archive reference, the token-guarded route and no running backup. Keep-all retention never deletes on a timer. This is the narrow automatic-deletion exception recorded in AGENTS.md.
+
+Setup layout changes move checkout and kept archives with their repo. Restore receipts name included checkouts with `--checkout NAME=SHA256`. Diagnostics record `outside_item_kept` and `outside_item_deleted` with repo aliases and reason codes only.
+
+**Regression tests:**
+
+- `test_linked_checkouts.LinkedCheckoutTests.test_included_checkout_is_its_own_verified_archive_and_restore_receipt`
+- `test_linked_checkouts.LinkedCheckoutTests.test_new_checkouts_are_followed_and_a_removed_one_is_kept_for_30_days`
+- `test_linked_checkouts.LinkedCheckoutTests.test_a_temporarily_missing_checkout_is_kept_and_rejoins_when_it_returns`
+- `test_linked_checkouts.LinkedCheckoutTests.test_keep_window_expires_after_30_days_and_remove_now_deletes_on_request`
+- `test_linked_checkouts.LinkedCheckoutTests.test_nested_refused_and_excluded_checkouts`
+- `test_linked_checkouts.LinkedCheckoutTests.test_upload_and_pruning_require_the_whole_set_including_checkouts`
+- `test_linked_checkouts.LinkedCheckoutTests.test_upload_helper_is_asked_about_checkout_archives`
+- `test_linked_checkouts.LinkedCheckoutTests.test_setup_layout_change_moves_checkout_and_kept_archives`
+- `test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts`
+
+**Remaining exposure:** The keep window starts at the first backup after an item disappears. A checkout archive restores beside the repo and requires a separate Git reattachment step; the audit tool refuses it on its own because its root `.git` is a file. The tests do not cover installed native behavior or live iCloud upload.
+
+## GR30 — One RepoHub copy owns the helper port
+
+With app copies in both Applications folders, Sparkle can update `/Applications/Repo Hub.app` while an older helper from `~/Applications` still holds port 8767 after its parent app quits. The new helper can then exit with `Address already in use`, leaving the old helper to answer requests and causing the watchdog to roll back a correctly installed update.
+
+A helper that cannot bind now probes the listener, writes `helper-conflict.json` with `another_copy_running` or `port_in_use`, and exits with code 75. A bundled helper exits once its parent app is gone, after any backup finishes. The app refuses to start beside a RepoHub copy running from another folder and shows **Another copy of RepoHub is running** when its own helper hit a conflict. The update watchdog keeps the installed build when that build recorded `another_copy_running`, because restoring the old build would hit the same conflict. Diagnostics record `helper_conflict` and `helper_parent_exited` with reason codes only.
+
+**Regression tests:**
+
+- `test_helper_conflict.HelperConflictTests.test_second_helper_reports_another_copy_and_leaves_it_running`
+- `test_helper_conflict.HelperConflictTests.test_successful_start_clears_a_stale_conflict`
+- `test_helper_conflict.HelperConflictTests.test_helper_stops_after_its_app_exits_but_never_mid_backup`
+- `test_helper_conflict.HelperConflictTests.test_update_watchdog_reports_another_copy_instead_of_rolling_back`
+
+**Remaining exposure:** The native alerts are compiled but not driven by an automated UI test. Conflict handling in an installed app still requires manual verification.

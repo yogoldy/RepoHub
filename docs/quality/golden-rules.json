@@ -1,0 +1,782 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "GR01",
+      "title": "Preserve complete contained workspace bytes",
+      "breakpoint": "Hidden, ignored and uncommitted files silently omitted; archive member handling loses directories or modes.",
+      "diagnostic_events": [
+        "archive_stage",
+        "archive_verified",
+        "repo_backup_finished"
+      ],
+      "cause_and_solution": "Git status is not a file inventory. Archive contained filesystem entries and verify their contents before publication.",
+      "required_behavior": "Include ignored/uncommitted bytes and ordinary contained Git history; do not follow external links. Sockets and named pipes are skipped everywhere, so one never blocks a backup. At startup, half-written archives in the staging folder are removed; published backups and unrelated files never are.",
+      "test_ids": [
+        "test_hub.HubTests.test_complete_archive_includes_hidden_ignored_and_symlink_without_following",
+        "test_hub.HubTests.test_archive_content_verification_includes_hardlinks_and_empty_directories",
+        "test_scoped_backups.ScopedBackupTests.test_appledouble_and_hidden_ignored_files_are_still_protected",
+        "test_hub.HubTests.test_sockets_and_named_pipes_never_block_a_backup",
+        "test_hub.HubTests.test_startup_removes_only_stale_staging_archives"
+      ],
+      "remaining_gap": "Live databases and unsaved application memory are not atomic snapshots. External Git directories/worktrees/submodules require explicit support."
+    },
+    {
+      "id": "GR02",
+      "title": "Hashes decide meaningful changes",
+      "breakpoint": "Equal-size edits restore their mtime, or source content changes during archive construction.",
+      "diagnostic_events": [
+        "repo_checked",
+        "archive_stage",
+        "repo_backup_failed",
+        "verification_deferred",
+        "scan_retry_requested"
+      ],
+      "cause_and_solution": "Metadata is only a scheduling hint. Hash content; compare source before/after and verify archived members. A typed SourceChanged during a backup is a deferred attempt, not a persistent generic error that shadows later manual scans. Preserve attempt history separately from live verification and retain ordinary I/O/corruption failures.",
+      "required_behavior": "Reject unstable snapshots; preserve old backups; detect same-size/same-mtime edits. Manual Rescan now must recover a deferred source-change display without starting a backup or erasing its diagnostic history. Continued writes stay Checking again; a stable comparison may become backed up only with matching upload evidence, or backup pending when edits remain. Real failures remain visible after rescanning.",
+      "test_ids": [
+        "test_hub.HubTests.test_same_size_same_mtime_edit_is_detected_and_replaced",
+        "test_hub.HubTests.test_timestamp_only_changes_match_hashes_and_do_not_replace_backup",
+        "test_hub.HubTests.test_metadata_preserving_change_during_snapshot_is_rejected",
+        "test_hub.HubTests.test_change_during_backup_does_not_publish",
+        "test_hub.HubTests.test_source_mutation_is_transient_and_retry_is_scoped",
+        "test_hub.HubTests.test_archive_mutation_is_not_source_mutation",
+        "test_hub.HubTests.test_retry_api_requires_trusted_explicit_repo_and_never_uploads",
+        "test_scoped_backups.ScopedBackupTests.test_source_changed_backup_defers_and_manual_scan_recovers_without_backup",
+        "test_scoped_backups.ScopedBackupTests.test_source_change_deferral_does_not_hide_real_failure_after_rescan",
+        "test_change_evidence.EvidenceTests.test_changing_source_has_explainable_icon_and_manual_retry_trail"
+      ],
+      "remaining_gap": "Concurrent writes can force retries. No filesystem snapshot or transactional database capture is provided."
+    },
+    {
+      "id": "GR03",
+      "title": "Finder-only hints cannot cause broad replacements",
+      "breakpoint": "Repeated .DS_Store writes look like edits; a whole-schedule check rebuilds unchanged repos.",
+      "diagnostic_events": [
+        "repo_checked",
+        "schedule_decision",
+        "archive_reused",
+        "repo_backup_finished"
+      ],
+      "cause_and_solution": "Classify Finder/Git/project differences separately; ignore only ordinary .DS_Store trigger changes while retaining honest full-match status.",
+      "required_behavior": "No replacement for Finder-only writes; build only selected meaningfully changed/new/damaged repos.",
+      "test_ids": [
+        "test_scoped_backups.ScopedBackupTests.test_repeated_finder_writes_do_not_replace_archives_or_rewrite_cloud_index",
+        "test_scoped_backups.ScopedBackupTests.test_only_meaningfully_changed_repo_gets_archive_when_schedule_checks_every_repo",
+        "test_scoped_backups.ScopedBackupTests.test_targeted_backup_cannot_copy_another_repo_even_if_it_changed",
+        "test_scoped_backups.ScopedBackupTests.test_finder_exception_cannot_hide_corrupt_archive"
+      ],
+      "remaining_gap": "Other metadata such as AppleDouble remains protected. Never generalize this exception to arbitrary hidden files."
+    },
+    {
+      "id": "GR04",
+      "title": "Unavailable verification is not corruption",
+      "breakpoint": "iCloud placeholders/timeouts/permissions produce read failures and can trigger unnecessary rebuilds.",
+      "diagnostic_events": [
+        "verification_deferred",
+        "repo_backup_failed",
+        "archive_repair_needed",
+        "archive_reused"
+      ],
+      "cause_and_solution": "Separate OSError availability from checksum/archive-format failures; defer unavailable reads instead of rebuilding.",
+      "required_behavior": "Keep index/archive intact on unavailable reads, disclose the failure, then reuse or replace after recovery.",
+      "test_ids": [
+        "test_scoped_backups.ScopedBackupTests.test_unavailable_archive_is_reported_without_replacement_and_recovery_reuses_it",
+        "test_scoped_backups.ScopedBackupTests.test_read_failure_defers_changed_repo_until_verification_can_recover",
+        "test_hub.HubTests.test_corrupted_archive_detected_and_repaired"
+      ],
+      "remaining_gap": "Conservative deferral also delays genuinely changed sources. Other RuntimeError classifications and real provider races remain review points."
+    },
+    {
+      "id": "GR05",
+      "title": "Retain old backup until exact replacement is safe",
+      "breakpoint": "Copy/index errors, stale cloud receipts or 100% progress lead to premature deletion.",
+      "diagnostic_events": [
+        "archive_verified",
+        "retention_decision",
+        "retention_verified",
+        "prune_started",
+        "prune_finished",
+        "retention_failed"
+      ],
+      "cause_and_solution": "Persist a verified replacement; gate pruning on fresh acknowledgement for its exact archive identity.",
+      "required_behavior": "Never prune on progress alone, missing/old receipts or failed publication; preserve unknown/legacy files.",
+      "test_ids": [
+        "test_hub.HubTests.test_failed_replacement_preserves_previous_copy",
+        "test_hub.HubTests.test_old_copy_kept_until_replacement_upload_is_confirmed",
+        "test_hub.HubTests.test_progress_and_retry_error_do_not_confirm_or_prune",
+        "test_hub.HubTests.test_index_publication_failure_keeps_old_copy_and_retries_cleanup",
+        "test_policy_health.SettingsHTTPTests.test_stale_upload_receipt_keeps_previous_backup"
+      ],
+      "remaining_gap": "Network outage, quota exhaustion and full-disk behavior need controlled live fault runs; mocked transitions are not provider guarantees."
+    },
+    {
+      "id": "GR06",
+      "title": "Display decisions need fresh evidence",
+      "breakpoint": "Green check uses old archive data, stale hashes, missing upload flags or an unavailable helper.",
+      "diagnostic_events": [
+        "status_repo",
+        "ui_presented",
+        "presentation_input_disagreement",
+        "presentation_disagreement",
+        "menu_bar_presented",
+        "menu_bar_disagreement",
+        "upload_stale"
+      ],
+      "cause_and_solution": "Use the shared status policy and join archive/observation/run identities; revoke stale/failed receipts. Preserve backend snapshots and log typed client freshness separately; compare views only with matching freshness context.",
+      "required_behavior": "Green requires fresh content verification and exact-archive upload acknowledgement. Display policy 5 also allows the existing ordinary .DS_Store-only exception when project files and Git match; raw comparison remains different and finder-only evidence is retained. Older policies retain their original meaning. Absent view receipts do not prove agreement. Selected timing receipts compare original private dates and bounded codes; exact dates never enter shareable diagnostics. Policy 6 checks every horizontal card receipt while details are collapsed or expanded, plus the one selected expanded timing line when present. Missing, hidden or incorrect compact text cannot be proven by an expanded-panel receipt.",
+      "test_ids": [
+        "test_status_clarity.ClarityTests.test_waiting_copy_keeps_stale_evidence_non_green_and_recovers_without_backup",
+        "test_policy_health.HealthTests.test_completed_repo_check_is_independent_of_an_older_scan",
+        "test_policy_health.HealthTests.test_progressing_scan_defers_scan_only_alert_without_making_status_fresh",
+        "test_hub.HubTests.test_scan_publishes_completed_repo_without_refreshing_pending_repo",
+        "test_rescan.RescanTests.test_menu_rescan_controller_requests_only_scanning_and_recovers_from_rejection",
+        "test_rescan.RescanTests.test_scan_api_guards_request_and_preserves_backup_when_files_change",
+        "test_selected_actions.SelectedActionTests.test_explicit_backup_and_scan_preserve_unselected_repositories",
+        "test_selected_actions.SelectedActionTests.test_invalid_missing_stale_and_busy_selection_never_starts_worker",
+        "test_selected_actions.SelectedActionTests.test_multi_scan_and_worker_start_failure_preserve_locks",
+        "test_selected_actions.SelectedActionTests.test_http_guards_and_explicit_fields_precede_worker_dispatch",
+        "test_menu_appearance.MenuAppearanceTests.test_counts_consume_existing_card_statuses_including_finder_and_unknown",
+        "test_menu_appearance.MenuAppearanceTests.test_native_counts_have_independent_diagnostics_and_private_export",
+        "test_menu_appearance.MenuAppearanceTests.test_native_readback_receipt_and_http_origin_token_guards",
+        "test_hub.HubTests.test_failed_cloud_probe_revokes_previous_confirmation",
+        "test_hub.HubTests.test_upload_unknown_false_conflict_and_error_never_confirm_success",
+        "test_backup_lifecycle.LifecycleTests.test_green_icon_with_missing_upload_is_logged_as_input_disagreement",
+        "test_change_evidence.EvidenceTests.test_no_record_of_second_view_is_not_claimed_as_agreement",
+        "test_change_evidence.EvidenceTests.test_both_views_are_correlated_and_disagreement_is_reported",
+        "test_change_evidence.EvidenceTests.test_client_freshness_override_preserves_backend_and_detects_false_green",
+        "test_status_clarity.ClarityTests.test_actual_js_mapping_preserves_policy_and_matches_evidence",
+        "test_status_clarity.ClarityTests.test_wrong_category_sentence_and_false_green_are_detected",
+        "test_status_clarity.ClarityTests.test_only_labels_require_complete_current_comparison",
+        "test_backup_timing.TimingTests.test_cloud_location_requires_same_archive_fresh_observation_and_valid_creation",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_secondary_receipts_detect_wrong_date_location_and_countdown",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_actual_javascript_timing_matches_original_receipts",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_compact_backup_facts_keep_location_and_creation_evidence",
+        "test_menu_information.MenuInformationTests.test_information_navigation_and_folder_demonstration",
+        "test_status_clarity.ClarityTests.test_finder_display_success_preserves_raw_difference_and_exact_upload_requirement",
+        "test_status_clarity.ClarityTests.test_finder_display_rejects_uncertain_stale_busy_and_meaningful_changes",
+        "test_status_clarity.ClarityTests.test_finder_diagnostics_keep_previous_display_versions_interpretable",
+        "test_change_evidence.EvidenceTests.test_finder_only_green_display_keeps_real_backup_and_diagnostic_evidence",
+        "test_card_timing.CardTimingTests.test_all_cards_are_checked_with_no_expanded_selection",
+        "test_card_timing.CardTimingTests.test_missing_wrong_or_hidden_card_time_is_detected_independently_of_detail",
+        "test_card_timing.CardTimingTests.test_missing_receipts_and_inconsistent_expansion_fail_closed",
+        "test_card_timing.CardTimingTests.test_actual_compact_javascript_uses_same_timing_contract_for_every_state",
+        "test_menu_cards.MenuCardTests.test_actual_card_controller_and_timing_dom_faults",
+        "test_menu_cards.MenuCardTests.test_real_controller_observations_reach_independent_diagnostic_checks",
+        "test_card_timing.CardTimingTests.test_rendered_clock_text_and_day_labels_match_known_utc_times",
+        "test_card_timing.CardTimingTests.test_expanded_checks_all_cards_and_only_selected_detail"
+      ],
+      "remaining_gap": "Freshness override and replay have typed automated coverage. Native correlation across delayed startup, timeout, cache expiry and recovery lacks coverage. Rendered progress percentages also need visual verification."
+    },
+    {
+      "id": "GR07",
+      "title": "Schedule and power policy stay per repo",
+      "breakpoint": "A power transition pauses incorrectly, resets unrelated timers or starts all repos after one edit.",
+      "diagnostic_events": [
+        "schedule_decision",
+        "backup_deferred",
+        "backup_paused",
+        "backup_finished"
+      ],
+      "cause_and_solution": "Track effective per-repo settings and cadence; recheck power before automatic work and preserve unattempted clocks.",
+      "required_behavior": "Battery defaults have no after-edit backups; manual-only works; a selected automatic plan cannot force unrelated repos. A failed or deferred periodic attempt keeps its timer, so it is retried after five minutes instead of a full interval.",
+      "test_ids": [
+        "test_policy_health.PolicyTests.test_battery_default_is_no_after_edits_and_manual_only_is_supported",
+        "test_policy_health.SettingsHTTPTests.test_after_edit_plan_only_archives_selected_repo",
+        "test_policy_health.SettingsHTTPTests.test_power_change_finishes_current_archive_and_stops_next_repo",
+        "test_policy_health.SettingsHTTPTests.test_partial_automatic_run_does_not_advance_unattempted_repo_clock",
+        "test_policy_health.SettingsHTTPTests.test_repo_cadence_survives_restart_and_only_backs_up_due_repo",
+        "test_backup_timing.TimingTests.test_projection_matches_actual_eligibility_and_does_not_mutate",
+        "test_backup_timing.TimingTests.test_overrides_retry_busy_and_unobserved_edits",
+        "test_backup_timing.TimingTests.test_saved_cadence_manual_reset_and_power_are_respected",
+        "test_policy_health.SettingsHTTPTests.test_failed_periodic_backup_retries_in_five_minutes_not_a_full_interval"
+      ],
+      "remaining_gap": "Physical battery transitions, full sleep/wake and logout/login cycles still require hardware smoke tests."
+    },
+    {
+      "id": "GR08",
+      "title": "Diagnostics cannot break or mutate backups",
+      "breakpoint": "Full disk, partial records, rotation or logging recursion stops backups or produces fake edits.",
+      "diagnostic_events": [
+        "heartbeat",
+        "runtime_gap",
+        "helper_started",
+        "backup_interrupted"
+      ],
+      "cause_and_solution": "Bound private JSONL storage; tolerate write loss; exclude diagnostics from monitored/saved data. Record unobserved gaps honestly.",
+      "required_behavior": "Backup operation survives log failure; malformed records are bounded; diagnostic activity creates no backup changes.",
+      "test_ids": [
+        "test_diagnostics.DiagnosticTests.test_full_disk_failure_recovers_and_records_loss",
+        "test_diagnostics.DiagnosticTests.test_partial_write_survives_restart_without_poisoning_next_event",
+        "test_diagnostics.DiagnosticTests.test_logging_failure_does_not_stop_backup_or_enter_backup_data",
+        "test_change_evidence.EvidenceTests.test_diagnostic_activity_does_not_create_repo_or_saved_data_changes",
+        "test_backup_lifecycle.LifecycleTests.test_restart_discloses_incomplete_run_without_claiming_recovery"
+      ],
+      "remaining_gap": "The app cannot observe while powered off. Missing records are evidence gaps, not successful recovery."
+    },
+    {
+      "id": "GR09",
+      "title": "Shared diagnostics have an explicit type contract",
+      "breakpoint": "A new log field, raw error, nested payload or exact timestamp leaks through the export.",
+      "diagnostic_events": [
+        "verification_deferred",
+        "repo_checked",
+        "ui_presented"
+      ],
+      "cause_and_solution": "Use separately reviewed field-specific enums/types, fresh aliases and bounded relative measurements; reject unknown events and values.",
+      "required_behavior": "No names/paths/raw hashes/arbitrary text/exact dates/exact sizes; exclude private alias key from previews.",
+      "test_ids": [
+        "test_diagnostic_export.ExportTests.test_enums_are_field_specific_and_not_a_global_word_list",
+        "test_diagnostic_export.ExportTests.test_unknown_events_and_unknown_nested_fields_fail_closed",
+        "test_diagnostic_export.ExportTests.test_no_wall_clock_raw_sizes_hashes_or_free_text",
+        "test_diagnostic_export.ExportTests.test_adversarial_types_and_huge_numbers_do_not_escape_or_crash",
+        "test_diagnostic_export.ExportTests.test_namespaces_are_fresh_and_relative_order_preserved",
+        "test_report_preview.ReportPreviewTests.test_bug_has_exact_share_files_and_private_local_draft",
+        "test_status_clarity.ClarityTests.test_new_export_fields_are_typed_and_never_copy_exception_prose",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_new_exports_are_bounded_and_exclude_private_calendar_evidence",
+        "test_timing_diagnostics.TimingDiagnosticTests.test_malformed_or_missing_selected_timing_receipts_fail_closed",
+        "test_card_timing.CardTimingTests.test_card_exports_identify_surfaces_without_calendar_or_private_text",
+        "test_diagnostic_export.ExportTests.test_reports_carry_the_running_apps_version_but_never_free_text"
+      ],
+      "remaining_gap": "Operational patterns remain bounded facts. User-written report prose is separate; a preview and confidentiality reminder cannot guarantee it contains no personal information."
+    },
+    {
+      "id": "GR10",
+      "title": "Local HTML APIs cannot widen filesystem access",
+      "breakpoint": "Untrusted origin/frame/path or stale JSON revision changes files outside its scope.",
+      "diagnostic_events": [
+        "presentation_input_disagreement",
+        "runtime_error"
+      ],
+      "cause_and_solution": "Keep loopback Host/Origin/token and revision guards; resolve allowed paths; native bridge accepts fixed actions and valid repo IDs.",
+      "required_behavior": "Reject cross-origin and arbitrary path/payload requests; report previews cannot redirect their destination. Scanning a repo never runs commands named in its own Git config.",
+      "test_ids": [
+        "test_hub.HubTests.test_http_json_conflicts_origin_host_and_view_boundaries",
+        "test_hub.HubTests.test_data_and_views_cannot_escape",
+        "test_hub.HubTests.test_scanning_never_runs_a_command_from_the_repos_git_config",
+        "test_report_preview.ReportPreviewTests.test_http_preview_requires_existing_origin_and_token_checks",
+        "test_report_preview.ReportPreviewTests.test_bad_inputs_and_destination_injection_rejected",
+        "test_hub.HubTests.test_backup_request_reports_when_nothing_will_start",
+        "test_hub.HubTests.test_scanning_never_runs_a_repos_git_filter_command"
+      ],
+      "remaining_gap": "Credential-backed GitHub delivery and other cloud destinations are unimplemented and need their own threat model/tests."
+    },
+    {
+      "id": "GR11",
+      "title": "Restore audit must independently verify every supported entry",
+      "breakpoint": "Archive corruption/path traversal, input mutation or receiving umask hides a broken restore.",
+      "diagnostic_events": [
+        "archive_verified"
+      ],
+      "cause_and_solution": "Use an independently captured manifest, trusted input identities, safe isolated extraction and Git fsck/history checks. Explicitly restore link modes without changing targets.",
+      "required_behavior": "Reject bad identities/unsafe paths/input mutations and compare full manifest plus contained Git facts. Accept only validated contained registered-worktree metadata and disclose that linked checkout contents are not verified. Accept a nested .git pointer only for a checkout inside the repo that pairs with its own registration in both directions, record the pairing at capture and refuse unpaired pointers before extraction. Only with --allow-finder-only may regular .DS_Store files outside .git differ (changed, added or removed), matching the app's Finder rule; every difference is counted in the receipt and all other entries still match exactly. Restore links that leave the root as exact link text without following them, list them in capture and restore receipts, and keep outside links within Git storage refused. Plan restore capacity from verified manifest sizes, retain a free-space reserve, bound copies and refuse exhausted capacity without altering inputs. Sockets and named pipes are never archived or compared.",
+      "test_ids": [
+        "test_restore_audit.RestoreAuditTests.test_full_restore_with_ignored_uncommitted_git_and_log_receipts",
+        "test_restore_audit.RestoreAuditTests.test_finder_files_in_git_refs_are_tolerated_but_other_fsck_errors_fail",
+        "test_restore_audit.RestoreAuditTests.test_empty_nested_git_marker_restores_but_pointer_files_still_fail",
+        "test_restore_audit.RestoreAuditTests.test_relative_output_and_source_paths_still_verify_git",
+        "test_restore_audit.RestoreAuditTests.test_finder_only_differences_pass_only_when_allowed_and_are_counted",
+        "test_restore_audit.RestoreAuditTests.test_allowing_finder_files_still_catches_every_other_difference",
+        "test_restore_audit.RestoreAuditTests.test_gitmodules_inside_a_dependency_restores_but_top_level_submodules_fail",
+        "test_restore_audit.RestoreAuditTests.test_symlink_mode_survives_different_receiver_umask_without_changing_target",
+        "test_restore_audit.RestoreAuditTests.test_corrupt_archive_and_wrong_manifest_identity_fail_before_extraction",
+        "test_restore_audit.RestoreAuditTests.test_traversal_duplicate_extra_and_absolute_paths_are_rejected",
+        "test_restore_audit.RestoreAuditTests.test_input_mutation_during_restore_is_reported",
+        "test_restore_audit.RestoreAuditTests.test_restored_hooks_and_fsmonitor_are_not_executed",
+        "test_restore_worktrees.RestoreWorktreeTests.test_registered_worktree_metadata_restores_without_external_checkout",
+        "test_restore_worktrees.RestoreWorktreeTests.test_external_or_malformed_common_directory_is_rejected_before_git",
+        "test_restore_worktrees.RestoreWorktreeTests.test_tampered_archive_common_directory_fails_before_git",
+        "test_restore_worktrees.RestoreWorktreeTests.test_linked_root_git_markers_and_common_store_redirection_stay_rejected",
+        "test_restore_worktrees.RestoreWorktreeTests.test_missing_or_symlinked_administrative_files_are_rejected",
+        "test_restore_worktrees.RestoreWorktreeTests.test_invalid_registered_head_is_not_a_successful_git_audit",
+        "test_restore_worktrees.ContainedCheckoutTests.test_checkouts_inside_the_repo_restore_and_are_compared",
+        "test_restore_worktrees.ContainedCheckoutTests.test_pointer_to_another_repo_or_mismatched_back_pointer_is_refused",
+        "test_restore_worktrees.ContainedCheckoutTests.test_baseline_without_the_pairing_is_refused_before_extraction",
+        "test_restore_audit.RestoreAuditTests.test_legacy_baseline_without_worktree_scope_still_restores",
+        "test_restore_audit.RestoreAuditTests.test_outside_link_is_reported_but_git_alternates_fail_capture",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_outside_links_restore_exactly_and_are_reported",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_forged_entry_beneath_an_outside_link_never_writes_outside",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_git_internal_outside_links_stay_rejected_before_git",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_tampered_link_report_or_target_fails",
+        "test_restore_outside_links.RestoreOutsideLinkTests.test_baseline_without_link_report_still_restores_and_discloses",
+        "test_restore_capacity.RestoreCapacityTests.test_valid_manifest_above_eight_gib_has_no_fixed_byte_ceiling",
+        "test_restore_capacity.RestoreCapacityTests.test_insufficient_capacity_fails_before_any_extracted_file",
+        "test_restore_capacity.RestoreCapacityTests.test_large_plan_uses_allocation_fragments_and_explicit_budget",
+        "test_restore_capacity.RestoreCapacityTests.test_operator_budget_and_reserve_are_recorded_on_a_real_restore",
+        "test_restore_capacity.RestoreCapacityTests.test_operator_budget_refuses_capture_and_restore_without_extraction",
+        "test_restore_capacity.RestoreCapacityTests.test_space_loss_mid_copy_retains_failure_receipt_and_unchanged_inputs",
+        "test_restore_capacity.RestoreCapacityTests.test_filesystem_space_error_never_becomes_a_pass",
+        "test_restore_capacity.RestoreCapacityTests.test_copy_uses_bounded_memory_and_detects_short_or_overlong_streams",
+        "test_restore_capacity.RestoreCapacityTests.test_invalid_budget_arguments_and_entry_guard_still_fail_closed",
+        "test_restore_capacity.RestoreCapacityTests.test_inventory_entry_limit_stops_before_building_an_unbounded_manifest",
+        "test_restore_audit.RestoreAuditTests.test_named_pipes_in_the_source_are_not_part_of_the_restore"
+      ],
+      "remaining_gap": "Synthetic audit tests do not prove current iCloud delivery. Actual independent receive/restore needs two-device evidence and cannot validate restored app/macros semantics. Outside link targets are reported, but their contents are not captured; explicit inclusion is a separate feature."
+    },
+    {
+      "id": "GR12",
+      "title": "Installation and restart must load the tested release",
+      "breakpoint": "Missing runtime module/route, stale native web view or launch-job reload fails after copying new code.",
+      "diagnostic_events": [
+        "helper_started",
+        "backup_interrupted",
+        "heartbeat"
+      ],
+      "cause_and_solution": "Validate package/asset dependencies; retain old runtime; restart existing registered jobs; verify installed hashes and helper build identity before considering deployment complete.",
+      "required_behavior": "Compiled native sources and packaged modules/routes must agree; local diagnostics must disclose interrupted runs.",
+      "test_ids": [
+        "test_backup_lifecycle.LifecycleTests.test_restart_discloses_incomplete_run_without_claiming_recovery",
+        "test_backup_lifecycle.LifecycleTests.test_creation_reuse_and_render_reason_share_archive_run_identity"
+      ],
+      "remaining_gap": "Live install, rollback, login-item registration and per-device served UI checks remain manual. Native compilation alone does not prove launchd/iCloud integration. Coverage excludes repeat permission checks on clean installations across devices and interruption of the running controller."
+    },
+    {
+      "id": "GR13",
+      "title": "A report sends only its exact consented payload once",
+      "breakpoint": "Timeouts, double-clicks, crashes, account switches or unsafe preview/destination changes can publish the wrong report or duplicate it.",
+      "diagnostic_events": [
+        "report_delivery"
+      ],
+      "cause_and_solution": "Freeze and hash the exact public preview; require explicit Send/account confirmation; persist sending before POST under a process-safe lock; reconcile ambiguous outcomes against exact authored issue bytes without automatically reposting. Credentials remain in native Keychain/backend memory.",
+      "required_behavior": "Fixed product tracker and approved diagnostic text only. Durable exact-identity receipts, retained drafts, no background sending, no token/prose in operational logs or HTML credential handling. Account verification is not proof of issue-write permission; denied submissions explain token/repository/Issues access and preserve the exact draft for explicit retry.",
+      "test_ids": [
+        "test_report_delivery.ReportDeliveryTests.test_exact_preview_receipt_and_repeat_send_never_duplicates",
+        "test_report_delivery.ReportDeliveryTests.test_lost_post_response_recovers_existing_issue_without_second_post",
+        "test_report_delivery.ReportDeliveryTests.test_absent_issue_after_ambiguous_send_is_not_permission_to_repost",
+        "test_report_delivery.ReportDeliveryTests.test_process_interruption_leaves_durable_uncertain_identity",
+        "test_report_delivery.ReportDeliveryTests.test_double_click_while_posting_is_serialized",
+        "test_report_delivery.ReportDeliveryTests.test_client_cannot_change_destination_payload_or_consent",
+        "test_report_delivery.ReportDeliveryTests.test_foreign_or_malformed_receipt_never_becomes_sent",
+        "test_report_delivery.ReportDeliveryTests.test_delivery_diagnostics_contain_only_codes_and_aliased_identity",
+        "test_report_delivery.ReportDeliveryTests.test_sender_api_uses_existing_origin_and_token_boundary",
+        "test_report_labels.ReportLabelTests.test_issue_text_never_selects_other_labels_or_commands",
+        "test_report_delivery.ReportDeliveryTests.test_failed_durable_intent_flush_cannot_start_a_post",
+        "test_report_delivery.ReportDeliveryTests.test_sign_in_success_does_not_grant_post_permission_and_retry_keeps_draft"
+      ],
+      "remaining_gap": "GitHub list visibility can lag creation; absent or changed issues after ambiguous POST remain unconfirmed, requiring manual investigation rather than blind resend. Reconciliation scans at most 2000 authored issues. Tokens require explicit native setup; fine-grained tokens for non-owner public contributions have GitHub limitations. Coverage of native token entry and public issue delivery is limited to one installation. Cross-device credential setup and onboarding for contributors without repository ownership are untested. HTTP 401/403 share one access-denied code; permission absence, expired credentials, rate limiting and account policy are not individually diagnosed."
+    },
+    {
+      "id": "GR14",
+      "title": "Reporting is reachable from the primary menu-bar surface",
+      "breakpoint": "Backend and syntax checks pass while the shipped menu has no reporting entry point.",
+      "cause_and_solution": "Load the same report controller and stylesheet in both shipped surfaces; check actual required controls and run compose, preview and explicit-send behavior for each HTML entry point.",
+      "required_behavior": "Both surfaces offer bug and feature reports, preserve separate in-memory drafts, show the exact preview, and post only after explicit Send.",
+      "diagnostic_events": [
+        "report_delivery"
+      ],
+      "test_ids": [
+        "test_report_entry.ReportEntryTests.test_both_surfaces_support_report_compose_preview_and_explicit_send"
+      ],
+      "remaining_gap": "A mocked DOM/API regression proves controller wiring, not native WebKit layout, modal focus, secure token onboarding or live GitHub response. Check the installed menu and a narrow viewport for layout and focus behavior."
+    },
+    {
+      "id": "GR15",
+      "title": "Workspace selection preserves identity and copy scope",
+      "breakpoint": "A new source mode changes existing IDs, aliases duplicate a source, missing folders replace good archives with empty copies, or configuration changes race backup source selection.",
+      "diagnostic_events": [
+        "workspace_configuration",
+        "repo_checked",
+        "repo_backup_failed",
+        "repo_backup_finished",
+        "status_repo",
+        "ui_presented"
+      ],
+      "cause_and_solution": "Persist a validated canonical registry with retained inactive identities; preserve legacy IDs; reject overlaps and changed locations; bind revision-safe configuration saves and backup source selection to the same lock.",
+      "required_behavior": "Migration preserves backups, scoped JSON and schedules; only active approved sources can be copied; source removal preserves current archives; unavailable/retargeted sources fail without empty replacements; configuration events export no paths. Copy activity, error attribution, diagnostic projections and problem episodes use workspace IDs so duplicate names cannot share status.",
+      "test_ids": [
+        "test_workspace_registry.WorkspaceTests.test_migration_preserves_ids_archives_json_and_overrides",
+        "test_workspace_registry.WorkspaceTests.test_same_named_manual_folders_have_independent_identity_and_complete_archives",
+        "test_workspace_registry.WorkspaceTests.test_initial_manual_configuration_needs_no_repo_home",
+        "test_workspace_registry.WorkspaceTests.test_saved_manual_selection_is_authoritative_over_legacy_home",
+        "test_workspace_registry.WorkspaceTests.test_removing_and_readding_preserves_identity_backups_and_scoped_settings",
+        "test_workspace_registry.WorkspaceTests.test_missing_folder_cannot_replace_archive_with_empty_backup",
+        "test_workspace_registry.WorkspaceTests.test_reviewing_home_removes_missing_source_without_deleting_backup",
+        "test_policy_health.HealthTests.test_removed_source_retires_alert_but_keeps_failure_history",
+        "test_workspace_registry.WorkspaceTests.test_dynamic_children_exclude_hidden_symlinks_and_keep_missing_identity",
+        "test_workspace_registry.WorkspaceTests.test_deduplicated_alias_and_retargeted_source_never_change_identity",
+        "test_workspace_registry.WorkspaceTests.test_invalid_overlap_missing_and_protected_sources_do_not_mutate_registry",
+        "test_workspace_registry.WorkspaceTests.test_revision_busy_and_write_failure_leave_prior_selection_intact",
+        "test_workspace_registry.WorkspaceTests.test_backup_source_selection_is_serialized_with_configuration_changes",
+        "test_workspace_registry.WorkspaceTests.test_invalid_saved_registry_fails_closed_without_resetting",
+        "test_workspace_registry.WorkspaceTests.test_configuration_diagnostics_export_no_paths",
+        "test_workspace_registry.WorkspaceTests.test_workspace_api_requires_host_origin_token_and_revision",
+        "test_workspace_registry.WorkspaceTests.test_backup_activity_and_failures_use_workspace_ids",
+        "test_workspace_registry.WorkspaceTests.test_duplicate_names_scope_diagnostics_and_problem_episodes"
+      ],
+      "remaining_gap": "Native testing covers core source selection and disk-image unmount, substitution and remount. Simultaneous native selection and isolated macOS privacy checks need separate coverage. Destination and naming migration are covered under GR24."
+    },
+    {
+      "id": "GR16",
+      "title": "Review exact source selections before saving",
+      "breakpoint": "Folder discovery changes after review; cancelled or stale native picker result updates a different draft; selection UI saves without disclosing removal.",
+      "diagnostic_events": [
+        "workspace_review",
+        "workspace_configuration"
+      ],
+      "cause_and_solution": "Keep folder choice local until backend validation, bind the review to the current registry and candidate inventory, and correlate native picker results to a single request. Canonicalize native selections with POSIX realpath so macOS pathname aliases do not duplicate draft entries.",
+      "required_behavior": "Review lists exact canonical paths and removals; stale review is rejected; cancel and failed review never save; picker accepts only exact main menu frame and typed request IDs.",
+      "test_ids": [
+        "test_workspace_registry.WorkspaceTests.test_review_is_read_only_and_requires_same_discovered_folder_list",
+        "test_workspace_registry.WorkspaceTests.test_review_discloses_removal_without_erasing_data_and_rejects_invalid_token",
+        "test_workspace_registry.WorkspaceTests.test_preview_guard_and_diagnostics_exclude_source_prose",
+        "test_workspace_registry.WorkspaceTests.test_unmonitored_home_inventory_drift_rejects_review_without_registry_change"
+      ],
+      "remaining_gap": "A regression covers duplicate pathname aliases during simultaneous native selection. The gate checks the bridge and draft. The full native cancel, remove, review, save and restart sequence requires separate testing. The menu popover can obscure the independent NSOpenPanel. The menu closes while the picker is open and reopens with its draft intact. Required host checks exercise selection, cancellation, saving and restart. Single-installation coverage compares registry and archive state across selection, cancellation, deduplication, removal, review, save and restart. Full re-add/removal and cross-device repeat coverage are incomplete."
+    },
+    {
+      "id": "GR17",
+      "title": "Access failure cannot publish an incomplete backup",
+      "breakpoint": "Denied source reads and destination writes can be confused with empty or changed content.",
+      "diagnostic_events": [
+        "repo_backup_failed",
+        "scan_finished",
+        "verification_deferred"
+      ],
+      "cause_and_solution": "Retain errno and classify access/unavailable/I/O outcomes without claiming a specific macOS privacy decision. Continue independent repos and recover after access returns.",
+      "required_behavior": "No partial archive or replacement of the previous verified backup; access failures remain visible and recoverable.",
+      "test_ids": [
+        "test_access_failures.AccessTests.test_errno_classification_is_not_a_privacy_claim",
+        "test_access_failures.AccessTests.test_unreadable_nested_file_preserves_archive_and_other_repo_recovers",
+        "test_access_failures.AccessTests.test_unreadable_root_scan_keeps_identity_and_previous_archive",
+        "test_access_failures.AccessTests.test_unwritable_destination_preserves_previous_archive",
+        "test_access_failures.AccessTests.test_revocation_during_archive_creation_never_publishes_partial_copy",
+        "test_access_failures.AccessTests.test_missing_destination_is_not_empty_success",
+        "test_access_failures.AccessTests.test_destination_revocation_during_snapshot_keeps_verified_copy"
+      ],
+      "remaining_gap": "Actual macOS privacy refusal/revocation and installed readiness UI require isolated native tests. POSIX tests do not establish TCC behavior."
+    },
+    {
+      "id": "GR18",
+      "title": "A source path is not a source identity",
+      "breakpoint": "A different directory or mounted volume can occupy the saved canonical path.",
+      "diagnostic_events": [
+        "repo_backup_failed",
+        "workspace_review",
+        "workspace_configuration"
+      ],
+      "cause_and_solution": "Persist directory file ID and macOS volume UUID, retain stable workspace IDs, and check identity before scan/copy/publication. Explicit reviewed selection adopts replacements.",
+      "required_behavior": "Missing or substituted sources never replace known-good archives. Original volumes recover without resetting schedules.",
+      "test_ids": [
+        "test_source_identity.IdentityTests.test_replacement_at_same_path_requires_review_and_preserves_id",
+        "test_source_identity.IdentityTests.test_original_directory_restores_without_identity_reset",
+        "test_source_identity.IdentityTests.test_volume_mismatch_cannot_be_hidden_by_same_inode",
+        "test_source_identity.IdentityTests.test_legacy_identity_migration_waits_for_accessible_source"
+      ],
+      "remaining_gap": "Disk-image testing covers unmount, replacement and remount. Physical hot-unplug is untested, and sustained races and unusual/cloned filesystem identities remain untested."
+    },
+    {
+      "id": "GR19",
+      "title": "Readiness reflects the actual helper and optional permissions",
+      "breakpoint": "Native folder choice can succeed while the background process cannot read files; notifications can be mistaken for a backup prerequisite.",
+      "diagnostic_events": [
+        "access_readiness",
+        "repo_backup_failed"
+      ],
+      "cause_and_solution": "Contextual native notification requests and guarded helper-owned access probes expose unchecked/blocked/unavailable/changed states separately from backup/upload success. Track request progress separately from OS authorization and make an interrupted request retryable after restart; native readiness and JavaScript request-state regressions run in the gate. Enter the Python helper through the signed native app executable using execv, preserving the launchd PID/runtime/config while giving macOS an app responsibility identity. Packaging and native exit/signal checks run in the gate.",
+      "required_behavior": "No blanket privilege demand; notification refusal does not prevent backup. Login registration must match this installation. Whether the app starts at login is reported from the app's own login-item state file, never inferred; anything missing, damaged or unrecognised is unknown, not registered.",
+      "test_ids": [
+        "test_readiness.ReadinessTests.test_helper_probe_detects_and_recovers_denial_without_changing_backup",
+        "test_readiness.ReadinessTests.test_notifications_are_optional_and_do_not_gate_backup",
+        "test_readiness.ReadinessTests.test_access_endpoint_requires_origin_token_and_no_path_payload",
+        "test_readiness.ReadinessTests.test_login_state_comes_from_the_app_and_unknown_input_is_never_registered"
+      ],
+      "remaining_gap": "Manual permission checks on each required release host cover explicit refusal, restoration, restart and denial of the initial notification request. Use an isolated identity to preserve existing permission grants."
+    },
+    {
+      "id": "GR20",
+      "title": "Updates replace one verified application version",
+      "breakpoint": "Separate native, Python and web copies can leave the installed app behind the preview or start mismatched components.",
+      "diagnostic_events": [
+        "application_update",
+        "update_checkpoint"
+      ],
+      "cause_and_solution": "Build a self-contained bundle with pinned standalone Python and Sparkle, copy web resources from an explicit allowlist covering served routes, verify resources before helper startup, correlate helper release identity and retain settings outside the app. Reject unsafe feed settings and untyped updater facts.",
+      "required_behavior": "No mixed-version UI/helper, no unverified update archive, and no forced termination of an active backup. Developer ID packages retain the reference Team IDs, code identifiers and designated requirements for the app, interpreter and cloud helper; a different or code-hash-only identity stops packaging and archive preparation. Unlisted web files never ship; missing or linked required web assets fail packaging. Test apps cannot use the production app identity or helper port.",
+      "test_ids": [
+        "test_app_package.AppPackageTests.test_bundle_web_allowlist_excludes_unlisted_files_and_directories",
+        "test_app_package.AppPackageTests.test_bundle_web_allowlist_rejects_missing_or_linked_required_assets",
+        "test_release_gate.ReleaseGateTests.test_served_web_asset_must_be_declared_in_bundle_allowlist",
+        "test_app_package.AppPackageTests.test_integrity_rejects_missing_changed_and_extra_components",
+        "test_app_package.AppPackageTests.test_links_cannot_escape_resources_and_link_changes_are_detected",
+        "test_app_package.AppPackageTests.test_production_requires_https_and_test_requires_disposable_identity",
+        "test_app_package.AppPackageTests.test_dependency_archive_cannot_write_outside_destination",
+        "test_update_evidence.UpdateEvidenceTests.test_only_matching_release_and_bounded_facts_are_accepted",
+        "test_update_evidence.UpdateEvidenceTests.test_update_facts_export_without_paths_or_raw_error_text",
+        "test_update_recovery.UpdateRecoveryTests.test_rollback_must_belong_to_this_identity_and_state",
+        "test_update_recovery.UpdateRecoveryTests.test_old_or_unrelated_helper_cannot_confirm_replacement",
+        "test_update_shutdown.UpdateShutdownTests.test_bundled_sigterm_waits_for_archive_publication_and_preserves_prior_copy",
+        "test_update_feed.UpdateFeedTests.test_feed_uses_actual_build_signature_and_exact_length",
+        "test_update_feed.UpdateFeedTests.test_key_file_must_be_private_regular_and_owned",
+        "test_signing_identity.SigningIdentityTests.test_changed_team_helper_identifier_or_hash_requirement_is_rejected",
+        "test_signing_identity.SigningIdentityTests.test_package_inspection_checks_all_access_components_and_rejects_escaping_helper",
+        "test_signing_identity.SigningIdentityTests.test_wrong_identity_stops_archive_before_notarization_or_signing_key_use",
+        "test_update_shutdown.UpdateShutdownTests.test_loopback_startup_does_not_wait_for_hostname_resolution",
+        "test_update_recovery.UpdateRecoveryTests.test_bundled_interpreter_is_recognised_whatever_minor_version_it_pins"
+      ],
+      "remaining_gap": "Isolated tests cover cancellation, signed replacement, invalid signatures, truncation, equal-version and busy refusals, and rollback after injected failure with fixture data preserved, and an installed Developer ID package preserved protected configuration in the tested upgrade. Coverage for retaining privacy grants between signed builds is limited to a single installation. Signature compatibility alone cannot establish TCC consent retention. Cross-device continuity requires a separate manual check."
+    },
+    {
+      "id": "GR21",
+      "title": "Updates require a passing gate for the exact main revision",
+      "breakpoint": "A branch check, stale run, partial upload or broad cleanup can publish unaccepted bytes or remove unrelated releases.",
+      "diagnostic_events": [
+        "application_update"
+      ],
+      "cause_and_solution": "Require a successful exact-main push gate and matching job, monotonic versions, production receipts and scoped current-plus-three package retention. Git tags stay intact.",
+      "required_behavior": "No publication from forks or PRs; no stale-main promotion; no test archive or unrelated release deletion.",
+      "test_ids": [
+        "test_release_policy.ReleasePolicyTests.test_only_exact_successful_main_push_can_release",
+        "test_release_policy.ReleasePolicyTests.test_versions_increase_and_failed_drafts_reserve_numbers",
+        "test_release_policy.ReleasePolicyTests.test_retention_keeps_current_plus_three_without_deleting_tags_or_unrelated_releases",
+        "test_release_policy.ReleasePolicyTests.test_retention_requires_a_matching_production_receipt",
+        "test_publish_release.PublishReleaseTests.test_publish_verifies_draft_then_latest_before_scoped_cleanup",
+        "test_publish_release.PublishReleaseTests.test_upload_corruption_or_new_main_never_publishes_or_prunes",
+        "test_publish_release.PublishReleaseTests.test_unconfirmed_latest_or_foreign_historical_receipt_prevents_all_deletion",
+        "test_publish_release.PublishReleaseTests.test_missing_altered_or_test_artifacts_are_rejected",
+        "test_publish_release.PublishReleaseTests.test_gate_must_be_clean_exact_macos_and_passed",
+        "test_publish_release.PublishReleaseTests.test_signing_requires_complete_secrets_and_always_restores_keychain_search",
+        "test_publish_release.PublishReleaseTests.test_draft_without_created_tag_uses_exact_target_and_rejects_collisions",
+        "test_personal_updates.PersonalUpdateTests.test_personal_mode_is_explicit_and_does_not_relax_identity_or_https",
+        "test_personal_updates.PersonalUpdateTests.test_personal_archive_requires_matching_manifest_and_app_flags",
+        "test_personal_updates.PersonalUpdateTests.test_automatic_discovery_does_not_enable_silent_install_or_test_network_requests",
+        "test_personal_updates.PersonalUpdateTests.test_personal_release_uses_sparkle_key_without_apple_credentials_and_cleans_it",
+        "test_personal_updates.PersonalUpdateTests.test_personal_path_keeps_archive_signing_but_never_calls_notarytool",
+        "test_personal_updates.PersonalUpdateTests.test_scheduled_checks_have_typed_private_diagnostic_evidence"
+      ],
+      "remaining_gap": "Single-device coverage includes Sparkle upgrades and retention of Developer ID permission grants. Cross-device continuity requires separate verification."
+    },
+    {
+      "id": "GR22",
+      "title": "Settings persist only through explicit reviewed saves",
+      "breakpoint": "Closing a dirty settings page can silently lose a draft; repeated submits or stale revisions can overwrite saved choices.",
+      "diagnostic_events": [
+        "workspace_configuration",
+        "schedule_decision"
+      ],
+      "cause_and_solution": "Keep local drafts, guard Back/Close/Escape, serialize saves and preserve the existing session-token and revision-checked API boundary. Folder persistence has workspace_configuration evidence; effective saved scheduling policy appears in schedule_decision. Discard-only UI paths are covered by controller regressions, not claimed as save events.",
+      "required_behavior": "No persistence from editing or navigation. Failed saves keep the draft. Folder choices retain review and revision protections.",
+      "test_ids": [
+        "test_menu_appearance.MenuAppearanceTests.test_appearance_page_explicit_save_discard_conflict_and_duplicate_submit",
+        "test_menu_appearance.MenuAppearanceTests.test_native_bridge_persistence_and_exact_shared_javascript_execution",
+        "test_settings_pages.SettingsPagesTests.test_explicit_save_discard_busy_and_failure_preserve_drafts_and_revision_guards",
+        "test_settings_pages.SettingsPagesTests.test_folder_review_cancel_conflict_and_navigation_keep_saved_sources_intact"
+      ],
+      "remaining_gap": "Actual isolated browser checks cover schedule edits/save/discard/reload, folder-mode discard and a long access list with a fixed toolbar. Shared-controller regressions cover both menu and full-page folder hosts. Native Settings layout, permission actions and folder picking are not validated by these browser cases."
+    },
+    {
+      "id": "GR23",
+      "title": "First-run setup cannot activate an unreviewed or partial configuration",
+      "breakpoint": "Fresh packages required a pre-existing personal config; independent settings saves could expose only part of a setup draft.",
+      "diagnostic_events": [
+        "setup_review",
+        "setup_applied",
+        "setup_continued",
+        "setup_recovery"
+      ],
+      "cause_and_solution": "Bootstrap empty manual sources with backups disabled. Review helper-observed access against the exact draft/revision, then serialize and journal application. Recover before starting scans or backups; keep current operation until explicit apply.",
+      "required_behavior": "New installs remain idle until explicit reviewed save. Denied, changed, busy or stale requests cannot activate a draft. Reload discards unsaved choices and stale discovery/access/completion UI without browser confirmation or configuration writes. Existing configurations and optional permission choices survive. Native bootstrap and exact trusted welcome-page bridge checks run in the macOS gate. Re-checking sources during apply holds only the backup and scan locks, so status stays available, and any configuration change made meanwhile stops the apply.",
+      "test_ids": [
+        "test_setup_service.SetupTests.test_fresh_install_is_idle_until_explicit_apply_and_preserves_default_schedule",
+        "test_setup_service.SetupTests.test_first_backup_pending_needs_no_nonexistent_upload_receipt",
+        "test_setup_service.SetupTests.test_replaced_draft_source_is_rejected_before_probing_its_new_contents",
+        "test_setup_service.SetupTests.test_stale_busy_denied_and_changed_selection_never_apply_a_partial_draft",
+        "test_setup_service.SetupTests.test_existing_continue_and_fresh_cancel_do_not_activate_changes",
+        "test_setup_service.SetupTests.test_interrupted_metadata_save_blocks_runtime_until_restart_recovers",
+        "test_setup_api.SetupAPITests.test_setup_and_discovery_require_host_origin_token_and_review_before_save",
+        "test_setup_api.SetupAPITests.test_full_http_review_apply_and_restart_preserve_non_git_source",
+        "test_setup_api.SetupAPITests.test_setup_resources_are_served_from_explicit_routes",
+        "test_setup_api.SetupAPITests.test_setup_diagnostics_export_only_typed_results_without_selected_paths",
+        "test_setup_ui.SetupUITests.test_actual_welcome_controller_requires_access_review_and_explicit_save",
+        "test_setup_service.SetupTests.test_status_stays_available_while_setup_reads_every_source",
+        "test_setup_service.SetupTests.test_settings_saved_while_setup_reads_sources_stop_the_apply"
+      ],
+      "remaining_gap": "The native welcome-window layout, folder picker, macOS permission denial and recovery, and updates to an installed app require separate manual checks. Synthetic permission failures do not prove TCC behavior."
+    },
+    {
+      "id": "GR24",
+      "title": "Readable backup paths preserve identity and verified archives",
+      "breakpoint": "Workspace IDs doubled as user-visible folder names; naive renames or destination changes can lose indexes, reuse an old upload receipt or overwrite another repo.",
+      "diagnostic_events": [
+        "setup_applied",
+        "setup_recovery",
+        "repo_backup_finished",
+        "upload_observed"
+      ],
+      "cause_and_solution": "Keep IDs in metadata, compute collision-safe readable parent groups and journal staged renames with archive verification. Bind the chosen iCloud destination to physical identity. Destination switches keep prior archives and require a new local copy.",
+      "required_behavior": "No arbitrary hash suffixes, foreign-folder overwrite, source overlap, silent destination rebinding or pruning of old-location archives. Every moved archive is verified, and upload evidence is re-observed for the new path. Native backup navigation uses the helper's selected existing physical root, with no hard-coded fallback or page-supplied path; macOS bridge checks cover this boundary.",
+      "test_ids": [
+        "test_backup_layout.LayoutTests.test_names_keep_identity_separate_and_group_duplicate_parents",
+        "test_backup_layout.LayoutTests.test_journal_recovers_rename_and_partial_metadata_write_without_losing_bytes",
+        "test_backup_layout.LayoutTests.test_stage_interruption_and_id_name_swap_are_recoverable",
+        "test_backup_layout.LayoutTests.test_collisions_links_and_changed_archives_fail_without_overwrite",
+        "test_destination_policy.DestinationTests.test_one_cloud_destination_and_probe_leave_contents_unchanged",
+        "test_destination_policy.DestinationTests.test_outside_alias_overlap_missing_and_disk_full_are_rejected",
+        "test_destination_policy.DestinationTests.test_replaced_or_disconnected_destination_never_recreates_or_rebinds",
+        "test_setup_service.SetupTests.test_existing_apply_migrates_names_but_preserves_bytes_ids_settings_and_restart",
+        "test_setup_service.SetupTests.test_destination_switch_keeps_old_archives_and_requires_new_copy",
+        "test_setup_service.SetupTests.test_nested_readable_layout_retention_keeps_siblings_until_exact_upload"
+      ],
+      "remaining_gap": "Real iCloud folder renames, file-provider placeholders, disk interruption and re-observed upload acknowledgement require native testing. Only iCloud is supported."
+    },
+    {
+      "id": "GR25",
+      "title": "Recursive Git discovery returns bounded candidates without enabling them",
+      "breakpoint": "Unbounded recursion, Git-looking files or external worktree storage can yield unsafe or misleading source selections.",
+      "diagnostic_events": [
+        "git_discovery",
+        "workspace_review",
+        "workspace_configuration"
+      ],
+      "cause_and_solution": "Scan explicitly with depth/count/time limits and cancellation. Validate Git metadata without running hooks. Skip linked and protected directories; disclose invalid/external layouts and incomplete areas. Add only user-selected results to the existing individual-folder draft.",
+      "required_behavior": "Discovery never activates repos, removes non-Git selections or changes repo-home behavior. Incomplete, cancelled or failed scans are not reported as complete empty success. Cancellation accepted before final publication remains cancelled with partial diagnostics, including during the last identity check. Existing source-review and identity checks still govern saves.",
+      "test_ids": [
+        "test_git_discovery.DiscoveryTests.test_recursive_candidates_do_not_modify_sources_and_show_unsupported_layouts",
+        "test_git_discovery.DiscoveryTests.test_protected_paths_and_links_are_not_traversed_and_limits_disclosed",
+        "test_git_discovery.DiscoveryTests.test_missing_git_cancellation_and_permission_failures_are_not_empty_success",
+        "test_setup_ui.SetupUITests.test_actual_welcome_controller_requires_access_review_and_explicit_save"
+      ],
+      "remaining_gap": "Large real inventories and unusual Git layouts need observed runs. External Git storage is explicitly unsupported by discovery; no background auto-add is implemented."
+    },
+    {
+      "id": "GR26",
+      "title": "Experimental update channels cannot silently promote Stable",
+      "breakpoint": "Publishing every successful main build through one latest-release feed exposes it to all installations. Channel changes and promotion must preserve provenance, enforce release checks and retain the original archive.",
+      "diagnostic_events": [
+        "application_update"
+      ],
+      "cause_and_solution": "Default each Mac to Stable; expose Dev only after an explicit Boolean local opt-in read at launch. Enforce the same policy in native selection, settings rendering and bounded diagnostics, including preexisting Dev preferences. Keep fixed feeds and guarded revision-checked saves. Publish Dev locally after focused clean-source checks, record exact successful full-gate GitHub qualification on that same Dev package, and require explicit approval plus installed-build checks of the exact package on both required host labels for notarized Stable promotion. Reserve global builds under a repository lock and verify uploaded bytes and archive signatures before changing feeds.",
+      "required_behavior": "Absent, false or malformed opt-in means Stable only; hidden controls cannot authorize experimental saves. Removing the opt-in suppresses saved Dev preferences on restart without changing unrelated settings or backup readiness. Malformed or contradictory UI/diagnostic policy evidence fails closed. Experimental publication preserves public latest. Local Dev provisioning verifies existing keys before saving in Keychain; repeated releases load credentials only after the clean-source gate, never request pasted secrets, never expose child signing output, and allow a fresh run after failure. Missing/locked credentials and an untrusted helper fail closed. Publisher keys/tools never ship in the app. Qualification and promotion change metadata only and retain archive bytes. Candidate validation records local checks, exact GitHub checks and installed-build checks on both required hosts in that order (a single-host exception requires explicit release approval for the exact tag, source, build and hash and all `pro` checks. Without it, `air` checks are also required); no Testing channel is accepted. Hosted qualification cannot build a package and leaves Stable unchanged. Skipped/stale gates, malformed or wrong-channel feeds, foreign sources and incomplete acceptance fail closed. Interrupted promotion requires explicit resume and rechecks. Channel diagnostics are bounded and never establish backup or upload success.",
+      "test_ids": [
+        "test_update_channels.UpdateChannelTests.test_shipped_channel_page_explicit_save_discard_and_conflicts",
+        "test_update_channels.UpdateChannelTests.test_native_default_feed_isolation_and_revision_checked_selection",
+        "test_update_channels.UpdateChannelTests.test_channel_diagnostics_are_bounded_and_cannot_establish_backup_success",
+        "test_update_channels.UpdateChannelTests.test_experimental_policy_diagnostics_reject_disagreement_and_export_bounded_values",
+        "test_channel_release.ChannelReleaseTests.test_candidate_publication_compares_download_before_feed_without_moving_stable",
+        "test_channel_release.ChannelReleaseTests.test_candidate_checks_draft_metadata_without_requiring_a_published_tag",
+        "test_channel_release.ChannelReleaseTests.test_dev_gate_cannot_be_missing_skipped_stale_dirty_or_full_gate_substitute",
+        "test_channel_release.ChannelReleaseTests.test_github_qualification_requires_exact_successful_nonfork_push_and_real_contract",
+        "test_channel_release.ChannelReleaseTests.test_full_gate_requires_executed_rules_and_native_package_workflow_commands",
+        "test_channel_release.ChannelReleaseTests.test_workflow_qualifies_existing_dev_without_building_or_publishing_stable",
+        "test_channel_release.ChannelReleaseTests.test_pointer_is_a_prerelease_never_latest_and_retries_only_identical_bytes",
+        "test_channel_release.ChannelReleaseTests.test_qualification_keeps_dev_feed_and_archive_and_records_ordered_checks",
+        "test_channel_release.ChannelReleaseTests.test_stable_requires_exact_approval_both_hosts_notarization_and_protected_main",
+        "test_channel_release.ChannelReleaseTests.test_pro_only_exception_is_explicit_exact_release_scoped_and_preserves_default_air_gate",
+        "test_channel_release.ChannelReleaseTests.test_interrupted_promotion_needs_explicit_resume_and_rechecks_requirements",
+        "test_channel_release.ChannelReleaseTests.test_auto_qualification_selects_only_existing_exact_source_candidate",
+        "test_channel_release.ChannelReleaseTests.test_validation_record_rejects_missing_skipped_and_out_of_order_evidence",
+        "test_channel_release.ChannelReleaseTests.test_repository_lock_is_exclusive_and_never_removes_another_owners_lock",
+        "test_channel_release.ChannelReleaseTests.test_promotion_authenticates_archive_using_public_key_without_private_key",
+        "test_local_dev.LocalDevTests.test_publication_requires_local_host_clean_source_and_explicit_action",
+        "test_local_dev.LocalDevTests.test_repeated_publications_use_keychain_after_gate_without_secret_prompts_or_logs",
+        "test_local_dev.LocalDevTests.test_failed_gate_or_source_change_never_loads_credentials",
+        "test_local_dev.LocalDevTests.test_locked_keychain_and_failed_publish_stop_safely_and_allow_fresh_retry",
+        "test_local_dev.LocalDevTests.test_untrusted_helper_invalid_credentials_and_unsafe_directory_are_rejected",
+        "test_local_dev.LocalDevTests.test_setup_verifies_before_storing_and_never_overwrites_an_existing_item",
+        "test_local_dev.LocalDevTests.test_cli_errors_never_echo_raw_exception_or_secret",
+        "test_local_dev.LocalDevTests.test_wrong_update_public_key_never_imports_credentials_or_signs",
+        "test_local_dev.LocalDevTests.test_native_disposable_keychain_roundtrip_and_unsigned_helper_refusal",
+        "test_local_dev.LocalDevTests.test_codesign_predicate_is_inline_and_checks_the_fixture_identifier",
+        "test_local_dev.LocalDevTests.test_local_signing_tool_and_secrets_never_ship_to_app_users",
+        "test_validate_signing.ValidateSigningTests.test_hosted_signing_requires_explicit_manual_request_and_exact_source",
+        "test_validate_signing.ValidateSigningTests.test_failed_stale_skipped_or_changed_gate_never_opens_signing_material",
+        "test_validate_signing.ValidateSigningTests.test_validation_package_cannot_be_promoted_as_a_managed_release",
+        "test_validate_signing.ValidateSigningTests.test_failure_or_source_change_cleans_package_and_never_leaks_error_text",
+        "test_validate_signing.ValidateSigningTests.test_workflow_keeps_signing_opt_in_read_only_and_after_full_gate"
+      ],
+      "remaining_gap": "Synthetic GitHub tests and public-key fixtures do not prove live prerelease/feed publication, Apple notarization, channel changes in the installed native app or update continuity across installations. Those behaviors require live release-service and installed-app checks."
+    },
+    {
+      "id": "GR27",
+      "title": "Outside items are reviewed explicitly and never change backup status",
+      "breakpoint": "Links and linked checkouts can point to content outside a repo; following them silently copies unreviewed data, and reporting them as problems turns ordinary repos red.",
+      "diagnostic_events": [
+        "outside_review"
+      ],
+      "cause_and_solution": "Detect outside links and Git worktree registrations from the scan inventory without following them. Measure sizes only when the review opens. Store per-repo choices in a separate revision-checked file keyed to the link inside the repo.",
+      "required_behavior": "Absolute links whose normalized path stays inside the repo are not outside items. Defaults keep links only and committed work only. Unknown, escaping or invalid choices and stale revisions are refused. Removed links drop out of the review. Detection and link-only choices never change needs_backup, verification or card status; included folders follow GR28. Logs record only a repo alias and result, never outside paths or contents.",
+      "test_ids": [
+        "test_outside_items.DetectionTests.test_links_are_classified_without_following_and_git_internals_are_skipped",
+        "test_outside_items.DetectionTests.test_linked_checkouts_follow_git_registrations_and_removed_folders",
+        "test_outside_items.DetectionTests.test_malformed_registration_is_reported_invalid_not_followed",
+        "test_outside_items.DetectionTests.test_folder_size_reports_incomplete_totals_as_lower_bounds",
+        "test_outside_items.DetectionTests.test_absolute_links_that_stay_inside_the_repo_are_not_outside_items",
+        "test_outside_items.OutsideHubTests.test_scan_counts_outside_items_and_choices_never_change_backup_need",
+        "test_outside_items.OutsideHubTests.test_review_defaults_and_revision_checked_saves",
+        "test_outside_items.OutsideHubTests.test_http_routes_keep_token_origin_and_revision_guards",
+        "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
+      ],
+      "remaining_gap": "Review of actual outside folders in the installed app lacks native test coverage. Included folders are covered by GR28."
+    },
+    {
+      "id": "GR28",
+      "title": "Included linked folders are separate verified archives that count toward Backed up",
+      "breakpoint": "A reviewed linked folder lives outside the repo. Copying it into the repo archive changes that archive's format, and judging only the repo archive reports Backed up before the folder's copy is verified or uploaded.",
+      "diagnostic_events": [
+        "included_folder_archived",
+        "included_folder_refused",
+        "included_folder_failed",
+        "upload_observed"
+      ],
+      "cause_and_solution": "Archive each folder whose saved choice is include on its own, beside the repo backup in linked/<link path>/, storing links inside it as links. Record the set on the repo's index entry, ask macOS about every archive in it, and feed one combined upload state into the existing repo status. Refuse folders that overlap a monitored repo, a backup destination, RepoHub data, a system or top-level location, or another included link.",
+      "required_behavior": "The repo archive format is unchanged. Backed up requires every archive in the set to be verified and confirmed uploaded for that exact archive. Changed folder contents mark the repo for backup; timestamp-only changes reuse the verified archive. Superseded folder archives are pruned only after the whole new set uploads and never from a stale copy of the set. Unsafe choices are refused when saved and reported for the repo at backup time while the last verified archive stays referenced. Setup layout changes move folder archives with their repo after checksum verification. Restore receipts name included archives by link path and checksum. Logs record aliases and reason codes, never outside paths or contents.",
+      "test_ids": [
+        "test_included_folders.IncludedFolderTests.test_included_folder_gets_its_own_verified_archive_and_restore_receipt",
+        "test_included_folders.IncludedFolderTests.test_backed_up_requires_every_archive_in_the_set_to_upload",
+        "test_included_folders.IncludedFolderTests.test_upload_helper_is_asked_about_every_archive",
+        "test_included_folders.IncludedFolderTests.test_included_folder_changes_mark_the_repo_for_backup",
+        "test_included_folders.IncludedFolderTests.test_superseded_folder_archives_are_pruned_only_after_the_whole_set_uploads",
+        "test_included_folders.IncludedFolderTests.test_unsafe_or_duplicate_inclusions_are_refused",
+        "test_included_folders.IncludedFolderTests.test_a_link_retargeted_after_review_is_reported_and_keeps_the_last_archive",
+        "test_included_folders.IncludedFolderTests.test_unreachable_folder_keeps_its_backup_without_a_countdown",
+        "test_included_folders.IncludedFolderTests.test_unreachable_means_unmounted_volume_or_unreadable_not_deleted",
+        "test_included_folders.IncludedFolderTests.test_setup_layout_change_moves_folder_archives_with_their_repo",
+        "test_included_folders.IncludedFolderTests.test_restore_receipt_refuses_invalid_included_archive_claims",
+        "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
+      ],
+      "remaining_gap": "Restoring folder contents to their original location is a separate operation outside the audit; each folder archive is audited with its own capture and verify run. Linked checkouts and the 30-day keep window are covered by GR29. The tests do not cover installed native behavior or live iCloud upload of folder archives."
+    },
+    {
+      "id": "GR29",
+      "title": "Linked checkouts follow Git as separate archives, and removed outside items are kept for 30 days",
+      "breakpoint": "Linked checkouts can be created and removed frequently. Requiring a review for each one leaves new work unprotected, and deleting a backup as soon as its folder disappears loses data when a folder is only temporarily missing.",
+      "diagnostic_events": [
+        "included_folder_archived",
+        "included_folder_refused",
+        "outside_item_kept",
+        "outside_item_deleted"
+      ],
+      "cause_and_solution": "When a repo includes checkouts, archive each present checkout from Git's registration list on its own, beside the repo backup in checkouts/<registration name>/, as part of the repo's uploaded set. A checkout or included linked folder that is gone or no longer included moves to a keep window with its last verified archive and rejoins the set if it returns. Under latest-only retention its archives are deleted only after 30 days, or sooner through Remove now.",
+      "required_behavior": "New registered checkouts are backed up without another review; nested checkouts stay in the repo archive; refused locations are reported for the repo. Removing a checkout causes no error. Kept items are not required for Backed up. Nothing kept is deleted inside the window, and keep-all retention never deletes on a timer. Remove now requires the exact kept archive's reference, the token-guarded route and no running backup. Setup layout changes move checkout and kept archives with their repo. Restore receipts name included checkouts by registration and checksum. Logs record aliases and reason codes only.",
+      "test_ids": [
+        "test_linked_checkouts.LinkedCheckoutTests.test_included_checkout_is_its_own_verified_archive_and_restore_receipt",
+        "test_linked_checkouts.LinkedCheckoutTests.test_new_checkouts_are_followed_and_a_removed_one_is_kept_for_30_days",
+        "test_linked_checkouts.LinkedCheckoutTests.test_a_temporarily_missing_checkout_is_kept_and_rejoins_when_it_returns",
+        "test_linked_checkouts.LinkedCheckoutTests.test_keep_window_expires_after_30_days_and_remove_now_deletes_on_request",
+        "test_linked_checkouts.LinkedCheckoutTests.test_nested_refused_and_excluded_checkouts",
+        "test_linked_checkouts.LinkedCheckoutTests.test_upload_and_pruning_require_the_whole_set_including_checkouts",
+        "test_linked_checkouts.LinkedCheckoutTests.test_upload_helper_is_asked_about_checkout_archives",
+        "test_linked_checkouts.LinkedCheckoutTests.test_setup_layout_change_moves_checkout_and_kept_archives",
+        "test_outside_items.OutsideHubTests.test_review_page_saves_explicitly_and_preserves_drafts"
+      ],
+      "remaining_gap": "The keep window starts at the first backup after an item disappears. The audit tool refuses a checkout archive on its own because its root .git is a file; it restores beside the repo and is reattached with Git in a separate restore step. The tests do not cover installed native behavior or live iCloud upload."
+    },
+    {
+      "id": "GR30",
+      "title": "One RepoHub copy owns the helper port, and a second copy says so",
+      "breakpoint": "Two installed app copies or a helper that outlived its app hold the local port. A new helper then exits with an unexplained bind traceback, the app may silently display the other copy's helper, and the update watchdog rolls back a correctly installed build.",
+      "diagnostic_events": [
+        "helper_conflict",
+        "helper_parent_exited"
+      ],
+      "cause_and_solution": "A helper that cannot bind probes the listener, records helper-conflict.json (another_copy_running or port_in_use) and exits with code 75. A bundled helper exits after its parent app is gone, once any backup finishes. The app refuses to start beside a copy running from another folder, shows a clear message when its own helper hit a conflict, and the update watchdog keeps the installed build when that build recorded another_copy_running.",
+      "required_behavior": "The other copy keeps running untouched. Non-RepoHub listeners are reported as port_in_use. A successful start clears a stale conflict record. The parent watch never stops a helper during a backup. Only a conflict recorded by the target build prevents rollback; anything else follows the existing recovery path. Logs record reason codes only.",
+      "test_ids": [
+        "test_helper_conflict.HelperConflictTests.test_second_helper_reports_another_copy_and_leaves_it_running",
+        "test_helper_conflict.HelperConflictTests.test_successful_start_clears_a_stale_conflict",
+        "test_helper_conflict.HelperConflictTests.test_helper_stops_after_its_app_exits_but_never_mid_backup",
+        "test_helper_conflict.HelperConflictTests.test_update_watchdog_reports_another_copy_instead_of_rolling_back"
+      ],
+      "remaining_gap": "The native launch check and conflict message are compiled and the conflict-record parser is checked natively, but the alerts themselves are not driven by an automated UI test. Conflict handling in an installed app still requires manual verification."
+    }
+  ]
+}

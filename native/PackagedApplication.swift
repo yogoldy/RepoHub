@@ -1,0 +1,272 @@
+import Foundation
+import CryptoKit
+import Darwin
+
+// Legacy installs retain their launchd helper. Coordinated bundles own only the
+// helper they start, and refuse to display a different release's HTTP service.
+final class PackagedApplication {
+    struct FileEntry: Decodable {
+        let sha256: String?
+        let link: String?
+    }
+    struct Release: Decodable {
+        let schema: Int
+        let source_revision: String
+        let version: String
+        let build: String
+        let bundle_id: String
+        let files: [String: FileEntry]
+    }
+    enum Failure: Error { case packageInvalid, configurationInvalid, helperUnavailable }
+
+    let bundle: Bundle
+    let release: Release
+    let resources: URL
+    let stateDirectory: URL
+    let configURL: URL
+    let address: URL
+    let testMode: Bool
+    var helper: Process?
+    private var logHandle: FileHandle?
+    // Helper supervision. The app stops the helper on quit and before an update; any other
+    // exit is a crash and is restarted with a growing delay, so backups don't silently stop.
+    private let supervision = NSLock()
+    private var stopping = false
+    private var restartAttempts = 0
+    private var helperStarted = Date()
+
+    static var enabled: Bool { Bundle.main.object(forInfoDictionaryKey: "RepoHubPackaged") as? Bool == true }
+
+    init(bundle: Bundle = .main) throws {
+        self.bundle = bundle
+        guard let resourceURL = bundle.resourceURL else { throw Failure.packageInvalid }
+        let resources = resourceURL.resolvingSymlinksInPath()
+        self.resources = resources
+        release = try Self.verify(resources: resources, bundle: bundle)
+        testMode = bundle.object(forInfoDictionaryKey: "RepoHubTestMode") as? Bool == true
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        stateDirectory = testMode
+            ? home.appendingPathComponent("Library/Application Support/RepoHub Tests/" + release.bundle_id + "/state")
+            : home.appendingPathComponent("Library/Application Support/RepoHub")
+        configURL = stateDirectory.appendingPathComponent("config.json")
+        if !FileManager.default.fileExists(atPath: configURL.path) {
+            try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+            let cloud = testMode ? stateDirectory.deletingLastPathComponent().appendingPathComponent("cloud")
+                : home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
+            if testMode {
+                try FileManager.default.createDirectory(at: cloud, withIntermediateDirectories: true,
+                                                        attributes: [.posixPermissions: 0o700])
+            }
+            let initial: [String: Any] = ["state_dir": stateDirectory.path, "port": testMode ? 8879 : 8767,
+                "sources": ["mode": "manual", "paths": []] as [String: Any], "setup_required": true,
+                "backup_root": cloud.appendingPathComponent("Repository Backups").path,
+                "retention": "latest", "require_upload_before_prune": true,
+                "scan_seconds": 30, "cloud_seconds": 5, "verification_seconds": 900]
+            let descriptor = open(configURL.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+            if descriptor < 0 { throw Failure.configurationInvalid }
+            let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+            try handle.write(contentsOf: JSONSerialization.data(withJSONObject: initial, options: [.sortedKeys]))
+            try handle.synchronize()
+            try handle.close()
+        }
+        let data = try Data(contentsOf: configURL)
+        guard let config = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let state = config["state_dir"] as? String,
+              URL(fileURLWithPath: state).resolvingSymlinksInPath() == stateDirectory.resolvingSymlinksInPath(),
+              let port = config["port"] as? Int, port > 1024, port <= 65535,
+              (!testMode || port != 8767), (testMode || port == 8767) else {
+            throw Failure.configurationInvalid
+        }
+        if testMode {
+            guard release.bundle_id.hasPrefix("com.leogoldberg.repohub.test.") else {
+                throw Failure.configurationInvalid
+            }
+            for key in ["backup_root"] + (config["repos_root"] == nil ? [] : ["repos_root"]) {
+                guard let path = config[key] as? String,
+                      URL(fileURLWithPath: path).resolvingSymlinksInPath().path.hasPrefix(
+                        stateDirectory.deletingLastPathComponent().resolvingSymlinksInPath().path + "/") else {
+                    throw Failure.configurationInvalid
+                }
+            }
+        }
+        address = URL(string: "http://127.0.0.1:\(port)/")!
+    }
+
+    static func verify(resources resourceURL: URL, bundle: Bundle) throws -> Release {
+        // FileManager enumerators canonicalize /var and /tmp aliases on macOS.
+        // Use the same spelling before computing relative resource names.
+        let resources = resourceURL.resolvingSymlinksInPath()
+        let release = try JSONDecoder().decode(Release.self, from: Data(contentsOf: resources.appendingPathComponent("release.json")))
+        guard release.schema == 1, release.bundle_id == bundle.bundleIdentifier,
+              release.build == bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
+              release.version == bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              !release.files.isEmpty else { throw Failure.packageInvalid }
+        guard let resolvedRoot = realpath(resources.path, nil) else { throw Failure.packageInvalid }
+        let root = String(cString: resolvedRoot) + "/"
+        free(resolvedRoot)
+        var observed = Set<String>()
+        guard let enumerator = FileManager.default.enumerator(
+            at: resources, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]) else {
+            throw Failure.packageInvalid
+        }
+        for case let path as URL in enumerator {
+            guard path.path.hasPrefix(root) else { throw Failure.packageInvalid }
+            let relative = String(path.path.dropFirst(root.count))
+            let values = try path.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            if values.isSymbolicLink == true {
+                enumerator.skipDescendants()
+                guard let resolvedTarget = realpath(path.path, nil) else { throw Failure.packageInvalid }
+                let target = String(cString: resolvedTarget)
+                free(resolvedTarget)
+                guard target.hasPrefix(root),
+                      let expected = release.files[relative], expected.sha256 == nil,
+                      expected.link == (try FileManager.default.destinationOfSymbolicLink(atPath: path.path)) else {
+                    throw Failure.packageInvalid
+                }
+                observed.insert(relative)
+            } else if values.isRegularFile == true && relative != "release.json" {
+                guard let expected = release.files[relative], expected.link == nil else { throw Failure.packageInvalid }
+                let digest = SHA256.hash(data: try Data(contentsOf: path, options: .mappedIfSafe))
+                    .map { String(format: "%02x", $0) }.joined()
+                guard expected.sha256 == digest else { throw Failure.packageInvalid }
+                observed.insert(relative)
+            }
+        }
+        guard observed == Set(release.files.keys) else { throw Failure.packageInvalid }
+        return release
+    }
+
+    func matches(_ status: [String: Any]) -> Bool {
+        guard let identity = status["application_release"] as? [String: String] else { return false }
+        return identity["source_revision"] == release.source_revision
+            && identity["build"] == release.build && identity["bundle_id"] == release.bundle_id
+    }
+
+    // Written by a helper that found the port held by another RepoHub copy.
+    func helperConflict() -> [String: Any]? {
+        let url = stateDirectory.appendingPathComponent("helper-conflict.json")
+        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+              values.isRegularFile == true, values.isSymbolicLink != true,
+              let data = try? Data(contentsOf: url), data.count < 4096,
+              let value = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              value["reason"] as? String == "another_copy_running",
+              value["own_build"] as? String == release.build else { return nil }
+        return value
+    }
+
+    func startHelper() throws {
+        guard let executable = bundle.executableURL else { throw Failure.packageInvalid }
+        try? FileManager.default.removeItem(at: stateDirectory.appendingPathComponent("helper-conflict.json"))
+        try? logHandle?.close()  // A restart reopens the log.
+        let log = stateDirectory.appendingPathComponent("packaged-helper.log")
+        if !FileManager.default.fileExists(atPath: log.path) {
+            FileManager.default.createFile(atPath: log.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        }
+        logHandle = try FileHandle(forWritingTo: log)
+        try logHandle?.seekToEnd()
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = ["--bundled-helper"]
+        process.standardOutput = logHandle
+        process.standardError = logHandle
+        process.terminationHandler = { [weak self] exited in
+            DispatchQueue.main.async { self?.helperExited(exited) }
+        }
+        supervision.lock()
+        stopping = false
+        supervision.unlock()
+        try process.run()
+        helper = process
+        helperStarted = Date()
+        let processes = ["app_pid": Int(ProcessInfo.processInfo.processIdentifier),
+                         "helper_pid": Int(process.processIdentifier)]
+        if let data = try? JSONSerialization.data(withJSONObject: processes) {
+            try? data.write(to: stateDirectory.appendingPathComponent("application-processes.json"), options: .atomic)
+        }
+    }
+
+    func prepareRecovery(targetBuild: String) throws -> Process {
+        let directory = stateDirectory.appendingPathComponent("app-rollbacks/" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        let rollback = directory.appendingPathComponent(bundle.bundleURL.lastPathComponent)
+        try FileManager.default.copyItem(at: bundle.bundleURL, to: rollback)
+        let record: [String: Any] = ["app": bundle.bundleURL.path, "rollback": rollback.path,
+            "state": stateDirectory.path, "bundle_id": release.bundle_id,
+            "target_build": targetBuild, "port": address.port!]
+        let recordURL = directory.appendingPathComponent("recovery.json")
+        try JSONSerialization.data(withJSONObject: record).write(to: recordURL, options: .atomic)
+        let guardProcess = Process()
+        guardProcess.executableURL = rollback.appendingPathComponent("Contents/Resources/python/bin/python3")
+        guardProcess.arguments = ["-E", "-s", "-B",
+            rollback.appendingPathComponent("Contents/Resources/runtime/update_recovery.py").path,
+            "--record", recordURL.path]
+        guardProcess.standardOutput = FileHandle.nullDevice
+        guardProcess.standardError = FileHandle.nullDevice
+        return guardProcess
+    }
+
+    /// Restart a helper that exited without the app asking it to, unless another copy of
+    /// RepoHub holds the port (restarting would only fail again) or the app is stopping it.
+    private func helperExited(_ exited: Process) {
+        supervision.lock()
+        let intentional = stopping
+        supervision.unlock()
+        guard !intentional, exited === helper, helperConflict() == nil else { return }
+        // A helper that ran for a while starts the backoff over; quick repeated exits wait longer.
+        if Date().timeIntervalSince(helperStarted) > 300 { restartAttempts = 0 }
+        let note = "RepoHub: helper exited (status \(exited.terminationStatus)); restarting.\n"
+        try? logHandle?.write(contentsOf: Data(note.utf8))
+        scheduleRestart(replacing: exited)
+    }
+
+    private func scheduleRestart(replacing exited: Process) {
+        restartAttempts += 1
+        let delay = min(300.0, pow(2.0, Double(min(restartAttempts, 9))))  // 2 s, 4 s ... 5 min
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self = self else { return }
+            self.supervision.lock()
+            let stillWanted = !self.stopping
+            self.supervision.unlock()
+            guard stillWanted, self.helper === exited else { return }
+            do {
+                try self.startHelper()
+            } catch {
+                self.scheduleRestart(replacing: exited)  // Keep trying; the panel shows the helper as unavailable.
+            }
+        }
+    }
+
+    /// Say in the helper log that registering the login item failed; the panel then shows
+    /// "not set up" and the Login Items button opens System Settings.
+    func noteLoginItemFailure() {
+        try? logHandle?.write(contentsOf: Data("RepoHub: could not register as a login item.\n".utf8))
+    }
+
+    func stopHelper() {
+        supervision.lock()
+        stopping = true
+        supervision.unlock()
+        guard let helper = helper, helper.isRunning else { return }
+        helper.terminate()
+        // The helper has no shutdown work once the backup-idle guard has passed.
+        helper.waitUntilExit()
+        try? logHandle?.close()
+        self.helper = nil
+    }
+
+    func runHelper() -> Int32 {
+        let python = resources.appendingPathComponent("python/bin/python3")
+        let script = resources.appendingPathComponent("runtime/repohub.py")
+        let command = [python.path, "-E", "-s", "-B", script.path, "--config", configURL.path, "--bundled"]
+        let copied = command.map { strdup($0) }
+        guard copied.allSatisfy({ $0 != nil }) else { return 71 }
+        defer { copied.forEach { free($0) } }
+        var argv: [UnsafeMutablePointer<CChar>?] = copied + [nil]
+        _ = python.path.withCString { executable in
+            argv.withUnsafeMutableBufferPointer { execv(executable, $0.baseAddress!) }
+        }
+        return 74
+    }
+}

@@ -1,0 +1,39 @@
+name: Qualify Dev candidate
+on:
+  workflow_run:
+    workflows: [Golden rules]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: repohub-channel-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'yogoldy/RepoHub' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success' &&
+      vars.REPOHUB_RELEASE_ENABLED == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Recheck the exact clean source on the release runner
+        run: python3 tools/release_gate.py --require-clean --output "$RUNNER_TEMP/release-gate.json"
+      - name: Record full GitHub checks on the existing Dev package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOHUB_RELEASE_ENABLED: ${{ vars.REPOHUB_RELEASE_ENABLED }}
+          REPOHUB_UPDATE_PUBLIC_KEY: ${{ vars.REPOHUB_UPDATE_PUBLIC_KEY }}
+          ACCEPTED_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: python3 tools/channel_release.py qualify --auto --publish --run-id "$ACCEPTED_RUN_ID" --gate-receipt "$RUNNER_TEMP/release-gate.json"

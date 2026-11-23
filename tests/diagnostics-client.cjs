@@ -1,0 +1,99 @@
+const assert=require('node:assert/strict');
+const {create,displayState}=require('../web/diagnostics-client.js');
+(async()=>{
+  let now=0,calls=[],fail=false;
+  const fetcher=async(url,options={})=>{calls.push({url,options});if(fail)throw new Error('unreachable');return {ok:true,json:async()=>({token:'test-current-token'})};};
+  const client=create('menu',{native:true,fetcher,clock:()=>now,clientId:'a'.repeat(24)});
+  const status={diagnostic_observation_id:'b'.repeat(24)},rows=[{repo_id:'known',phase:'changed',display_label:'Finder metadata changed',ready:false}];
+  assert.equal(await client.observe({},rows),false);assert.equal(calls.length,0);
+  assert.equal(await client.observe(status,rows),true);assert.equal(calls.length,2);
+  const sent=JSON.parse(calls[1].options.body);
+  assert.equal(sent.surface,'menu');assert.equal(sent.native,true);assert.equal(sent.rows[0].display_label,'Finder metadata changed');
+  assert.equal(calls[1].options.headers['X-RepoHub-Token'],'test-current-token');
+  assert.equal(await client.observe(status,rows),false);assert.equal(calls.length,2);
+  now=60000;assert.equal(await client.observe(status,rows),true);
+  rows[0].display_label='Files changed';assert.equal(await client.observe(status,rows),true);
+  fail=true;rows[0].display_label='Git data changed';assert.equal(await client.observe(status,rows),false);
+  fail=false;assert.equal(await client.observe(status,rows),true);
+  const backend={...status,repos:[{health:{fresh:true},id:'known'}]};
+  const frozen=JSON.stringify(backend);
+  const offline=displayState(backend,'cache_expired');assert.equal(offline.repos[0].health.fresh,false);
+  assert.equal(JSON.stringify(backend),frozen);assert.equal(displayState(backend),backend);
+  assert.equal(await client.observe(backend,[{repo_id:'known',phase:'stale',display_label:'Status outdated',ready:false}],'cache_expired'),true);
+  assert.equal(JSON.parse(calls.at(-1).options.body).client_freshness,'cache_expired');
+  fail=true;
+  const stale=[{repo_id:'known',phase:'stale',display_label:'Status outdated',ready:false}];
+  assert.equal(await client.observe(backend,stale,'response_timeout'),false);
+  fail=false;const at=calls.length;
+  assert.equal(await client.observe(backend,[{repo_id:'known',phase:'changed',display_label:'Files changed',ready:false}]),true);
+  const replay=calls.slice(at).filter(c=>c.url==='/api/diagnostics/presentation').map(c=>JSON.parse(c.options.body));
+  assert.equal(replay[0].client_freshness,'response_timeout');assert.equal(replay[1].client_freshness,'current');
+  assert.equal(JSON.stringify(backend),frozen);
+  let release,announce;const entered=new Promise(resolve=>announce=resolve),blocked=new Promise(resolve=>release=resolve),frames=[];
+  let first=true;
+  const concurrent=create('menu',{native:true,clientId:'c'.repeat(24),fetcher:async(url,options={})=>{
+    if(url==='/api/session')return {ok:true,json:async()=>({token:'test'})};
+    frames.push(JSON.parse(options.body));
+    if(first){first=false;announce();await blocked;}
+    return {ok:true};
+  }});
+  const inFlight=concurrent.observe(backend,stale,'response_timeout');await entered;
+  assert.equal(await concurrent.observe(backend,stale,'cache_expired'),false);
+  release();await inFlight;
+  await concurrent.observe(backend,rows,'current');
+  assert.deepEqual(frames.map(frame=>frame.client_freshness),['response_timeout','cache_expired','current']);
+  globalThis.RepoStatus = {version: 'status-clarity-5'};
+  const timingFrames = [];
+  const timingClient = create('menu', {clientId: 'd'.repeat(24), fetcher: async (url, options = {}) => {
+    if (url === '/api/session') return {ok: true, json: async () => ({token: 'test'})};
+    timingFrames.push(JSON.parse(options.body));
+    return {ok: true};
+  }});
+  await timingClient.observe(backend, rows, 'current', 'known');
+  assert.equal(timingFrames[0].selected_repo_id, 'known');
+  assert.equal(timingFrames[0].policy_version, 'status-clarity-5');
+  globalThis.RepoStatus.version = 'status-clarity-4';
+  await timingClient.observe(backend, rows, 'current', 'known');
+  assert.equal(timingFrames[1].selected_repo_id, 'known');
+  globalThis.RepoStatus.version = 'status-clarity-6';
+  await timingClient.observe(backend, rows, 'current', null);
+  assert.equal(timingFrames[2].selected_repo_id, null);
+  assert.equal(timingFrames[2].policy_version, 'status-clarity-6');
+  globalThis.RepoStatus.version = 'status-clarity-7';
+  await timingClient.observe(backend, rows, 'current', null);
+  assert.equal(timingFrames[3].selected_repo_id, null);
+  assert.equal(timingFrames[3].policy_version, 'status-clarity-7');
+  delete globalThis.RepoStatus;
+  console.log('Diagnostic delivery checks passed');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
+// Observe the text and time nodes, rather than accepting a model receipt as DOM proof.
+const {readCardTiming, readDetailTiming} = require('../web/diagnostics-client.js');
+const compact = {kind: 'check', dueAt: '2026-10-17T23:00:00+00:00',
+  text: 'Next check Oct 17, 7:00 PM'};
+const time = {getAttribute: () => compact.dueAt};
+const line = {dataset: {kind: 'check'}, textContent: compact.text, hidden: false,
+  getClientRects: () => [1], querySelector: () => time};
+const button = {querySelector: () => line};
+assert.deepEqual(readCardTiming(button, compact), {
+  kind: 'check', due_at: compact.dueAt, text_matches: true,
+});
+line.textContent = 'Next check Oct 17, 8:00 PM';
+assert.equal(readCardTiming(button, compact).text_matches, false);
+line.textContent = compact.text;
+line.hidden = true;
+assert.equal(readCardTiming(button, compact).text_matches, false);
+line.hidden = false;
+line.getClientRects = () => [];
+assert.equal(readCardTiming(button, compact).text_matches, false);
+line.getClientRects = () => [1];
+line.querySelector = () => null;
+assert.equal(readCardTiming(button, compact).due_at, null);
+assert.equal(readCardTiming({querySelector: () => null}, compact).text_matches, false);
+const timing = {receipt: {schedule_state: 'scheduled'}, nextLine: 'Next scheduled check due: 7 PM'};
+const detailLine = {textContent: timing.nextLine, getClientRects: () => [1]};
+const panel = {hidden: false, querySelector: () => detailLine};
+assert.equal(readDetailTiming(panel, timing).text_matches, true);
+detailLine.textContent = 'Next scheduled check due: 8 PM';
+assert.equal(readDetailTiming(panel, timing).text_matches, false);
+console.log('Card and expanded timing observations detect missing, hidden and wrong text');

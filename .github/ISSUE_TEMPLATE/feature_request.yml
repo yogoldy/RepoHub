@@ -1,0 +1,18 @@
+name: Feature request
+description: Suggest an idea or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public. Please don't include confidential information. See the [roadmap](https://github.com/yogoldy/RepoHub/blob/main/ROADMAP.md) for what is already planned.
+  - type: textarea
+    id: want
+    attributes:
+      label: What would you like RepoHub to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter to you?

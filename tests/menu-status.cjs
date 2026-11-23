@@ -1,0 +1,103 @@
+const assert=require('node:assert/strict');
+const {view}=require('../web/repo-status.js');
+const good={id:'Example',name:'Example',health:{fresh:true},needs_backup:false,last_backup:{archive:'/current',sha256:'abc'},verification:{state:'matched',archive:'/current'},cloud:{state:'uploaded',archive:'/current'}};
+let count=0;
+function check(repo,phase,ready=false,backup={}){const value=view(repo,backup);assert.equal(value.phase,phase);assert.equal(value.ready,ready);count++;return value;}
+check(good,'ready',true);
+check({...good,health:{fresh:false}},'stale');
+check({...good,health:undefined},'stale');
+check({...good,needs_backup:true},'changed');
+check({...good,needs_backup:undefined},'unknown');
+check({...good,error:'copy error'},'error');
+check(good,'error',false,{errors:[{repo:'Example',error:'index publication failed'}]});
+check(good,'copying',false,{running:true,current_repo:'Example'});
+check(good,'ready',true,{running:true,current_repo:'Other'});
+check({...good,verification:{state:'checking'}},'verifying');
+check({...good,verification:{state:'matched',archive:'/old'}},'verifying');
+check({...good,cloud:{state:'uploaded',archive:'/old'}},'unknown');
+check({...good,last_backup:undefined},'verifying');
+check({...good,last_backup:{archive:'/current'}},'unknown');
+check({...good,cloud:{state:'unknown'}},'unknown');
+check({...good,cloud:{state:'error',detail:'iCloud issue'}},'error');
+for(const percent of [null,NaN,Infinity,-1,101,'50',true]){const value=check({...good,cloud:{state:'uploading',percent,error_code:4355}},'uploading');assert.equal(value.percent,null);}
+for(const percent of [0,55.4,100]){const value=check({...good,cloud:{state:'uploading',percent}},'uploading');assert.equal(value.percent,percent);}
+check({...good,cloud:{state:'pending',percent:100}},'pending');
+check({...good,needs_backup:true,cloud:{state:'uploading',percent:42}},'changed');
+function changed(counts,archive='/current'){
+  return {...good,needs_backup:true,verification:{state:'different',archive,changes:{counts}}};
+}
+assert.equal(check(changed({finder_metadata:2,git_data:0,repo_files:0}),'changed').label,'Finder metadata changed');
+assert.match(view(changed({finder_metadata:2,git_data:0,repo_files:0})).detail,/repo files still match/);
+assert.equal(check(changed({finder_metadata:0,git_data:1,repo_files:0}),'changed').label,'Git data changed');
+assert.equal(check(changed({finder_metadata:1,git_data:1,repo_files:0}),'changed').label,'Finder / Git data changed');
+assert.equal(check(changed({finder_metadata:1,git_data:1,repo_files:2}),'changed').label,'Files changed');
+assert.doesNotMatch(view(changed({finder_metadata:1,git_data:1,repo_files:2})).detail,/repo files still match/);
+assert.equal(check(changed({finder_metadata:1,git_data:0,repo_files:0},'/old'),'changed').label,'Backup needs updating');
+assert.equal(check({...good,needs_backup:true,verification:{state:'checking'}},'verifying').label,'Checking for changes');
+const finderIgnored={...good,verification:{state:'different',archive:'/current',backup_required:false,ignored_finder_only:true,changes:{counts:{finder_metadata:2,git_data:0,repo_files:0}}}};
+assert.equal(check(finderIgnored,'background').label,'Project files match');
+assert.match(view(finderIgnored).detail,/Only .DS_Store differs/);
+check({...finderIgnored,health:{fresh:false}},'stale');
+check({...finderIgnored,verification:{...finderIgnored.verification,archive:'/old'}},'verifying');
+check({...finderIgnored,last_backup:{archive:'/current'}},'verifying');
+check({...finderIgnored,verification:{...finderIgnored.verification,backup_required:true}},'verifying');
+check({...finderIgnored,needs_backup:true},'changed');
+check({...finderIgnored,cloud:{state:'uploaded',archive:'/old'}},'unknown');
+check({...finderIgnored,cloud:{state:'uploading',archive:'/current',percent:49}},'uploading');
+check({...finderIgnored,cloud:{state:'pending',archive:'/current'}},'pending');
+check({...finderIgnored,cloud:{state:'error',archive:'/current'}},'error');
+check(finderIgnored,'copying',false,{running:true,current_repo:'Example'});
+
+const changing={...good,needs_backup:true,verification:{state:'changing'}};
+assert.equal(check(changing,'verifying').label,'Files changing');
+assert.match(view(changing).detail,/next scan/);
+check({...changing,error:'real error'},'error');
+check({...changing,cloud:{state:'error'}},'error');
+
+const namedA={...good,id:'project-a',name:'Project'},namedB={...good,id:'project-b',name:'Project'};
+const activeA={running:true,current_repo:'Project',current_repo_id:'project-a'};
+check(namedA,'copying',false,activeA);
+check(namedB,'ready',true,activeA);
+check(namedA,'ready',true,{...activeA,current_repo_id:null});
+check(namedA,'error',false,{errors:[{repo:'Project',repo_id:'project-a',error:'fixture'}]});
+check(namedB,'ready',true,{errors:[{repo:'Project',repo_id:'project-a',error:'fixture'}]});
+check(namedA,'ready',true,{errors:[{repo:'Project',repo_id:null,error:'fixture'}]});
+console.log(count+' menu status checks passed');
+
+const {describeSchedule}=require('../web/repo-status.js');
+const policy={frequency_minutes:60,after_edits:false,edit_delay_minutes:5};
+const scheduled={backup_settings:{adapter:policy,battery:{...policy,frequency_minutes:0}},schedule_override:true};
+assert.equal(describeSchedule(scheduled,'adapter').label,'Every hour');
+assert.equal(describeSchedule(scheduled,'battery').label,'Manual only');
+assert.equal(describeSchedule(scheduled,'unknown').label,'Schedule unavailable');
+assert.equal(describeSchedule({},'adapter').label,'Schedule unavailable');
+assert.match(describeSchedule(scheduled,'adapter').detail,/Custom schedule/);
+assert.equal(describeSchedule({backup_settings:{adapter:{...policy,frequency_minutes:0,after_edits:true}}},'adapter').label,'5 minutes after edits settle');
+assert.equal(describeSchedule({backup_settings:{adapter:{...policy,frequency_minutes:'60'}}},'adapter').label,'Schedule unavailable');
+console.log('Schedule wording uses effective policy without inventing next-run times');
+
+const {present,legend}=require('../web/repo-status.js');
+const guide=legend();
+const examples=[good,finderIgnored,changed({repo_files:1}),
+ changed({repo_files:1,git_data:0,finder_metadata:0}),
+ changed({repo_files:0,git_data:1,finder_metadata:0}),
+ changed({repo_files:0,git_data:0,finder_metadata:1}),
+ changed({repo_files:0,git_data:1,finder_metadata:1}),{...good,needs_backup:true,last_backup:null},
+ {...good,needs_backup:true},{...good,verification:{state:'checking'}},changing,
+ {...good,cloud:{state:'uploading',archive:'/current'}},
+ {...good,cloud:{state:'pending',archive:'/current'}},
+ {...good,cloud:{state:'unknown'}},{...good,health:{fresh:false}},{...good,error:'fixture'}];
+for(const repo of examples){const state=present(repo);assert(guide.includes(state.label),'guide explains '+state.label);}
+assert(guide.includes(present(good,{running:true,current_repo_id:good.id}).label));
+assert.equal((guide.match(/class="status-guide-item"/g)||[]).length,6);
+console.log('Every presented label has an explanation in the six-category guide');
+// The dashboard's summary counts must refer to the repo's current archive, never an older one.
+{
+  const {currentEvidence}=require('../web/repo-status.js');
+  const repo={last_backup:{archive:'/new'},verification:{state:'matched',archive:'/new'},cloud:{state:'uploaded',archive:'/new'}};
+  assert.deepEqual(currentEvidence(repo),{verified:true,uploaded:true});
+  assert.deepEqual(currentEvidence({...repo,cloud:{state:'uploaded',archive:'/old'}}),{verified:true,uploaded:false});
+  assert.deepEqual(currentEvidence({...repo,verification:{state:'matched',archive:'/old'}}),{verified:false,uploaded:true});
+  assert.deepEqual(currentEvidence({...repo,last_backup:undefined}),{verified:false,uploaded:false});
+  count++;
+}

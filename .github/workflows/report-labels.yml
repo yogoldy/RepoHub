@@ -1,0 +1,18 @@
+name: Categorize app reports
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+jobs:
+  report-category:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Apply fixed category labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/report_labels.py

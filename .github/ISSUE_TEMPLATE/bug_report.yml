@@ -1,0 +1,29 @@
+name: Bug report
+description: Something in RepoHub isn't working as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping. **This issue is public. Please don't include confidential information**: real repo names, file contents, paths with your username, or anything you wouldn't post publicly. The in-app report (Settings → Help & diagnostics) shows you a sanitized preview before sending.
+        For a security problem, don't open an issue: use the repository's **Security** tab → **Report a vulnerability**.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+  - type: input
+    id: version
+    attributes:
+      label: RepoHub version
+      description: Settings → App updates shows it.
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac
+      description: For example macOS 15.2 on an Apple silicon Mac.
